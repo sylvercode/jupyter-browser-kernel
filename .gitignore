@@ -20,3 +20,4 @@ _bmad-backup/
 # OS
 .DS_Store
 Thumbs.db
+_bmad/core/config.yaml
