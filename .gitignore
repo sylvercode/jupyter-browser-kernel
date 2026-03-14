@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# esbuild output
+dist/
+
+# TypeScript incremental compilation cache
+*.tsbuildinfo
+
+# Packaged VS Code extension
+*.vsix
+
+# VS Code test runner working directory
+.vscode-test/
+
+# BMAD generated outputs
+_bmad-output/
+_bmad-backup/
+
+# OS
+.DS_Store
+Thumbs.db
