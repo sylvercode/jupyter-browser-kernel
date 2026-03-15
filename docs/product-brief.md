@@ -6,7 +6,7 @@ status: Draft
 owners:
   - Sylvercode
 sources:
-  - _bmad-output/brainstorming/brainstorming-session-2026-03-14-162248.md
+  - docs/brainstorming-session-2026-03-14-162248.md
   - spike/cdp-multiplex-findings.md
 ---
 

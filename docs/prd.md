@@ -20,7 +20,7 @@ classification:
   complexity: medium
   projectContext: greenfield
 inputDocuments:
-  - _bmad-output/planning/product-brief-2026-03-15.md
+  - docs/product-brief.md
   - _bmad-output/brainstorming/brainstorming-session-2026-03-14-162248.md
   - spike/cdp-multiplex-findings.md
 documentCounts:
@@ -92,7 +92,18 @@ No existing tool provides all three in a single VS Code-native workflow against 
 - Edge DevTools coexists without kicking the extension off: pass or fail.
 - Manual reconnect command restores session within a few seconds: pass or fail.
 
-## Product Scope
+## Product Scope & Phased Development
+
+### MVP Strategy & Philosophy
+
+**MVP Approach:** Problem-solving MVP focused on collapsing the macro iteration loop for one power-user GM profile.
+**Resource Requirements:** Solo developer with TypeScript, VS Code extension API, CDP integration, and Foundry macro domain familiarity.
+
+**Core User Journeys Supported:**
+
+- Primary success path: rapid macro write-run-inspect loop.
+- Primary edge path: safe experimentation with forward and reversal cells.
+- Solo operations path: manual reconnect and module handshake visibility.
 
 ### MVP - Minimum Viable Product
 
@@ -102,19 +113,47 @@ No existing tool provides all three in a single VS Code-native workflow against 
 4. Notebook controller for JavaScript cells in `.ipynb`, IIFE-wrapped and async-capable.
 5. Unified `EvalResult` error contract with normalized CDP and runtime exceptions.
 6. Manual reconnect command.
+7. One simple notebook example showing token state read and one token value update.
+8. VS Code-only integration path and manual install workflow documentation.
 
-### Growth Features (Post-MVP)
+### Growth Features
 
-1. Variable watcher with shallow values and watch chaining.
-2. `OutputChannel` sentinel logging via `$f.log()`.
-3. Workspace-scoped actions file with cell-to-action promotion and `$prompt()` macros.
-4. Configurable connect retry interval and timeout.
+**Phase 2 (Post-MVP):**
+
+- Variable watcher with shallow chaining UX.
+- `OutputChannel` sentinel logging via `$f.log()`.
+- Intentional output channel filtering.
+- Better troubleshooting ergonomics and diagnostics.
+- Configurable connect retry interval and timeout.
+
+**Phase 3 (Expansion):**
+
+- Workspace-scoped actions file with cell-to-action promotion and `$prompt()` macros.
+- Action persistence and cell to action roundtrip workflow.
+- Public Marketplace hardening (onboarding polish, broader compatibility docs, packaging maturity).
 
 ### Vision (Future)
 
 - Public VS Code Marketplace release with documentation and onboarding guide.
 - Action sharing between workspaces or team members.
 - Deeper Foundry helper API surface in the companion module.
+
+### Risk Mitigation Strategy
+
+**Technical Risks:**
+
+- CDP coexistence and session routing fragility.
+- Mitigation: browser-level multiplexing architecture plus targeted integration tests.
+
+**Market Risks:**
+
+- The "feels faster" value may not hold if UX frictions remain.
+- Mitigation: validate with real macro iteration loops and measure subjective cycle-time satisfaction.
+
+**Resource Risks:**
+
+- Solo bandwidth can drive scope creep and quality regression.
+- Mitigation: enforce M3 boundary strictly and defer non-essential functionality to Phase 2+.
 
 ## User Journeys
 
@@ -287,63 +326,6 @@ This product is a VS Code-only developer tool for Foundry macro power users. Its
 - Favor predictable behavior and clear failure messages over broad feature breadth.
 - Preserve the MVP philosophy: ship the smallest reliable loop first, then expand.
 
-## Project Scoping & Phased Development
-
-### MVP Strategy & Philosophy
-
-**MVP Approach:** Problem-solving MVP focused on collapsing the macro iteration loop for one power-user GM profile.
-**Resource Requirements:** Solo developer with TypeScript, VS Code extension API, CDP integration, and Foundry macro domain familiarity.
-
-### MVP Feature Set (Phase 1)
-
-**Core User Journeys Supported:**
-
-- Primary success path: rapid macro write-run-inspect loop.
-- Primary edge path: safe experimentation with forward and reversal cells.
-- Solo operations path: manual reconnect and module handshake visibility.
-
-**Must-Have Capabilities:**
-
-1. Browser-level CDP connection and session attachment to Foundry page.
-2. JavaScript notebook cell execution with async support.
-3. Clear in-cell result and error rendering with normalized error shape.
-4. Thin Foundry companion module (`$f`, version, output primitives).
-5. Manual reconnect command.
-6. One simple notebook example showing token state read and one token value update.
-7. VS Code-only integration path and manual install workflow documentation.
-
-### Post-MVP Features
-
-**Phase 2 (Post-MVP):**
-
-- Variable watcher with shallow chaining UX.
-- Intentional output channel filtering for `$f.log`.
-- Better troubleshooting ergonomics and diagnostics.
-- Optional reconnect tuning settings.
-
-**Phase 3 (Expansion):**
-
-- Action persistence and cell to action roundtrip workflow.
-- `$prompt()` macro substitution patterns for reusable actions.
-- Public Marketplace hardening (onboarding polish, broader compatibility docs, packaging maturity).
-
-### Risk Mitigation Strategy
-
-**Technical Risks:**
-
-- CDP coexistence and session routing fragility.
-- Mitigation: browser-level multiplexing architecture plus targeted integration tests.
-
-**Market Risks:**
-
-- The "feels faster" value may not hold if UX frictions remain.
-- Mitigation: validate with real macro iteration loops and measure subjective cycle-time satisfaction.
-
-**Resource Risks:**
-
-- Solo bandwidth can drive scope creep and quality regression.
-- Mitigation: enforce M3 boundary strictly and defer non-essential functionality to Phase 2+.
-
 ## Functional Requirements
 
 Traceability highlights: FR29 through FR32 satisfy Journey 1 and Journey 2 outcomes; FR4 and FR8 through FR12 satisfy Journey 3 operations needs; FR19 through FR28 and FR42 satisfy Journey 4 troubleshooting and diagnostics needs.
@@ -378,19 +360,19 @@ Traceability highlights: FR29 through FR32 satisfy Journey 1 and Journey 2 outco
 ### Output and Result Inspection
 
 - FR19: A power user can inspect execution results inline in the notebook after each run.
-- FR20: The extension can expose intentional script output emitted by companion runtime helpers.
-- FR21: A power user can distinguish deliberate script output from unrelated browser console noise.
-- FR22: The extension can preserve execution feedback needed to compare multiple code iterations.
+- FR20 [Post-MVP]: The extension can expose intentional script output emitted by companion runtime helpers.
+- FR21 [Post-MVP]: A power user can distinguish deliberate script output from unrelated browser console noise.
+- FR22 [Post-MVP]: The extension can preserve execution feedback needed to compare multiple code iterations.
 
 ### Variable Observation
 
-- FR23: A power user can define expressions to observe as watched values.
-- FR24: A power user can request manual refresh of watched values.
-- FR25: The extension can refresh watched values after notebook execution events.
-- FR26: A power user can configure complex watch projections that summarize selected nested attributes into a compact representation, instead of only viewing raw shallow values.
-- FR27: A power user can define projected reference fields, such as ActorUUID, as watchable links and start a new watch on the referenced entity directly from that projection.
-- FR27a: A power user can choose the projection format for complex watches, including single-line string and structured key-value summary.
-- FR28: The extension can represent watcher evaluation failures without blocking other watch evaluations.
+- FR23 [Post-MVP]: A power user can define expressions to observe as watched values.
+- FR24 [Post-MVP]: A power user can request manual refresh of watched values.
+- FR25 [Post-MVP]: The extension can refresh watched values after notebook execution events.
+- FR26 [Post-MVP]: A power user can configure complex watch projections that summarize selected nested attributes into a compact representation, instead of only viewing raw shallow values.
+- FR27 [Post-MVP]: A power user can define projected reference fields, such as ActorUUID, as watchable links and start a new watch on the referenced entity directly from that projection.
+- FR27a [Post-MVP]: A power user can choose the projection format for complex watches, including single-line string and structured key-value summary.
+- FR28 [Post-MVP]: The extension can represent watcher evaluation failures without blocking other watch evaluations.
 
 ### Macro Iteration Workflow
 
@@ -401,11 +383,11 @@ Traceability highlights: FR29 through FR32 satisfy Journey 1 and Journey 2 outco
 
 ### Action Promotion and Reuse
 
-- FR33: A power user can save a notebook cell as a named reusable action.
-- FR34: A power user can execute a saved action against the active Foundry session.
-- FR35: A power user can open a saved action as a notebook cell for further editing.
-- FR36: The extension can persist actions in workspace scope for repeated use.
-- FR37: A power user can provide prompt values required by parameterized action or cell templates before execution.
+- FR33 [Post-MVP]: A power user can save a notebook cell as a named reusable action.
+- FR34 [Post-MVP]: A power user can execute a saved action against the active Foundry session.
+- FR35 [Post-MVP]: A power user can open a saved action as a notebook cell for further editing.
+- FR36 [Post-MVP]: The extension can persist actions in workspace scope for repeated use.
+- FR37 [Post-MVP]: A power user can provide prompt values required by parameterized action or cell templates before execution.
 
 ### Installation, Scope, and Usage Constraints
 
