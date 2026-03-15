@@ -1,112 +1,84 @@
 # Copilot Instructions
 
+## Status
+
+This file is an interim instruction set created after BMAD planning artifacts were added. Earlier versions of this file described a speculative implementation and architecture that are no longer canonical.
+
+Until a dedicated architecture artifact exists, treat `docs/prd.md` as the primary source of truth for product scope and technical direction. Use `docs/product-brief.md` for supporting context and `spike/cdp-multiplex-findings.md` for CDP multiplexing research.
+
+Do not assume that previously documented folders, files, panels, or flows already exist in code. Verify the workspace before making implementation decisions.
+
 ## Project Overview
 
-`foundry-devil-code-sight` is a VS Code extension that connects to a running [FoundryVTT](https://foundryvtt.com/) instance via the [Chrome DevTools Protocol (CDP)](https://chromedevtools.github.io/devtools-protocol/). It provides three developer-tooling capabilities:
+`foundry-devil-code-sight` is a VS Code extension for rapid FoundryVTT macro iteration against a live Foundry browser session.
 
-- **Variable watcher** – observe predefined or user-defined FoundryVTT JavaScript variables; refreshes manually, after JS execution, or on a configurable auto-refresh timer
-- **Jupyter scratchpad** – run JavaScript cells from a `.ipynb` notebook directly in the FoundryVTT browser context using a custom VS Code `NotebookController`; optionally attach [vscode-edge-devtools](https://marketplace.visualstudio.com/items?itemName=ms-edgedevtools.vscode-edge-devtools) for full debugger support
-- **Log viewer** – stream console log messages from the FoundryVTT tab
+The current planned v1 direction is:
 
-## Tech Stack
+- JavaScript notebook scratchpad execution against a live Foundry page.
+- Browser-level CDP connection with target-session multiplexing so the extension can coexist with Edge DevTools.
+- A thin companion Foundry module that exposes namespace/version/output helpers.
+- Lightweight value inspection and intentional output viewing.
+- Manual reconnect and explicit module handshake states.
 
-- **Language**: TypeScript (strict mode)
-- **Runtime**: VS Code Extension API (`vscode`)
-- **CDP client**: `chrome-remote-interface` (Node.js CDP library)
-- **Notebook integration**: VS Code `vscode.NotebookController` API (registers a "FoundryVTT" kernel selectable in any `.ipynb` file); requires `ms-toolsai.jupyter` in `extensionDependencies`
-- **Log/watcher UI**: VS Code WebviewPanel (lightweight HTML, no heavy framework)
-- **Bundler**: esbuild (outputs single CJS file, required for VS Code extensions)
-- **JS debugging integration**: `ms-edgedevtools.vscode-edge-devtools` — listed in `extensionDependencies`
+## Canonical Sources
 
-## Architecture
+When instructions conflict, use this precedence order:
 
-```
-src/
-  extension.ts           # Activation entry point — registers commands and providers
-  cdp/
-    client.ts            # CDP connection lifecycle (connect/disconnect/reconnect)
-    targets.ts           # CDP target discovery and FoundryVTT tab selection
-    runtime.ts           # Runtime.evaluate wrapper (returnByValue, awaitPromise,
-                         # exceptionDetails handling)
-    console.ts           # Log domain + Runtime.consoleAPICalled → log panel
-  notebook/
-    controller.ts        # vscode.NotebookController — "FoundryVTT" kernel
-                         # executeHandler sends cell source to CDP Runtime.evaluate
-                         # and writes output back as NotebookCellOutput
-    outputSerializer.ts  # Serializes/deserializes cell outputs for notebook persistence
-  panels/
-    watchPanel.ts        # WebviewPanel: variable watcher
-    logPanel.ts          # WebviewPanel: log viewer
-  watchers/
-    variableWatcher.ts   # Holds watched expressions and last-known values;
-                         # exposes refresh() triggered manually, post-cell-execution,
-                         # or by an optional auto-refresh timer
-  debug/
-    launchConfig.ts      # Generates a pwa-msedge/pwa-chrome launch config reusing
-                         # the already-connected CDP port for vscode-edge-devtools
-  config/
-    schema.ts            # Zod schema for extension settings (contributes.configuration)
-  types/
-    messages.ts          # Shared typed IPC message shapes (Extension ↔ WebviewPanel)
-media/
-  (WebviewPanel HTML/CSS/JS assets — bundled by esbuild)
-```
+1. Reality in the current codebase.
+2. `docs/prd.md`.
+3. `docs/product-brief.md`.
+4. `spike/cdp-multiplex-findings.md`.
+5. This file.
 
-### Data flow
+If the PRD and the existing code disagree, preserve working code unless the task is explicitly to realign implementation with planning artifacts.
 
-1. User launches FoundryVTT in Chrome/Chromium/Edge with `--remote-debugging-port=9222`.
-2. The extension connects to `ws://localhost:<port>` via CDP, filters targets for the FoundryVTT tab (`type === 'page'`, URL contains `/game`).
-3. **Variable watching**: `variableWatcher.refresh()` evaluates all watched expressions and pushes diffs to the Watch WebviewPanel. Triggered by: (a) manual Refresh, (b) completion of a notebook cell execution, or (c) auto-refresh timer. Auto-refresh is **disabled by default** (`foundryDevilCodeSight.watchAutoRefreshInterval = 0`).
-4. **Log streaming**: `Log` domain + `Runtime.consoleAPICalled` events are forwarded to the Log WebviewPanel.
-5. **Notebook cell execution**: The `NotebookController.executeHandler` receives one or more cells, calls `Runtime.evaluate` for each cell's source, and writes results as `vscode.NotebookCellOutput`. On completion, `variableWatcher.refresh()` is called. Errors are surfaced as `NotebookCellOutput` with MIME type `application/vnd.code.notebook.error`.
-6. **JS debugging**: `vscode.debug.startDebugging` with a `pwa-msedge`/`pwa-chrome` config targeting the same CDP port, handing control to vscode-edge-devtools. Adding `debugger;` at the top of a cell will pause execution in the DevTools debugger.
+## Stable Technical Constraints
 
-### Notebook controller registration
+- Language: TypeScript with strict mode.
+- Runtime: VS Code extension APIs.
+- CDP client library: `chrome-remote-interface`.
+- Bundling: esbuild to a single CommonJS extension entry.
+- Notebook dependency: `ms-toolsai.jupyter` must remain in `extensionDependencies`.
+- Debug integration dependency: `ms-edgedevtools.vscode-edge-devtools` must remain in `extensionDependencies`.
+- Activation event should remain scoped to `onCommand:foundryDevilCodeSight.connect` unless requirements change.
+- Settings use the `foundryDevilCodeSight.*` namespace.
 
-```ts
-const controller = vscode.notebooks.createNotebookController(
-  'foundry-devil-code-sight',   // unique ID
-  'jupyter-notebook',      // notebookType — works with .ipynb files
-  'FoundryVTT'             // label shown in the kernel picker
-);
-controller.supportedLanguages = ['javascript'];
-controller.executeHandler = executeHandler;
-```
+Current contributed settings from `package.json` are:
 
-### Extension ↔ WebviewPanel messaging
+- `foundryDevilCodeSight.cdpHost`
+- `foundryDevilCodeSight.cdpPort`
+- `foundryDevilCodeSight.watchAutoRefreshInterval`
 
-All IPC uses typed message objects via `panel.webview.postMessage` / `window.addEventListener('message')`. All shapes live in `src/types/messages.ts` — never inline ad-hoc message objects.
+## Planning Constraints From The PRD
 
-## Build & Dev Commands
+These are currently the most important planning constraints to preserve:
+
+- Use browser-level CDP WebSocket multiplexing and per-target flat sessions for DevTools coexistence.
+- Attach only to Foundry page targets whose URL contains `/game`.
+- Treat DevTools coexistence as a first-class requirement, not a nice-to-have.
+- Keep runtime execution JavaScript-only for v1.
+- Normalize evaluation failures into a shared result contract instead of leaking raw CDP errors directly to each UI surface.
+- Manual reconnect is in scope for MVP; automatic reconnect is deferred.
+- Companion-module handshake states matter: missing, legacy, mismatch, and ok.
+- Prefer intentional output capture over broad console mirroring.
+- Respect CDP serialization limits; do not design around deep object mirroring unless planning artifacts change.
+
+## Working Rules For Agents
+
+- Do not reintroduce outdated assumptions from older versions of this file, especially speculative log-panel architecture, fixed file trees, or implementation details not backed by current docs or code.
+- Do not invent a `src/` layout, module boundaries, or webview structure unless the task is explicitly to create them.
+- Before implementing features, confirm whether they are MVP scope or post-MVP scope in `docs/prd.md`.
+- Keep docs and planning artifacts aligned when code changes materially affect user workflows or architecture.
+- If you need architectural detail that the PRD does not settle, call that out explicitly instead of guessing.
+
+## Build And Dev Commands
 
 ```bash
 npm install
-npm run compile       # one-shot TypeScript compile
-npm run watch         # incremental esbuild watch
-npm run lint          # ESLint
-npm run test          # extension integration tests via @vscode/test-electron
+npm run compile
+npm run watch
+npm run lint
+npm run test
 ```
 
-Press **F5** in VS Code to launch the Extension Development Host.
-
-To run a single test file:
-```bash
-npx mocha --require ts-node/register src/test/suite/controller.test.ts
-```
-
-## Key Conventions
-
-- **Target selection**: Filter CDP targets by `type === 'page'` and URL containing `/game`. Never attach to DevTools or background service-worker targets.
-- **`Runtime.evaluate` safety**: Always pass `returnByValue: true` and `awaitPromise: true`. Always check `exceptionDetails` — never assume success.
-- **Watcher refresh modes**: Auto-timer is disabled when `foundryDevilCodeSight.watchAutoRefreshInterval` is `0` (the default). The timer must be cleared and re-created whenever the setting changes.
-- **Cell output**: Use the `text/plain` MIME type for primitive results; use `application/json` for objects; use `application/vnd.code.notebook.error` for exceptions.
-- **Scratchpad debug shortcut**: Prepend `debugger;\n` to the cell source when launching the debugger so execution pauses immediately in the vscode-edge-devtools UI.
-- **CDP port reuse**: `debug/launchConfig.ts` must read the port from the extension's existing connection state — do not prompt the user for it again.
-- **Panel lifecycle**: All WebviewPanels are singletons — `reveal` if already open, create otherwise. Dispose the CDP client session when the last consumer is disposed.
-- **Settings namespace**: All contributed settings use the prefix `foundryDevilCodeSight.*`. Key settings:
-  - `foundryDevilCodeSight.cdpHost` — hostname/IP of the CDP endpoint (default: `localhost`; set to `host.docker.internal` when running inside a devcontainer)
-  - `foundryDevilCodeSight.cdpPort` — CDP remote debugging port (default: `9222`)
-  - `foundryDevilCodeSight.watchAutoRefreshInterval` — auto-refresh interval in ms, `0` = disabled (default: `0`)
-- **Activation event**: Activate on `onCommand:foundryDevilCodeSight.connect` only — do not use `*` or `onStartupFinished`.
-- **Error surfacing**: User-visible errors → `vscode.window.showErrorMessage`; verbose/diagnostic output → a dedicated `vscode.OutputChannel` (`FoundryVTT DevTools`).
-- **Extension dependencies**: Both `ms-toolsai.jupyter` and `ms-edgedevtools.vscode-edge-devtools` must appear in `extensionDependencies` in `package.json`.
+Press `F5` in VS Code to launch the Extension Development Host.
