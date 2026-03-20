@@ -14,282 +14,382 @@ stepsCompleted:
   - step-10-nonfunctional
   - step-11-polish
   - step-12-complete
+  - step-e-01-discovery
+  - step-e-02-review
+  - step-e-03-edit
 classification:
   projectType: developer_tool
-  domain: general (FoundryVTT/tabletop specialization)
+  domain: browser execution platform
   complexity: medium
   projectContext: greenfield
+  adapterFocus: foundry
+  platformCore: browser-kernel
 inputDocuments:
   - docs/product-brief.md
-  - _bmad-output/brainstorming/brainstorming-session-2026-03-14-162248.md
+  - docs/brainstorming-session-2026-03-14-162248.md
   - spike/cdp-multiplex-findings.md
 documentCounts:
   productBriefs: 1
   research: 0
   brainstorming: 1
   projectDocs: 0
+  planningArtifacts: 1
 workflowType: prd
+workflow: edit
 projectName: foundry-devil-code-sight
+lastEdited: 2026-03-19
+editHistory:
+  - date: 2026-03-18
+    changes: Reframed the product as a browser execution platform with Foundry as the first MVP profile, split core platform and profile scope, and regrouped requirements.
+  - date: 2026-03-19
+    changes: Strengthened NFR measurability and specificity with explicit thresholds, conditions, and measurement methods.
+  - date: 2026-03-19
+    changes: Closed scope-to-FR traceability gaps by aligning MVP scope bullets to FR16/FR17/FR25-FR28 and making transport-boundary isolation explicit in FR14.
+  - date: 2026-03-19
+    changes: Fixed FR wording issues — FR14/FR18 declarative/passive forms rewritten to capability form, FR17/FR28 vague quantifiers made specific, FR29 subjective adjective removed, FR34 negative constraint rewritten as capability.
+  - date: 2026-03-19
+    changes: Added Requirements Traceability Map section mapping all five user journeys to scope items, FRs, and NFRs.
+  - date: 2026-03-19
+    changes: Closed four traceability gaps — FR29 added to RTM J1 row and Foundry scope 6, output discrimination demonstrated in Journey 1 climax, Foundry scope item 3 extended to cover execution gating (FR24), scope item 7 extended to cover in-app readiness guidance (FR23).
+  - date: 2026-03-19
+    changes: Added $prompt() pre-execution parameter substitution to Phase 3 scope and as FR37 [Post-MVP], resolving the critical product-brief coverage gap.
 ---
 
 # Product Requirements Document - foundry-devil-code-sight
 
 **Author:** Sylvercode
 **Date:** 2026-03-15
+**Last Edited:** 2026-03-18
 
 ## Executive Summary
 
-`foundry-devil-code-sight` is a VS Code extension for Foundry VTT power users — GMs and players who write, test, and iterate macros against a live world. It connects to the running Foundry browser tab via the Chrome DevTools Protocol and provides a JavaScript notebook scratchpad, inline value inspection, and a lightweight variable watcher, all without leaving VS Code.
+`foundry-devil-code-sight` is a VS Code extension that provides a browser-backed JavaScript notebook execution kernel for rapid workflow iteration against live browser applications. The first supported profile targets Foundry VTT, where GMs and players can write, test, and iterate macros against a live world without leaving VS Code.
 
-The core problem it solves is cycle time: the standard Foundry macro editor offers a single text box, no output panel, no run history, and no way to inspect values without console archaeology. The result is slow, error-prone iteration. This extension collapses that feedback loop — write a cell, run it, see the result inline, tweak, rerun — so the user _feels_ an order-of-magnitude faster even when the underlying work is the same.
+The immediate user problem is cycle time. In Foundry, the standard macro editor compresses execution into a single text box with weak output visibility and no durable notebook workflow. More broadly, browser-hosted automation work often lacks a deterministic, notebook-first execution loop that can run against a live page, surface structured results, and coexist with existing developer tooling.
 
-A key architectural property is coexistence: by using browser-level CDP WebSocket multiplexing (`Target.attachToTarget`, flat sessions), the extension runs alongside Edge DevTools without conflict. Neither kicks the other off.
+The product solves that problem by combining notebook execution, normalized result handling, and browser-session orchestration behind a single workflow. Users write a cell, run it against the active page, inspect the result inline, adjust one line, and rerun without re-establishing context. Foundry is the MVP validation vertical, but the kernel, result contract, reconnect model, and diagnostics are intended to support additional browser-application profiles later.
+
+A key architectural property is coexistence. The execution model must work alongside active browser debugging tools, including Edge DevTools, without forced disconnect behavior. The platform also preserves transport flexibility: direct CDP transport is viable today, and a browser-extension bridge remains a credible later transport option. The kernel contract must remain stable even if transport changes.
 
 ### What Makes This Special
 
-The differentiator is not the notebook itself — it's the compression of the write→run→inspect cycle into a frictionless loop. Three capabilities combine to produce this:
+The differentiator is not a notebook UI by itself. The differentiator is a deterministic browser execution loop with explicit profile boundaries.
 
-1. **Fast rerun**: re-execute any cell instantly with full Foundry context — no copy-paste into the macro editor, no page reload.
-2. **Immediate value inspection**: cell output and watched variables surface inline in VS Code, not buried in the browser console.
-3. **Reversibility by design**: users can write a forward cell and a reversal cell side by side, making aggressive experimentation safe — try it, undo it, try again.
-
-No existing tool provides all three in a single VS Code-native workflow against a live Foundry world.
+1. **Fast rerun:** re-execute any cell against the active target without copy-paste workflows or page-local editors.
+2. **Structured visibility:** surface success values, intentional output, and execution errors inline in the notebook with a shared result contract.
+3. **Safe experimentation:** keep forward and rollback cells adjacent so destructive experiments are reversible inside the same notebook flow.
+4. **Coexistence by design:** preserve compatibility with browser developer tools instead of treating them as a competing attachment.
+5. **Profile-ready architecture:** keep target matching, readiness checks, and runtime helpers profile-owned so Foundry is the first profile, not the whole platform definition.
 
 ### Project Classification
 
-| Dimension       | Value                                         |
-| --------------- | --------------------------------------------- |
-| Project Type    | Developer Tool (VS Code extension)            |
-| Domain          | General — FoundryVTT/tabletop macro authoring |
-| Complexity      | Medium                                        |
-| Project Context | Greenfield                                    |
+| Dimension       | Value                                                  |
+| --------------- | ------------------------------------------------------ |
+| Project Type    | Developer Tool (VS Code extension)                     |
+| Domain          | Browser execution kernel validated through Foundry VTT |
+| Complexity      | Medium                                                 |
+| Project Context | Greenfield                                             |
+| MVP Scope       | One shipped profile: Foundry VTT                       |
 
 ## Success Criteria
 
-### User Success
+### Core Platform User Success
 
-- A power-user GM or player can open a `.ipynb` notebook in VS Code, connect to their live Foundry world, write a JavaScript macro cell, execute it, and see the result inline, without touching the Foundry macro editor.
-- The write, run, inspect cycle feels materially faster, making iteration no longer the primary bottleneck.
-- Watched variables surface values without requiring `console.log` archaeology in the browser.
-- A user can write a forward cell and a reversal cell side by side, making experimentation safe to undo.
+- A user can open a `.ipynb` notebook in VS Code, connect to a live browser target, run a JavaScript cell, and see a structured result inline.
+- A user can rerun modified cells repeatedly against the same browser session without rebuilding context between runs.
+- Syntax and runtime failures always appear as explicit notebook output with message, stack, and source location when available.
+- Manual reconnect restores a usable execution session after target reload or disconnect.
+- Intentional execution output is distinguishable from unrelated browser console noise.
+
+### Foundry Profile User Success
+
+- A Foundry power user can connect to a live world, execute notebook cells against it, and avoid the Foundry macro editor during iteration.
+- The write, run, inspect loop feels materially faster than the standard Foundry macro workflow.
+- A user can keep forward-operation and rollback cells side by side to make risky world mutations reversible.
+- Foundry-specific readiness state is explicit enough that one person can diagnose setup problems without deep CDP archaeology.
 
 ### Business Success
 
-- The extension works reliably for personal daily use across Foundry VTT sessions.
-- If and when published to the VS Code Marketplace, it is documented, installable, and functional for other power users with the same setup.
+- The extension supports reliable personal daily use for Foundry-driven notebook iteration.
+- The planning artifacts support future profile expansion without requiring a second product-boundary rewrite.
+- If published later, the extension is documented clearly enough that users understand what the platform core does and what the Foundry profile adds.
 
 ### Technical Success
 
-- Cell execution succeeds for both synchronous and async JavaScript against the live Foundry context.
-- Errors (syntax and runtime) are surfaced clearly in notebook cell output and are never silently swallowed.
-- Edge DevTools can be attached simultaneously without disconnecting the extension.
-- Manual reconnect command reliably restores the CDP session after a page reload.
+- JavaScript notebook cell execution succeeds for synchronous and asynchronous browser-page code.
+- The shared result contract normalizes success and failure outcomes independent of transport choice.
+- Edge DevTools coexistence is preserved for the Foundry MVP profile.
+- Core execution and normalization are verifiable against deterministic static HTML fixtures without requiring a live Foundry runtime.
+- Foundry readiness checks implement the profile contract with explicit `missing`, `legacy`, `unsupported`, and `ok` states.
 
 ### Measurable Outcomes
 
-- Notebook cell executes Foundry JavaScript and returns a result: pass or fail.
-- Execution errors surface as notebook output with name, message, and stack: pass or fail.
-- Edge DevTools coexists without kicking the extension off: pass or fail.
-- Manual reconnect command restores session within a few seconds: pass or fail.
+- A JavaScript notebook cell executes against a live browser target and returns a structured result: pass or fail.
+- Execution failures surface as notebook output with name, message, and stack: pass or fail.
+- Edge DevTools coexistence remains intact during Foundry execution: pass or fail.
+- Manual reconnect restores a usable session within a few seconds when the browser target is available: pass or fail.
+- Headless static-fixture tests cover success, syntax-error, runtime-error, and serialization-edge-case paths for the core kernel: pass or fail.
 
 ## Product Scope & Phased Development
 
 ### MVP Strategy & Philosophy
 
-**MVP Approach:** Problem-solving MVP focused on collapsing the macro iteration loop for one power-user GM profile.
-**Resource Requirements:** Solo developer with TypeScript, VS Code extension API, CDP integration, and Foundry macro domain familiarity.
+**MVP Approach:** Establish a reliable browser-backed notebook execution kernel and validate it through one delivered profile: Foundry VTT.
+
+**Resource Requirements:** Solo developer with TypeScript, VS Code extension APIs, browser-execution transport knowledge, and Foundry macro familiarity.
 
 **Core User Journeys Supported:**
 
-- Primary success path: rapid macro write-run-inspect loop.
-- Primary edge path: safe experimentation with forward and reversal cells.
-- Solo operations path: manual reconnect and module handshake visibility.
+- Primary success path: rapid notebook write-run-inspect loop.
+- Primary edge path: safe experimentation with forward and rollback cells.
+- Solo operations path: reconnect and readiness-state visibility.
+- Platform path: preserve explicit boundaries so future profiles can reuse the kernel.
 
-### MVP - Minimum Viable Product
+### MVP - Core Kernel Scope
 
-1. CDP browser-level connection via `Target.attachToTarget` (flat session, multiplexed).
-2. Companion Foundry module: namespace init (`$f`), `__version`, `$f.out()`, `$f.log()`.
-3. Three-state module handshake on connect: missing, legacy, mismatch, ok.
-4. Notebook controller for JavaScript cells in `.ipynb`, IIFE-wrapped and async-capable.
-5. Unified `EvalResult` error contract with normalized CDP and runtime exceptions.
-6. Manual reconnect command.
-7. One simple notebook example showing token state read and one token value update.
-8. VS Code-only integration path and manual install workflow documentation.
+1. Browser-session connection and lifecycle management for a live execution target.
+2. Browser debugger coexistence as a first-class requirement.
+3. JavaScript notebook execution for `.ipynb` cells, including async execution.
+4. Shared result contract for normalized success and error handling with transport-boundary isolation.
+5. Manual reconnect command and connection-state reporting.
+6. Explicit transport boundary so one MVP transport can ship without defining the permanent platform transport.
+7. Intentional output discrimination and execution-history retention in notebook workflows.
+8. Automated core-kernel validation against deterministic browser-test fixtures.
+
+### MVP - Foundry Profile Scope
+
+1. Foundry target matching rules for live game pages.
+2. Thin companion Foundry module with runtime namespace and version metadata.
+3. Foundry readiness classification: `missing`, `legacy`, `unsupported`, `ok`; notebook execution is blocked until readiness is `ok`.
+4. Foundry macro iteration from notebook cells without using the Foundry macro editor.
+5. Forward and rollback notebook-cell workflow for safe experimentation, including multi-version iteration.
+6. Foundry-specific notebook example showing token-state read and one token update.
+7. Manual installation and quickstart guidance for VS Code plus the Foundry profile; in-app install or update guidance surfaced when readiness is not `ok`.
 
 ### Growth Features
 
-**Phase 2 (Post-MVP):**
+**Phase 2 - Core Platform:**
 
+- Better diagnostics and troubleshooting ergonomics.
+- Configurable retry interval and timeout handling.
+- Hardened transport abstraction after the transport spike selects a long-term direction.
+- Stronger automated platform coverage for reconnect, serialization, and output tagging behavior.
+
+**Phase 2 - Foundry Profile:**
+
+- Intentional output helpers surfaced through profile-owned runtime conventions.
 - Variable watcher with shallow chaining UX.
-- `OutputChannel` sentinel logging via `$f.log()`.
-- Intentional output channel filtering.
-- Better troubleshooting ergonomics and diagnostics.
-- Configurable connect retry interval and timeout.
+- Guided diagnostics for common Foundry readiness failures.
 
-**Phase 3 (Expansion):**
+**Phase 3 - Expansion:**
 
-- Workspace-scoped actions file with cell-to-action promotion and `$prompt()` macros.
-- Action persistence and cell to action roundtrip workflow.
-- Public Marketplace hardening (onboarding polish, broader compatibility docs, packaging maturity).
+- Workspace-scoped action promotion and reuse flows.
+- Pre-execution parameter substitution (`$prompt()`) for parameterized action inputs.
+- Adapter onboarding guidance for future profiles.
+- Public Marketplace hardening, packaging maturity, and onboarding polish.
+- Additional browser-application profiles only after the core kernel and Foundry profile are stable.
 
 ### Vision (Future)
 
-- Public VS Code Marketplace release with documentation and onboarding guide.
-- Action sharing between workspaces or team members.
-- Deeper Foundry helper API surface in the companion module.
+- A public VS Code browser-execution platform with one first-party Foundry profile and clear boundaries for later profiles.
+- Reusable execution and diagnostics contracts that support additional browser applications without redefining the product.
+- Profile-specific helper surfaces that remain thin and optional relative to the platform core.
 
 ### Risk Mitigation Strategy
 
-**Technical Risks:**
+**Core Platform Risks:**
 
-- CDP coexistence and session routing fragility.
-- Mitigation: browser-level multiplexing architecture plus targeted integration tests.
+- CDP coexistence and session-routing fragility.
+  - Mitigation: browser-level session design plus deterministic fixture-based regression coverage.
+- Transport lock-in before profile boundaries stabilize.
+  - Mitigation: preserve transport as an explicit architecture decision and keep the kernel contract transport-agnostic.
+- Error normalization drift across execution paths.
+  - Mitigation: test the shared result contract against success, syntax, runtime, and serialization cases before live-profile expansion.
 
-**Market Risks:**
+**Foundry Profile Risks:**
 
-- The "feels faster" value may not hold if UX frictions remain.
-- Mitigation: validate with real macro iteration loops and measure subjective cycle-time satisfaction.
+- Readiness-state confusion caused by missing or outdated companion module versions.
+  - Mitigation: explicit state model plus targeted install/update guidance.
+- Unsafe rapid experimentation in a mutable live world.
+  - Mitigation: forward/rollback notebook patterns and example notebooks.
 
 **Resource Risks:**
 
-- Solo bandwidth can drive scope creep and quality regression.
-- Mitigation: enforce M3 boundary strictly and defer non-essential functionality to Phase 2+.
+- Solo bandwidth can drive scope creep and premature multi-profile abstraction.
+  - Mitigation: keep MVP delivered through one profile and generalize only at platform boundaries.
 
 ## User Journeys
 
+The following journeys are validated through the Foundry VTT profile. They describe the MVP delivery path. The underlying execution loop, reconnect model, and result handling are platform concerns that later profiles can reuse.
+
 ### Journey 1: Primary Success Path - Rapid Macro Iteration
 
+**Profile:** Foundry VTT  
 **Persona:** Garmek, power-user GM, preparing a session and refining world automation.
 
 **Opening scene:**
-He has a macro idea that touches actor state and scene data. In Foundry's macro editor, this would mean repetitive paste-run-edit cycles with weak visibility into intermediate values.
+He has a macro idea that touches actor state and scene data. In Foundry's macro editor, the work would require repetitive paste-run-edit cycles with weak visibility into intermediate values.
 
 **Rising action:**
-He opens a `.ipynb` notebook in VS Code, selects the Foundry kernel, and writes the first JavaScript cell. He runs it, inspects output inline, adjusts one line, reruns, then repeats several times in minutes.
+He opens a `.ipynb` notebook in VS Code, connects to the active Foundry session, writes a JavaScript cell, runs it, inspects the result inline, edits one line, and reruns several times in minutes.
 
 **Climax:**
-The macro produces the intended world change and the expected value output appears immediately in the notebook. No context switching, no console hunting.
+The macro produces the intended world change and the expected value output appears immediately in the notebook, clearly distinguishable from unrelated browser console activity. He never has to switch back to the Foundry macro editor to continue iterating.
 
 **Resolution:**
-He keeps the working version in a notebook cell and optionally promotes it into a reusable action. The workflow feels "10x faster" because rerun and inspection are frictionless.
+He keeps the working version in notebook cells and uses the notebook as durable execution history.
 
 **Failure/recovery path:**
-If evaluation throws, the error is visible in-cell (name/message/stack). He edits and reruns immediately, preserving momentum.
+If evaluation throws, the error is visible in-cell with structured details, and he reruns immediately after editing.
 
-### Journey 2: Primary Edge Case - Safe Experimentation and Reversal
+### Journey 2: Primary Edge Path - Safe Experimentation and Reversal
 
+**Profile:** Foundry VTT  
 **Persona:** Same GM, now testing risky world mutations before game time.
 
 **Opening scene:**
-He needs to try a destructive or broad macro but is unsure of side effects.
+He needs to try a destructive or broad macro but is unsure about side effects.
 
 **Rising action:**
-He writes a forward-operation cell and, directly below it, a reversal/rollback cell that undoes that operation. He executes forward, inspects watchers/output, and decides whether to keep or rollback.
+He writes a forward-operation cell and, directly below it, a reversal cell that undoes the same operation. He executes forward, inspects output, and decides whether to keep or roll back.
 
 **Climax:**
-Unexpected output appears, but he can immediately run the rollback cell and restore state without leaving VS Code.
+Unexpected behavior appears, but he can immediately run the rollback cell and restore state without leaving VS Code.
 
 **Resolution:**
-Risky experimentation becomes safe. He iterates aggressively because mistakes are cheap to reverse.
+Risky experimentation becomes cheap enough to support aggressive iteration.
 
 **Failure/recovery path:**
-If rollback logic is incomplete, he inspects affected values through watcher outputs and patches rollback code in-place.
+If rollback logic is incomplete, he inspects the affected values, patches the rollback cell, and reruns.
 
-### Journey 3: Admin/Operations Hat - Environment and Connection Management
+### Journey 3: Operations Path - Connection and Readiness Recovery
 
-**Persona:** Same GM acting as installer/operator of his own toolchain.
+**Profile:** Foundry VTT  
+**Persona:** Same GM acting as installer and operator of his own toolchain.
 
 **Opening scene:**
-Foundry reloads or restarts; session state is broken or module/version state changed.
+Foundry reloads, the browser target changes, or the companion module version no longer matches expectations.
 
 **Rising action:**
-He clicks reconnect, runs handshake, sees explicit status (missing/legacy/mismatch/ok), and applies guidance if module update is needed.
+He runs reconnect, the extension re-establishes the session, and the Foundry profile reports readiness as `missing`, `legacy`, `unsupported`, or `ok`.
 
 **Climax:**
-Connection is restored and notebook execution resumes without full environment reset.
+Connection is restored and notebook execution resumes without restarting VS Code.
 
 **Resolution:**
-Operational burden stays low: one person can maintain the setup without deep CDP troubleshooting every session.
+Operational overhead remains low enough for one user to maintain the workflow routinely.
 
 **Failure/recovery path:**
-If reconnect fails, diagnostics indicate where to look first (host/port/target/module state), reducing blind debugging.
+If reconnect fails, diagnostics point first to the endpoint, target selection, or profile readiness state.
 
-### Journey 4: Support/Troubleshooting Hat - Diagnosing Unexpected Macro Behavior
+### Journey 4: Support Path - Diagnosing Unexpected Behavior
 
+**Profile:** Foundry VTT  
 **Persona:** Same GM acting as his own support engineer.
 
 **Opening scene:**
-A macro "runs" but game state is not what he expected.
+A macro runs, but the world state does not match his expectation.
 
 **Rising action:**
-He reruns targeted cells, narrows scope, uses watcher values and intentional output to isolate the exact failing assumption. Edge DevTools can remain attached for deeper breakpoints if needed.
+He reruns narrow cells, adds targeted output, and isolates the failing assumption while Edge DevTools remains available for deeper browser debugging.
 
 **Climax:**
-He identifies the mismatch between expected and actual state (permission, stale reference, or object path issue).
+He identifies the mismatch between expected and actual state, such as permission checks, stale references, or object-path assumptions.
 
 **Resolution:**
-He patches the macro and validates fix in the same notebook sequence. The notebook becomes living troubleshooting history.
+He patches the macro and validates the fix in the same notebook sequence.
 
 **Failure/recovery path:**
-If debugging gets complex, he adds finer-grained cells and output markers, then converges incrementally instead of rewriting from scratch.
+If the issue grows more complex, he adds smaller cells and converges incrementally instead of rewriting the whole script.
+
+### Journey 5: Platform Path - Reusing the Kernel for a Future Profile
+
+**Persona:** A future developer extending the platform beyond Foundry.
+
+**Opening scene:**
+The kernel has already proven stable through the Foundry MVP profile. A second browser application becomes a candidate target.
+
+**Rising action:**
+The developer defines profile-owned target matching, readiness checks, runtime helpers, and example notebooks while reusing the existing session, execution, reconnect, and result-normalization logic.
+
+**Climax:**
+Notebook cells execute against the new profile with the same result structure and failure behavior that Foundry uses.
+
+**Resolution:**
+The product expands by adding profile-specific boundaries instead of rewriting the platform core.
+
+**Failure/recovery path:**
+If the new profile cannot satisfy the shared readiness or result contract, the issue is treated as a platform-boundary decision rather than patched with one-off profile logic.
 
 ### Journey Requirements Summary
 
 These journeys imply concrete capability needs:
 
-1. Fast, repeatable notebook cell execution against live Foundry context.
-2. Clear in-cell result and error rendering (syntax + runtime).
-3. Minimal-friction rerun loop for micro-iterations.
-4. Lightweight value inspection (watcher + output channel conventions).
-5. Reliable manual reconnect and explicit module handshake states.
-6. Coexistence with Edge DevTools for deeper investigations.
-7. Support for forward/rollback scripting patterns in adjacent cells.
-8. Optional path from "experiment" to reusable saved action.
+1. Fast, repeatable notebook cell execution against a live browser target.
+2. Clear in-cell success and error rendering.
+3. Minimal-friction rerun loops for micro-iterations.
+4. Reliable reconnect and explicit profile readiness reporting.
+5. Coexistence with browser developer tools.
+6. Support for forward/rollback scripting patterns in the Foundry profile.
+7. Deterministic result handling independent of transport choice.
+8. Platform boundaries that allow future profiles to reuse the kernel.
 
 ## Domain-Specific Requirements
 
 ### Compliance and Regulatory
 
-- No formal regulated-domain compliance is required for MVP (no HIPAA, PCI, or FedRAMP target).
-- If Marketplace distribution happens later, follow VS Code extension packaging and security expectations, including minimal permissions and transparent behavior.
+- No formal regulated-domain compliance target applies to the MVP.
+- If Marketplace distribution happens later, the extension should follow VS Code packaging and security expectations, including clear disclosure of platform behavior and profile-specific capabilities.
 
 ### Technical Constraints
 
-- CDP session multiplexing is a hard architectural constraint for coexistence with DevTools.
-- Foundry runtime state is mutable and session-scoped, so execution must surface errors clearly and preserve rapid retry loops.
-- CDP serialization limits require shallow value inspection and explicit drill-down patterns instead of deep object mirroring.
+- JavaScript is the only runtime language supported in v1.
+- Browser debugger coexistence is a non-negotiable platform constraint.
+- CDP multiplexing is the current leading technical path for coexistence, but transport remains an explicit architecture decision rather than a permanent product assumption.
 - Manual reconnect is acceptable for MVP; automatic reconnect is deferred.
+- Serialization limits require shallow result inspection and explicit drill-down patterns rather than deep object mirroring.
 
 ### Integration Requirements
 
-- Must integrate with a running Chromium or Edge instance exposing remote debugging.
-- Must target the active Foundry game page only.
-- Must interoperate with Jupyter notebook workflows in VS Code.
-- Must rely on a thin companion Foundry module for runtime namespace and output conventions.
+**Core Platform Integration:**
+
+- Must integrate with VS Code notebook workflows.
+- Must connect to a live browser execution target through a user-controlled transport.
+- Must normalize execution results into a shared contract independent of the transport implementation.
+
+**Foundry Profile Integration:**
+
+- Must identify active Foundry game pages as valid execution targets.
+- Must interoperate with a thin Foundry companion module for runtime namespace and version checks.
+- Must preserve Foundry-specific guidance and examples without making them platform assumptions.
+
+### Trust and Security Model
+
+- The MVP assumes one user controls both VS Code and the Foundry browser session.
+- The platform core should not assume that all future profiles share the Foundry trust model.
+- Each future profile must document its own readiness, permissions, and runtime helper assumptions.
 
 ### Risk Mitigations
 
-- Risk: extension and DevTools session conflict.
-  - Mitigation: browser-level WebSocket with flat target sessions.
-- Risk: user confusion on module state/version.
-  - Mitigation: explicit handshake states and guided messaging.
-- Risk: misleading watcher expectations for deep objects.
-  - Mitigation: document shallow-watch model and chaining workflow.
-- Risk: unsafe rapid experimentation.
-  - Mitigation: encourage forward and rollback cell patterns in journeys and examples.
+- Risk: transport changes invalidate the execution model.
+  - Mitigation: keep transport separate from the notebook execution and result contracts.
+- Risk: a future profile hardcodes target logic into the platform core.
+  - Mitigation: keep target matching and readiness profile-owned.
+- Risk: Foundry-specific expectations leak into general platform language.
+  - Mitigation: isolate profile-specific terminology and examples to Foundry sections.
 
-## Developer Tool Specific Requirements
+## Project-Type Requirements
 
 ### Project-Type Overview
 
-This product is a VS Code-only developer tool for Foundry macro power users. Its core job is rapid macro iteration against a live Foundry session with tight write-run-inspect loops. Runtime execution support for v1 is strictly JavaScript and excludes any TypeScript transpile or alternate runtime path.
+This product is a VS Code-only developer tool. Its core job is deterministic JavaScript notebook execution against a live browser target. Foundry is the first delivered profile and the first user-validation environment.
 
 ### Technical Architecture Considerations
 
-- Runtime execution engine must accept and execute JavaScript only.
-- Notebook execution behavior should prioritize fast rerun and clear inline outputs and errors.
-- IDE integration scope is hard-limited to VS Code APIs and UX patterns.
-- Distribution assumptions should not depend on Marketplace publication in MVP.
+- The platform core owns session orchestration, notebook execution, reconnect behavior, and result normalization.
+- A profile owns target matching, readiness checks, runtime helpers, and profile-specific diagnostics.
+- Transport is a replaceable architecture layer. The product can ship one transport in MVP without freezing the long-term transport decision.
+- Feature design should optimize for VS Code notebook workflows and avoid premature abstraction for non-MVP IDEs.
 
 ### Language and Runtime Scope
 
@@ -302,127 +402,155 @@ This product is a VS Code-only developer tool for Foundry macro power users. Its
 ### Installation and Distribution Model
 
 - Installation model for MVP: manual installation only.
-- No Marketplace publishing requirement in MVP.
-- Documentation should explicitly assume a personal-use installation path.
-- Install guidance depth for MVP is a minimal quickstart; richer guided install UX can be added post-MVP.
+- Marketplace publishing is out of scope for MVP.
+- Documentation should assume a personal-use installation path for the Foundry profile.
+- Install guidance depth for MVP is a minimal quickstart, not a polished onboarding system.
 
 ### IDE Integration Boundaries
 
 - Hard boundary: VS Code only.
 - No support commitments for JetBrains IDEs, Neovim, or other editors in MVP.
-- Feature design should optimize for VS Code notebook and extension workflows without abstraction layers for multi-IDE compatibility.
+- The extension depends on notebook workflows rather than a cross-editor abstraction layer.
 
 ### Documentation and Example Requirements
 
-- Minimum documentation for MVP: one simple notebook.
-- The notebook should demonstrate:
-  - Reading token state
-  - Updating one token value
-- This notebook serves as both proof-of-install and baseline usage example.
+- Minimum documentation for MVP:
+  - One Foundry notebook example demonstrating token-state read and token update
+  - One architecture explanation distinguishing platform core from Foundry profile responsibilities
+  - One quickstart path for manual installation and reconnect troubleshooting
+
+### Adapter Implementation Constraints
+
+- Foundry-specific concepts such as tokens, actors, and companion-module readiness states must not appear as platform-level requirements unless they are explicitly marked as profile behavior.
+- Future profiles should extend the platform by supplying profile boundaries, not by rewriting core session or notebook logic.
+- Profiles should stay thin. Profile-specific runtime helpers are optional convenience layers, not platform prerequisites outside that profile.
 
 ### Implementation Considerations
 
-- Keep interfaces simple and explicit for solo power-user operation.
-- Favor predictable behavior and clear failure messages over broad feature breadth.
-- Preserve the MVP philosophy: ship the smallest reliable loop first, then expand.
+- Keep interfaces explicit and small.
+- Favor predictable behavior and actionable failure messages over breadth.
+- Generalize at contracts and boundaries, not through speculative multi-profile frameworks.
 
 ## Functional Requirements
 
-Traceability highlights: FR29 through FR32 satisfy Journey 1 and Journey 2 outcomes; FR4 and FR8 through FR12 satisfy Journey 3 operations needs; FR19 through FR28 and FR42 satisfy Journey 4 troubleshooting and diagnostics needs.
+Traceability highlights: FR1 through FR18 cover the platform execution contract used by all journeys; FR19 through FR36 cover the Foundry MVP profile and its deferred extensions.
 
-### Connection and Session Control
+### Core Platform Requirements
 
-- FR1: A power user can configure CDP host and port used by the extension.
-- FR2: A power user can initiate a connection to a running browser CDP endpoint from VS Code.
-- FR3: The extension can discover and select a Foundry game page target for execution.
-- FR4: A power user can manually reconnect the extension after disconnection or page reload.
-- FR5: A power user can disconnect the extension session from VS Code.
-- FR6: The extension can report current connection state to the user.
-- FR7: The extension can preserve coexistence with an active Edge DevTools session while connected to the same Foundry page.
+#### Connection and Session Control
 
-### Companion Module Handshake and Readiness
+- FR1: A user can configure the connection endpoint used by the extension.
+- FR2: A user can initiate a connection from VS Code to a live browser execution target.
+- FR3: The extension can identify and select a valid execution target according to the active profile's matching rules.
+- FR4: The extension can report current connection state to the user.
+- FR5: A user can manually reconnect the extension after disconnection or target reload.
+- FR6: A user can disconnect the active execution session from VS Code.
+- FR7: The extension can preserve coexistence with active browser developer tools connected to the same target.
 
-- FR8: The extension can detect whether the companion Foundry module runtime namespace is present.
-- FR9: The extension can read and compare companion module version metadata.
-- FR10: The extension can classify module state as missing, legacy, mismatch, or compatible.
-- FR11: The extension can present install or update guidance when module state is not compatible.
-- FR12: A power user can proceed with compatible module state without additional setup prompts.
+#### Notebook Execution
 
-### Notebook Execution
+- FR8: A user can run JavaScript notebook cells against the active browser target from VS Code.
+- FR9: The extension can execute asynchronous JavaScript cell logic and return resolved outcomes.
+- FR10: The extension can return successful execution values to notebook output.
+- FR11: The extension can surface syntax and runtime errors as notebook output with message, stack, and source location when available.
+- FR12: A user can rerun modified cells repeatedly in the same notebook workflow.
+- FR13: The extension can support execution isolation per cell while allowing explicit shared-runtime patterns when the user chooses them.
 
-- FR13: A power user can run JavaScript notebook cells against the live Foundry context from VS Code.
-- FR14: The extension can execute asynchronous JavaScript cell logic and return resolved outcomes.
-- FR15: The extension can return successful execution values to notebook output.
-- FR16: The extension can surface syntax and runtime errors as notebook outputs.
-- FR17: A power user can rerun modified cells repeatedly in the same notebook workflow.
-- FR18: The extension can support execution isolation per cell while allowing explicit shared runtime usage patterns.
+#### Result Normalization and Output Contract
 
-### Output and Result Inspection
+- FR14: The extension can normalize success and failure outcomes across supported transports and profiles through a shared result contract while preserving transport-boundary isolation from notebook execution semantics.
+- FR15: A user can inspect execution results inline in the notebook after each run.
+- FR16: The extension can distinguish intentional execution output from unrelated browser console noise.
+- FR17: The extension can preserve session-scoped execution history so a user can compare the result of each cell revision within a working session.
 
-- FR19: A power user can inspect execution results inline in the notebook after each run.
-- FR20 [Post-MVP]: The extension can expose intentional script output emitted by companion runtime helpers.
-- FR21 [Post-MVP]: A power user can distinguish deliberate script output from unrelated browser console noise.
-- FR22 [Post-MVP]: The extension can preserve execution feedback needed to compare multiple code iterations.
+#### Platform Testing and Validation
 
-### Variable Observation
+- FR18: A developer can verify the notebook execution pipeline and shared result contract against deterministic browser-test fixtures without any profile-specific runtime.
 
-- FR23 [Post-MVP]: A power user can define expressions to observe as watched values.
-- FR24 [Post-MVP]: A power user can request manual refresh of watched values.
-- FR25 [Post-MVP]: The extension can refresh watched values after notebook execution events.
-- FR26 [Post-MVP]: A power user can configure complex watch projections that summarize selected nested attributes into a compact representation, instead of only viewing raw shallow values.
-- FR27 [Post-MVP]: A power user can define projected reference fields, such as ActorUUID, as watchable links and start a new watch on the referenced entity directly from that projection.
-- FR27a [Post-MVP]: A power user can choose the projection format for complex watches, including single-line string and structured key-value summary.
-- FR28 [Post-MVP]: The extension can represent watcher evaluation failures without blocking other watch evaluations.
+### Foundry Profile Requirements
 
-### Macro Iteration Workflow
+#### Foundry Target and Readiness
 
-- FR29: A power user can maintain forward-operation and reversal-operation cells in the same notebook.
-- FR30: A power user can execute reversal cells to restore state after experiments.
-- FR31: A power user can iterate through multiple macro versions in one notebook session.
-- FR32: The extension can support notebook-first macro development without requiring Foundry macro-editor usage during iteration.
+- FR19: The Foundry profile can identify valid execution targets whose URL contains `/game`.
+- FR20: The Foundry profile can detect whether the companion runtime helper is present.
+- FR21: The Foundry profile can read and compare companion module version metadata.
+- FR22: The Foundry profile can classify readiness state as `missing`, `legacy`, `unsupported`, or `ok`.
+- FR23: The Foundry profile can present install or update guidance when readiness is not `ok`.
+- FR24: A user can proceed with Foundry execution when readiness is `ok`.
 
-### Action Promotion and Reuse
+#### Foundry Notebook Workflow
 
-- FR33 [Post-MVP]: A power user can save a notebook cell as a named reusable action.
-- FR34 [Post-MVP]: A power user can execute a saved action against the active Foundry session.
-- FR35 [Post-MVP]: A power user can open a saved action as a notebook cell for further editing.
-- FR36 [Post-MVP]: The extension can persist actions in workspace scope for repeated use.
-- FR37 [Post-MVP]: A power user can provide prompt values required by parameterized action or cell templates before execution.
+- FR25: A Foundry power user can execute macro logic from notebook cells without using the Foundry macro editor during iteration.
+- FR26: A Foundry power user can maintain forward-operation and reversal-operation cells in the same notebook.
+- FR27: A Foundry power user can execute reversal cells to restore state after experiments.
+- FR28: A Foundry power user can iterate through at least two successive macro versions in a single notebook session.
+- FR29: The extension can provide a Foundry starter notebook demonstrating token-state read and token-value update.
+- FR30: A Foundry power user can install and use the extension through a manual VS Code workflow without requiring Marketplace distribution.
 
-### Installation, Scope, and Usage Constraints
+#### Foundry Output and Observation
 
-- FR38: A power user can install and use the extension through a manual installation workflow.
-- FR39: The extension can operate within a hard VS Code-only usage scope.
-- FR40: The extension can provide a simple starter notebook demonstrating token state read and token value update.
-- FR41: A power user can use the extension for personal workflow without requiring Marketplace distribution.
-- FR42: A power user can see syntax and runtime error location mapped to the executed cell source, including line and column when available.
+- FR31 [Post-MVP]: The Foundry profile can expose intentional script output through profile-owned runtime helpers.
+- FR32 [Post-MVP]: A Foundry power user can define watched expressions and refresh them manually or after execution events.
+- FR33 [Post-MVP]: A Foundry power user can configure shallow projections and reference drill-down for watched values.
+- FR34 [Post-MVP]: A Foundry power user can continue refreshing other watched values when one watcher evaluation fails.
+
+#### Foundry Action Reuse
+
+- FR35 [Post-MVP]: A Foundry power user can save a notebook cell as a reusable action.
+- FR36 [Post-MVP]: A Foundry power user can reopen or execute a saved action, including prompted inputs when required.
+
+- FR37 [Post-MVP]: A user can define `$prompt()` substitution placeholders in a notebook cell so that execution pauses and requests a value for each placeholder before running.
 
 ## Non-Functional Requirements
 
-### Performance
+### Core Platform Performance
 
-- NFR1: Notebook cell execution feedback, including success or error output rendered in notebook, should appear within 2 seconds for typical macro cells under normal local conditions.
-- NFR2: Manual watch refresh should render updated watch results within 2 seconds for typical watch sets under normal local conditions.
-- NFR3: Reconnect command should report success or failure state within 5 seconds when browser and Foundry page are available.
+- NFR1: Notebook execution feedback must render within 2 seconds for synchronous JavaScript cells, measured as elapsed time from run command to notebook output render using a deterministic test cell under normal local development conditions.
+- NFR2: Manual reconnect must report success or failure within 5 seconds when the target browser and page are available, measured as elapsed time from reconnect command invocation to final connection state.
+- NFR3: Intentional output or watched-value refresh behavior, when enabled, must render within 2 seconds, measured as elapsed time from execution completion to output render under the same baseline conditions as NFR1.
 
-### Reliability
+### Core Platform Reliability
 
-- NFR4: The extension should recover usable execution state through manual reconnect after page reload without requiring VS Code restart.
-- NFR5: A failed watch expression should not block evaluation of other watch expressions in the same refresh cycle.
-- NFR6: Runtime and syntax errors must always be surfaced as explicit notebook outputs with structured location metadata, including message, line, column, and stack when available; silent failures are not acceptable.
+- NFR4: Manual reconnect must restore execution capability within 5 seconds after target reload when the target is reachable, measured by successful reconnection state and one successful JavaScript cell execution without restarting VS Code.
+- NFR5: Runtime and syntax failures must always surface as explicit notebook outputs; silent failure is not acceptable.
+- NFR6: The shared result contract must preserve identical success and failure classification across supported transports for equivalent test cases, measured by deterministic regression fixtures that cover success, syntax error, runtime error, and serialization-edge cases with 100% classification parity.
 
-### Integration
+### Core Platform Integration and Contracts
 
-- NFR7: The extension should attach only to valid Foundry game page targets and avoid non-page and debugger targets.
-- NFR8: The extension should coexist with an active Edge DevTools session connected to the same browser target without forced disconnect behavior.
-- NFR9: Companion module handshake should complete and return a module state classification, missing, legacy, mismatch, or compatible, on each connection attempt.
+- NFR7: The platform core must remain adapter-agnostic; it does not hardcode Foundry-specific target matching rules.
+- NFR8: The extension must coexist with Edge DevTools without forced disconnect behavior, measured by sustained active session state and successful notebook execution after DevTools attaches to the same target.
+- NFR9: Each profile must implement a readiness contract that returns a defined state set and blocks execution when readiness is not `ok`, measured by integration tests that verify state classification, execution gating behavior, and deterministic outcomes.
 
-### Security
+### Foundry Profile Integration and Contracts
 
-- NFR10: The extension should limit its operational scope to configured local or development CDP endpoints and should not initiate unexpected remote endpoint connections.
-- NFR11: The extension should not persist sensitive runtime secrets from evaluated cells unless explicitly saved by user action.
-- NFR12: User-facing diagnostics should avoid exposing unnecessary sensitive environment details while remaining actionable.
+- NFR10: The Foundry profile attaches only to targets whose URL contains `/game`.
+- NFR11: The Foundry readiness check must complete within a configurable timeout and return one of `missing`, `legacy`, `unsupported`, or `ok`, with default timeout 5 seconds and configurable bounds of 1 to 30 seconds, measured from check start to state result.
+
+### Core Platform Testing and Validation
+
+- NFR12: Core execution and result normalization must be validated through deterministic automated tests that require 100% pass rate for success paths, syntax errors, runtime errors, and serialization-boundary cases without requiring a live profile runtime.
+- NFR13: Automated platform tests must cover success paths, syntax errors, runtime errors, reconnect state transitions, and serialization boundaries including circular references, null or undefined values, and large payload handling.
+- NFR14: Any future profile must pass fixture-based target-matching and readiness-contract tests before live-environment integration testing begins.
+
+### Security and Diagnostics
+
+- NFR15: The extension must connect only to explicitly user-configured endpoints and must not initiate other outbound endpoint connections, measured by connection-policy tests and traffic inspection during normal workflows.
+- NFR16: The extension must not persist sensitive runtime secrets from evaluated cells unless explicitly saved by user action, measured by file-system audit and settings-state verification after execution sessions.
+- NFR17: User-facing diagnostics must include actionable root-cause category and next-step guidance while excluding sensitive environment details such as tokens, credentials, and private paths, measured by diagnostic-message review against a defined redaction checklist.
 
 ### Deferred Quality Improvements
 
-- Visual syntax error underlining in notebook cells is deferred to post-MVP and will be reconsidered after the MVP execution and diagnostics loop is stable.
+- Visual syntax error underlining in notebook cells remains deferred until the core execution and diagnostics loop is stable.
+- A browser-extension bridge transport remains a candidate future architecture path, but evaluating it is separate from MVP delivery.
+
+## Requirements Traceability Map
+
+This table maps each user journey to the scope items, functional requirements, and non-functional requirements it exercises. Use this as the primary cross-reference for epic and story decomposition.
+
+| Journey                               | Scope Items                   | FRs                       | NFRs                               |
+| ------------------------------------- | ----------------------------- | ------------------------- | ---------------------------------- |
+| J1: Rapid Macro Iteration             | Core 1–4, 6–7; Foundry 1–4, 6 | FR1–FR17, FR19–FR25, FR29 | NFR1, NFR3, NFR5–6, NFR8, NFR10–11 |
+| J2: Safe Experimentation and Reversal | Core 3–4; Foundry 5           | FR8–FR17, FR25–FR28       | NFR1, NFR5–6                       |
+| J3: Connection and Readiness Recovery | Core 1–2, 4–5; Foundry 1–3, 7 | FR1–FR7, FR19–FR24, FR30  | NFR2, NFR4, NFR8–11                |
+| J4: Diagnosing Unexpected Behavior    | Core 2, 4, 7                  | FR14–FR18                 | NFR5–6, NFR8, NFR15–17             |
+| J5: Platform Path — Future Profile    | Core 1–8                      | FR1–FR18                  | NFR6–7, NFR9, NFR12–14             |
