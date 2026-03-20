@@ -53,6 +53,12 @@ editHistory:
     changes: Closed four traceability gaps — FR29 added to RTM J1 row and Foundry scope 6, output discrimination demonstrated in Journey 1 climax, Foundry scope item 3 extended to cover execution gating (FR24), scope item 7 extended to cover in-app readiness guidance (FR23).
   - date: 2026-03-19
     changes: Added $prompt() pre-execution parameter substitution to Phase 3 scope and as FR37 [Post-MVP], resolving the critical product-brief coverage gap.
+  - date: 2026-03-19
+    changes: Restored intentional execution-output capture as a core kernel MVP capability (FR16 rewritten, scope item 7 expanded, Journey 4 and Journey Requirements Summary updated). Clarified $f.out()/$f.log() as Foundry-profile helpers in FR31 and Phase 2 Foundry scope.
+  - date: 2026-03-19
+    changes: Promoted FR31 to MVP — without a concrete emitter the core output-capture capability (FR16) is untestable in the MVP profile. Added Foundry scope item 7 for companion-module output helpers, removed $f.out()/$f.log() from Phase 2 Foundry deferral, and updated RTM J1/J4 rows.
+  - date: 2026-03-19
+    changes: Post-validation refinements — enumerated platform connection states in FR4, added measurement methods to NFR5 and NFR13, added Glossary section defining profile, transport, shared result contract, execution history retention, transport-boundary isolation, readiness state, and connection state.
 ---
 
 # Product Requirements Document - foundry-devil-code-sight
@@ -153,7 +159,7 @@ The differentiator is not a notebook UI by itself. The differentiator is a deter
 4. Shared result contract for normalized success and error handling with transport-boundary isolation.
 5. Manual reconnect command and connection-state reporting.
 6. Explicit transport boundary so one MVP transport can ship without defining the permanent platform transport.
-7. Intentional output discrimination and execution-history retention in notebook workflows.
+7. Intentional execution-output capture, discrimination, and execution-history retention in notebook workflows.
 8. Automated core-kernel validation against deterministic browser-test fixtures.
 
 ### MVP - Foundry Profile Scope
@@ -164,7 +170,8 @@ The differentiator is not a notebook UI by itself. The differentiator is a deter
 4. Foundry macro iteration from notebook cells without using the Foundry macro editor.
 5. Forward and rollback notebook-cell workflow for safe experimentation, including multi-version iteration.
 6. Foundry-specific notebook example showing token-state read and one token update.
-7. Manual installation and quickstart guidance for VS Code plus the Foundry profile; in-app install or update guidance surfaced when readiness is not `ok`.
+7. Companion-module output helpers (`$f.out()`, `$f.log()`) as the MVP emitter surface for core output capture (FR16).
+8. Manual installation and quickstart guidance for VS Code plus the Foundry profile; in-app install or update guidance surfaced when readiness is not `ok`.
 
 ### Growth Features
 
@@ -177,7 +184,6 @@ The differentiator is not a notebook UI by itself. The differentiator is a deter
 
 **Phase 2 - Foundry Profile:**
 
-- Intentional output helpers surfaced through profile-owned runtime conventions.
 - Variable watcher with shallow chaining UX.
 - Guided diagnostics for common Foundry readiness failures.
 
@@ -291,7 +297,7 @@ If reconnect fails, diagnostics point first to the endpoint, target selection, o
 A macro runs, but the world state does not match his expectation.
 
 **Rising action:**
-He reruns narrow cells, adds targeted output, and isolates the failing assumption while Edge DevTools remains available for deeper browser debugging.
+He reruns narrow cells, uses intentional output capture to surface intermediate values, and isolates the failing assumption while Edge DevTools remains available for deeper browser debugging.
 
 **Climax:**
 He identifies the mismatch between expected and actual state, such as permission checks, stale references, or object-path assumptions.
@@ -328,11 +334,12 @@ These journeys imply concrete capability needs:
 1. Fast, repeatable notebook cell execution against a live browser target.
 2. Clear in-cell success and error rendering.
 3. Minimal-friction rerun loops for micro-iterations.
-4. Reliable reconnect and explicit profile readiness reporting.
-5. Coexistence with browser developer tools.
-6. Support for forward/rollback scripting patterns in the Foundry profile.
-7. Deterministic result handling independent of transport choice.
-8. Platform boundaries that allow future profiles to reuse the kernel.
+4. Intentional execution-output capture and inline surfacing distinct from background browser noise.
+5. Reliable reconnect and explicit profile readiness reporting.
+6. Coexistence with browser developer tools.
+7. Support for forward/rollback scripting patterns in the Foundry profile.
+8. Deterministic result handling independent of transport choice.
+9. Platform boundaries that allow future profiles to reuse the kernel.
 
 ## Domain-Specific Requirements
 
@@ -442,7 +449,7 @@ Traceability highlights: FR1 through FR18 cover the platform execution contract 
 - FR1: A user can configure the connection endpoint used by the extension.
 - FR2: A user can initiate a connection from VS Code to a live browser execution target.
 - FR3: The extension can identify and select a valid execution target according to the active profile's matching rules.
-- FR4: The extension can report current connection state to the user.
+- FR4: The extension can report current connection state to the user using defined platform states: `disconnected`, `connecting`, `connected`, and `error`.
 - FR5: A user can manually reconnect the extension after disconnection or target reload.
 - FR6: A user can disconnect the active execution session from VS Code.
 - FR7: The extension can preserve coexistence with active browser developer tools connected to the same target.
@@ -460,7 +467,7 @@ Traceability highlights: FR1 through FR18 cover the platform execution contract 
 
 - FR14: The extension can normalize success and failure outcomes across supported transports and profiles through a shared result contract while preserving transport-boundary isolation from notebook execution semantics.
 - FR15: A user can inspect execution results inline in the notebook after each run.
-- FR16: The extension can distinguish intentional execution output from unrelated browser console noise.
+- FR16: The extension can capture output generated during cell execution and surface it as notebook output, distinguishable from unrelated browser console activity.
 - FR17: The extension can preserve session-scoped execution history so a user can compare the result of each cell revision within a working session.
 
 #### Platform Testing and Validation
@@ -489,7 +496,7 @@ Traceability highlights: FR1 through FR18 cover the platform execution contract 
 
 #### Foundry Output and Observation
 
-- FR31 [Post-MVP]: The Foundry profile can expose intentional script output through profile-owned runtime helpers.
+- FR31: The Foundry profile can expose intentional script output through profile-owned runtime helpers such as `$f.out()` and `$f.log()`.
 - FR32 [Post-MVP]: A Foundry power user can define watched expressions and refresh them manually or after execution events.
 - FR33 [Post-MVP]: A Foundry power user can configure shallow projections and reference drill-down for watched values.
 - FR34 [Post-MVP]: A Foundry power user can continue refreshing other watched values when one watcher evaluation fails.
@@ -512,7 +519,7 @@ Traceability highlights: FR1 through FR18 cover the platform execution contract 
 ### Core Platform Reliability
 
 - NFR4: Manual reconnect must restore execution capability within 5 seconds after target reload when the target is reachable, measured by successful reconnection state and one successful JavaScript cell execution without restarting VS Code.
-- NFR5: Runtime and syntax failures must always surface as explicit notebook outputs; silent failure is not acceptable.
+- NFR5: Runtime and syntax failures must always surface as explicit notebook outputs; silent failure is not acceptable, measured by regression tests exercising all error paths including syntax errors, runtime exceptions, and evaluation timeouts.
 - NFR6: The shared result contract must preserve identical success and failure classification across supported transports for equivalent test cases, measured by deterministic regression fixtures that cover success, syntax error, runtime error, and serialization-edge cases with 100% classification parity.
 
 ### Core Platform Integration and Contracts
@@ -529,7 +536,7 @@ Traceability highlights: FR1 through FR18 cover the platform execution contract 
 ### Core Platform Testing and Validation
 
 - NFR12: Core execution and result normalization must be validated through deterministic automated tests that require 100% pass rate for success paths, syntax errors, runtime errors, and serialization-boundary cases without requiring a live profile runtime.
-- NFR13: Automated platform tests must cover success paths, syntax errors, runtime errors, reconnect state transitions, and serialization boundaries including circular references, null or undefined values, and large payload handling.
+- NFR13: Automated platform tests must cover success paths, syntax errors, runtime errors, reconnect state transitions, and serialization boundaries including circular references, null or undefined values, and large payload handling, measured by test-suite coverage audit confirming each listed path has at least one exercising test case.
 - NFR14: Any future profile must pass fixture-based target-matching and readiness-contract tests before live-environment integration testing begins.
 
 ### Security and Diagnostics
@@ -547,10 +554,20 @@ Traceability highlights: FR1 through FR18 cover the platform execution contract 
 
 This table maps each user journey to the scope items, functional requirements, and non-functional requirements it exercises. Use this as the primary cross-reference for epic and story decomposition.
 
-| Journey                               | Scope Items                   | FRs                       | NFRs                               |
-| ------------------------------------- | ----------------------------- | ------------------------- | ---------------------------------- |
-| J1: Rapid Macro Iteration             | Core 1–4, 6–7; Foundry 1–4, 6 | FR1–FR17, FR19–FR25, FR29 | NFR1, NFR3, NFR5–6, NFR8, NFR10–11 |
-| J2: Safe Experimentation and Reversal | Core 3–4; Foundry 5           | FR8–FR17, FR25–FR28       | NFR1, NFR5–6                       |
-| J3: Connection and Readiness Recovery | Core 1–2, 4–5; Foundry 1–3, 7 | FR1–FR7, FR19–FR24, FR30  | NFR2, NFR4, NFR8–11                |
-| J4: Diagnosing Unexpected Behavior    | Core 2, 4, 7                  | FR14–FR18                 | NFR5–6, NFR8, NFR15–17             |
-| J5: Platform Path — Future Profile    | Core 1–8                      | FR1–FR18                  | NFR6–7, NFR9, NFR12–14             |
+| Journey                               | Scope Items                     | FRs                             | NFRs                               |
+| ------------------------------------- | ------------------------------- | ------------------------------- | ---------------------------------- |
+| J1: Rapid Macro Iteration             | Core 1–4, 6–7; Foundry 1–4, 6–7 | FR1–FR17, FR19–FR25, FR29, FR31 | NFR1, NFR3, NFR5–6, NFR8, NFR10–11 |
+| J2: Safe Experimentation and Reversal | Core 3–4; Foundry 5             | FR8–FR17, FR25–FR28             | NFR1, NFR5–6                       |
+| J3: Connection and Readiness Recovery | Core 1–2, 4–5; Foundry 1–3, 7   | FR1–FR7, FR19–FR24, FR30        | NFR2, NFR4, NFR8–11                |
+| J4: Diagnosing Unexpected Behavior    | Core 2, 4, 7; Foundry 7         | FR14–FR18, FR31                 | NFR5–6, NFR8, NFR15–17             |
+| J5: Platform Path — Future Profile    | Core 1–8                        | FR1–FR18                        | NFR6–7, NFR9, NFR12–14             |
+
+## Glossary
+
+- **Profile:** A configuration boundary that defines target-matching rules, readiness checks, runtime helpers, and examples for a specific browser application. Foundry VTT is the MVP profile.
+- **Transport:** The communication layer between the extension and the browser target. CDP over browser-level WebSocket is the MVP transport; the architecture preserves replaceability.
+- **Shared result contract:** The normalized data structure that represents success and failure outcomes from cell execution, independent of transport or profile. Ensures consistent behavior across all execution paths.
+- **Execution history retention:** Session-scoped storage of cell execution results so earlier outputs remain available for comparison as cells are revised and rerun.
+- **Transport-boundary isolation:** The architectural property that notebook execution semantics do not depend on transport internals. The result contract mediates between transport and notebook concerns.
+- **Readiness state:** A profile-owned classification of whether the execution target meets the profile's prerequisites. Foundry uses `missing`, `legacy`, `unsupported`, and `ok`.
+- **Connection state:** A platform-level classification of the session lifecycle: `disconnected`, `connecting`, `connected`, or `error`.
