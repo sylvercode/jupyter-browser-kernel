@@ -1,137 +1,60 @@
 # Component Strategy
 
-
 ### Design System Components
 
-The product continues with a native-first component strategy:
+MVP relies on host-native components and explicit content contracts.
 
-- VS Code native surfaces for status, notebook output, and output channel.
-- Foundry native module settings UI for companion configuration.
-- No custom webview component library in V1.
+Foundation components:
 
-Foundation components reused from host systems:
+- VS Code status bar item
+- VS Code notebook output renderer
+- VS Code output channel
+- VS Code settings and command palette actions
 
-- VS Code status bar item.
-- VS Code notebook cell output rendering.
-- VS Code output channel text stream.
-- Foundry module settings form controls (`game.settings.register`-backed UI).
+### Contract Components
 
-Coverage outcome:
-Most UX is delivered by content contracts inside native components, not by introducing custom visual containers.
+### Status Contract
 
-### Custom Components
+**Purpose:** show one authoritative session state headline.  
+**States:** `Disconnected`, `Connecting`, `Connected`, `Error`.  
+**Behavior:** updates on connect, reconnect, disconnect, and session failures.  
+**Accessibility:** textual labels are required; color is supplemental.
 
-### Status Headline Contract (A2)
+### Cell Output Envelope Contract
 
-**Purpose:** Provide one authoritative readiness headline at a time in the status bar.  
-**Usage:** Always visible during connected workflow; updates on connection and handshake transitions.  
-**Anatomy:** icon + state label + optional companion version token.  
-**States:**
+**Purpose:** make each run outcome immediately interpretable.  
+**Success envelope:** result label plus value payload.  
+**Error envelope:** error label, type, message, stack, and source location when available.  
+**Behavior:** render on every run; keep structure consistent across transports.
 
-- `Disconnected`
-- `Connecting`
-- `Module Missing`
-- `Ready $(companionVersion)`
-- `Legacy $(companionVersion)`
-- `Unsupported $(companionVersion)`
+### Intentional Output Contract
 
-**Variants:** none in V1 (single-line status headline only).  
-**Accessibility:** textual state always present; color is supplemental only.  
-**Content Guidelines:** keep wording short, deterministic, and mutually exclusive.  
-**Interaction Behavior:** state refreshes on reconnect, handshake completion, and module state changes.
-
-### Cell Output Envelope Contract (B2)
-
-**Purpose:** Make every run outcome instantly readable without metadata overload.  
-**Usage:** Render for every cell execution result.  
-**Anatomy:**
-
-- Success: semantic result label + primary value
-- Error: semantic error label + type + message + location anchor
-- Optional metadata: duration (if enabled in extension settings)
-
-**States:**
-
-- Success
-- Error
-- Error with expanded stack details
-- Error with collapsed stack details (default)
-
-**Variants:**
-
-- Duration shown (setting enabled)
-- Duration hidden (setting disabled)
-
-**Accessibility:**
-
-- Semantic labels on all outputs (`Result`, `Error`)
-- Error locations represented as text, not color-only cues
-- Stack disclosure has keyboard-focusable toggle semantics
-
-**Content Guidelines:**
-
-- Keep the first line high-signal: status and error type
-- Keep line and column visible without expansion
-- Include called-function source line when resolvable, alongside executing cell line
-
-**Interaction Behavior:**
-
-- Stack trace collapsed by default
-- User can expand stack details on demand
-- Error line is highlighted in cell code
-- When available, display both the cell line and underlying called-function line reference
-
-### Output Log Entry Contract (C2)
-
-**Purpose:** Provide intentional, grep-friendly runtime breadcrumbs in output channel.  
-**Usage:** For `$f.log()` and other intentional extension-scoped runtime messages.  
-**Anatomy:** fixed prefix + timestamp + payload text or value.  
-**Prefix:** `FOUNDRY-DCS` (fixed, non-configurable in V1).  
-**States:** info baseline in V1; severity shaping can be layered later if needed.  
-**Accessibility:** plain-text readable format, no color dependency.  
-**Content Guidelines:**
-
-- Keep each entry single-line when practical
-- Preserve chronological ordering
-- Avoid noisy diagnostic duplication already shown in cell output
-
-**Interaction Behavior:** append-only stream per session; supports copy and search workflows.
+**Purpose:** capture user-intended runtime output distinctly from ambient browser noise.  
+**Surface:** output channel and notebook output associations.  
+**Prefix:** `JBK` (core-kernel identity prefix).  
+**Behavior:** append chronologically; optimize for scan and search.
 
 ### Component Implementation Strategy
 
-Foundation-first approach:
-
-- Use host-native components for rendering and interaction mechanics.
-- Implement custom behavior as formatting and state contracts over those primitives.
-
-Contract-first priorities:
-
-1. Status headline state machine mapped to connection and companion handshake outcomes.
-2. B2 cell envelope formatter with optional duration and default-collapsed stack details.
-3. In-cell error line emphasis with dual-location support (cell line + called-function line when available).
-4. Fixed-prefix log formatter (`FOUNDRY-DCS`) for intentional output channel entries.
-
-Consistency rules:
-
-- One authoritative status headline at a time.
-- One semantic output envelope per run.
-- One fixed log identity prefix across all sessions.
+1. Implement status state machine and reconnect actions.
+2. Implement normalized output envelope formatter.
+3. Implement intentional output formatter and tagging.
+4. Add optional progressive disclosure for stack depth and metadata.
 
 ### Implementation Roadmap
 
-Phase 1 - Core Components (MVP-critical):
+Phase 1 (MVP core):
 
-- Status Headline Contract (A2)
-- Cell Output Envelope Contract (B2 baseline: result or error labels, message, line and column)
-- Fixed Log Prefix Contract (C2 with `FOUNDRY-DCS`)
+- Status contract
+- Output envelope contract
+- Intentional output contract
 
-Phase 2 - Diagnostic Depth (still within V1 boundaries if capacity allows):
+Phase 2 (post-MVP core enhancements):
 
-- Optional duration controlled by extension setting
-- Collapsible stack disclosure in cell output (default collapsed)
-- In-cell error highlighting with robust anchor behavior
+- Richer watched-value rendering
+- Deeper drill-down interactions
 
-Phase 3 - Precision Enhancements:
+Phase 3 (post-MVP profile enhancements):
 
-- Called-function source line display alongside cell line where trace mapping allows
-- Additional polish for multi-error readability and copy or paste diagnostics hygiene
+- Profile-specific eligibility states and guidance
+- Profile-specific output conventions where needed

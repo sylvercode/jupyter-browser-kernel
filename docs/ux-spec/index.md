@@ -1,6 +1,11 @@
 # UX Spec Shards
 
-Sharded sections for the UX specification:
+This UX specification index is aligned to the current PRD direction for jupyter-browser-kernel.
+
+- MVP focus: profile-agnostic browser execution kernel UX.
+- Foundry-specific UX: example profile guidance and flows after core-kernel stability.
+
+Sharded sections:
 
 - [Executive Summary](./01-executive-summary.md)
 - [Core User Experience](./02-core-user-experience.md)
@@ -16,5 +21,6 @@ Sharded sections for the UX specification:
 - [Responsive Design & Accessibility](./12-responsive-design-accessibility.md)
 
 - [Official visual companion (HTML)](./ux-spec.html)
-
-- [Full original spec](./full-spec.md)
+- [Product Requirements Document](../prd.md)
+- [Product Brief](../product-brief.md)
+- [CDP Multiplexing Findings](../../spike/cdp-multiplex-findings.md)

@@ -1,23 +1,31 @@
 # Executive Summary
 
+`jupyter-browser-kernel` is a VS Code extension UX centered on one promise: a fast, trustworthy write-run-inspect loop for JavaScript notebook cells against a live browser target.
 
-### Project Vision
+The UX objective for MVP is profile-agnostic core-kernel clarity. Users should always know:
 
-foundry-devil-code-sight transforms Foundry macro work from a cramped, minimal editor experience into a deliberate IDE-native iteration loop. The product's UX purpose is to reduce the friction of writing, testing, and refining JavaScript macros by giving users clear execution feedback and a faster path from idea to validated behavior.
+- whether they are connected,
+- what happened after a run,
+- how to recover when execution fails.
+
+Foundry VTT remains an important example profile, but it is post-MVP from a UX-scope perspective.
 
 ### Target Users
 
-Primary users are Foundry macro authors who are already comfortable with JavaScript, including advanced hobby scripters and experienced professional developers. Users who feel blocked or irritated by Foundry's minimal macro UI are especially strong candidates and are likely to see this extension as essential rather than optional.
+Primary users are developers and advanced scripters who iterate JavaScript against live browser applications and value deterministic feedback over ad-hoc console workflows.
 
-### Key Design Challenges
+Secondary users are profile-specific power users (including Foundry macro authors) who adopt the same core UX loop once profile layers are added.
 
-- Replacing a high-friction Foundry macro workflow with a low-friction notebook loop without increasing cognitive load.
-- Making execution outcomes unmistakably clear, since notebook output clarity is the most important V1 UX surface.
-- Designing for technically capable users who expect IDE-grade feedback speed and precision, not simplified beginner abstractions.
-- Keeping interaction patterns optimized for desktop-only usage, with no mobile accommodation assumptions.
+### Core UX Challenges
 
-### Design Opportunities
+- Preserve momentum during repeated reruns without forcing setup churn.
+- Make success, error, and intentional output unmistakable in-cell.
+- Keep connection and reconnect state continuously legible.
+- Separate core-kernel behavior from profile-specific guidance so the product can expand cleanly.
 
-- Turn output clarity into the flagship UX differentiator through structured, readable, high-signal result/error presentation.
-- Create a confidence loop where users can run, inspect, and refine macros quickly enough to feel immediate productivity gains.
-- Position the extension as a must-have power tool for users frustrated by Foundry's native macro UI, especially those with professional development habits.
+### UX Opportunities
+
+- Make structured output the product's trust anchor.
+- Make reconnect and target-eligibility recovery feel operationally lightweight.
+- Turn notebooks into durable execution history for safe experimentation.
+- Keep profile integration additive, not disruptive to the core loop.
