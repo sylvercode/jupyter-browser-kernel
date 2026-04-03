@@ -1,7 +1,7 @@
 ---
 stepsCompleted: [1, 2, 3, 4]
 inputDocuments: []
-session_topic: "Preparing for the planning phase of foundry-devil-code-sight"
+session_topic: "Preparing for the planning phase of JupyterBrowserKernel"
 session_goals: "Uncover technical risks and unknowns to investigate before planning"
 selected_approach: "ai-recommended"
 techniques_used:
@@ -17,7 +17,7 @@ context_file: ""
 
 ## Session Overview
 
-**Topic:** Preparing for the planning phase of foundry-devil-code-sight
+**Topic:** Preparing for the planning phase of JupyterBrowserKernel
 **Goals:** Uncover technical risks and unknowns to investigate before planning
 
 ### Session Setup
@@ -27,7 +27,7 @@ _Fresh session initialized to explore ideas and possibilities for the project pl
 ## Technique Selection
 
 **Approach:** AI-Recommended Techniques
-**Analysis Context:** Preparing for the planning phase of `foundry-devil-code-sight` with focus on uncovering technical risks and unknowns before planning
+**Analysis Context:** Preparing for the planning phase of `JupyterBrowserKernel` with focus on uncovering technical risks and unknowns before planning
 
 **Recommended Techniques:**
 
@@ -123,7 +123,7 @@ _Concept:_ On connect, run the handshake. If module missing, `showWarningMessage
 _Novelty:_ The extension becomes its own onboarding guide at the exact moment the user needs it.
 
 **[Idea #9]**: Configurable Connect Retry Settings
-_Concept:_ `foundryDevilCodeSight.connectRetryInterval` (default: 2000ms) + `foundryDevilCodeSight.connectRetryTimeout` (default: 30000ms). Polls `game?.ready === true` before running the handshake. Set `connectRetryInterval: 0` to disable.
+_Concept:_ `jupyterBrowserKernel.connectRetryInterval` (default: 2000ms) + `jupyterBrowserKernel.connectRetryTimeout` (default: 30000ms). Polls `game?.ready === true` before running the handshake. Set `connectRetryInterval: 0` to disable.
 _Novelty:_ User-controlled resilience — devcontainer users set longer timeouts; local users set 0.
 
 **[Idea #13]**: GitHub Release as Distribution Contract

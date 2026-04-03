@@ -1,5 +1,5 @@
 # generated: 2026-04-02
-# last_updated: 2026-04-02
+# last_updated: 2026-04-02T02:11:24.260Z
 # project: jupyter-browser-kernel
 # project_key: NOKEY
 # tracking_system: file-system
@@ -43,8 +43,8 @@ story_location: "{project-root}/docs/stories"
 
 development_status:
   # ── Epic 1: Connect and Control Browser Sessions ──────────────────────────
-  epic-1: backlog
-  1-1-initialize-extension-from-starter-template: backlog
+  epic-1: in-progress
+  1-1-initialize-extension-from-starter-template: ready-for-dev
   1-2-configure-browser-endpoint: backlog
   1-3-connect-to-a-valid-browser-target: backlog
   1-4-disconnect-and-manual-reconnect-lifecycle: backlog
