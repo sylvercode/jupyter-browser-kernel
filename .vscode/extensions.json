@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    // Required runtime dependencies (also in extensionDependencies)
+    "ms-toolsai.jupyter",
+    "ms-edgedevtools.vscode-edge-devtools",
+    // TypeScript development
+    "dbaeumer.vscode-eslint",
+    "ms-vscode.vscode-typescript-next",
+    // Extension development
+    "ms-vscode.extension-test-runner",
+    "github.vscode-pull-request-github",
+    "github.copilot-chat"
+  ]
+}

@@ -15,8 +15,7 @@
   ],
   "main": "./dist/extension.js",
   "extensionDependencies": [
-    "ms-toolsai.jupyter",
-    "ms-edgedevtools.vscode-edge-devtools"
+    "ms-toolsai.jupyter"
   ],
   "contributes": {
     "commands": [
