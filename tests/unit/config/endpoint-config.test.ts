@@ -5,6 +5,7 @@ import {
   CDP_PORT_MAX,
   CDP_PORT_MIN,
   readEndpointConfig,
+  summarizeEndpointForDisplay,
   validateEndpointConfig,
 } from "../../../src/config/endpoint-config";
 
@@ -80,4 +81,82 @@ test("readEndpointConfig normalizes host and port from configuration", () => {
 
   assert.equal(result.host, "127.0.0.1");
   assert.equal(result.port, 9333);
+});
+
+test("readEndpointConfig does not apply endpoint defaults when settings are unset", () => {
+  const config = {
+    get<T>(_section: string, defaultValue: T): T {
+      return defaultValue;
+    },
+  };
+
+  const result = readEndpointConfig(config);
+
+  assert.equal(result.host, "");
+  assert.equal(Number.isNaN(result.port), true);
+});
+
+test("summarizeEndpointForDisplay shows loopback host as-is", () => {
+  assert.equal(
+    summarizeEndpointForDisplay({ host: "localhost", port: 9222 }),
+    "localhost:9222",
+  );
+  assert.equal(
+    summarizeEndpointForDisplay({ host: "127.0.0.1", port: 9222 }),
+    "127.0.0.1:9222",
+  );
+  assert.equal(
+    summarizeEndpointForDisplay({ host: "::1", port: 9222 }),
+    "::1:9222",
+  );
+});
+
+test("summarizeEndpointForDisplay redacts non-loopback host", () => {
+  assert.equal(
+    summarizeEndpointForDisplay({ host: "example.internal", port: 9222 }),
+    "[redacted-host]:9222",
+  );
+});
+
+test("readEndpointConfig treats non-string cdpHost as empty", () => {
+  const config = {
+    get<T>(section: string, defaultValue: T): T {
+      if (section === "cdpHost") {
+        return { nested: "value" } as unknown as T;
+      }
+
+      return defaultValue;
+    },
+  };
+
+  const result = readEndpointConfig(config);
+
+  assert.equal(result.host, "");
+});
+
+test("readEndpointConfig treats non-number cdpPort as NaN", () => {
+  const config = {
+    get<T>(section: string, defaultValue: T): T {
+      if (section === "cdpPort") {
+        return "9222" as unknown as T;
+      }
+
+      return defaultValue;
+    },
+  };
+
+  const result = readEndpointConfig(config);
+
+  assert.equal(Number.isNaN(result.port), true);
+});
+
+test("summarizeEndpointForDisplay preserves port in output", () => {
+  assert.equal(
+    summarizeEndpointForDisplay({ host: "localhost", port: 9333 }),
+    "localhost:9333",
+  );
+  assert.equal(
+    summarizeEndpointForDisplay({ host: "remote.host", port: 9333 }),
+    "[redacted-host]:9333",
+  );
 });

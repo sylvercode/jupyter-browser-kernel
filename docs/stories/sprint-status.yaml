@@ -45,7 +45,7 @@ development_status:
   # ── Epic 1: Connect and Control Browser Sessions ──────────────────────────
   epic-1: in-progress
   1-1-initialize-extension-from-starter-template: done
-  1-2-configure-browser-endpoint: review
+  1-2-configure-browser-endpoint: done
   1-3-connect-to-a-valid-browser-target: backlog
   1-4-disconnect-and-manual-reconnect-lifecycle: backlog
   1-5-preserve-devtools-coexistence: backlog

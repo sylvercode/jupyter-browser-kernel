@@ -1,66 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { t as localize } from "@vscode/l10n";
 
 import {
   executeConnectCommand,
   type ConnectCommandRuntime,
 } from "../../../src/commands/connect-command";
-
-function format(
-  message: string,
-  ...args: Array<string | number | boolean>
-): string;
-function format(
-  message: string,
-  args: Record<string, string | number | boolean>,
-): string;
-function format(options: {
-  message: string;
-  args?:
-    | Array<string | number | boolean>
-    | Record<string, string | number | boolean>;
-  comment: string | string[];
-}): string;
-function format(
-  messageOrOptions:
-    | string
-    | {
-        message: string;
-        args?:
-          | Array<string | number | boolean>
-          | Record<string, string | number | boolean>;
-        comment: string | string[];
-      },
-  ...args: Array<
-    string | number | boolean | Record<string, string | number | boolean>
-  >
-): string {
-  if (typeof messageOrOptions !== "string") {
-    if (!messageOrOptions.args || Array.isArray(messageOrOptions.args)) {
-      const resolvedArgs = messageOrOptions.args ?? [];
-      return format(messageOrOptions.message, ...resolvedArgs);
-    }
-
-    return format(messageOrOptions.message, messageOrOptions.args);
-  }
-
-  if (
-    args.length === 1 &&
-    typeof args[0] === "object" &&
-    !Array.isArray(args[0])
-  ) {
-    const namedArgs = args[0] as Record<string, string | number | boolean>;
-    return messageOrOptions.replace(/\{([^}]+)\}/g, (_match, key: string) => {
-      const resolved = namedArgs[key];
-      return resolved === undefined ? "" : String(resolved);
-    });
-  }
-
-  return messageOrOptions.replace(/\{(\d+)\}/g, (_match, index: string) => {
-    const resolved = args[Number(index)];
-    return resolved === undefined ? "" : String(resolved);
-  });
-}
 
 function createRuntime(
   overrides: Partial<ConnectCommandRuntime>,
@@ -70,7 +15,7 @@ function createRuntime(
       ok: true,
       endpoint: { host: "localhost", port: 9222 },
     }),
-    localize: format,
+    localize: localize,
     showInformationMessage: () => undefined,
     showErrorMessage: () => undefined,
     openSettings: () => undefined,
@@ -132,4 +77,53 @@ test("executeConnectCommand blocks invalid endpoint and offers actionable settin
   assert.equal(errorMessages.length, 1);
   assert.match(errorMessages[0], /jupyterBrowserKernel\.cdpPort/);
   assert.deepEqual(openedSettings, ["jupyterBrowserKernel.cdpPort"]);
+});
+
+test("executeConnectCommand does not open settings when user dismisses error dialog", async () => {
+  const openedSettings: string[] = [];
+
+  const runtime = createRuntime({
+    readAndValidate: () => ({
+      ok: false,
+      error: {
+        field: "host",
+        message: "Invalid CDP host: host cannot be empty.",
+        correctiveAction:
+          "Set jupyterBrowserKernel.cdpHost to a hostname or IP address, for example localhost.",
+      },
+    }),
+    showErrorMessage: () => undefined, // user dismissed without clicking Open Settings
+    openSettings: (query) => {
+      openedSettings.push(query);
+      return undefined;
+    },
+  });
+
+  await executeConnectCommand(runtime);
+
+  assert.deepEqual(openedSettings, []);
+});
+
+test("executeConnectCommand falls back to host settings key for unknown validation field", async () => {
+  const openedSettings: string[] = [];
+
+  const runtime = createRuntime({
+    readAndValidate: () => ({
+      ok: false,
+      error: {
+        field: "future-field" as never,
+        message: "Invalid endpoint field.",
+        correctiveAction: "Update endpoint settings.",
+      },
+    }),
+    showErrorMessage: (_message, action) => action,
+    openSettings: (query) => {
+      openedSettings.push(query);
+      return undefined;
+    },
+  });
+
+  await executeConnectCommand(runtime);
+
+  assert.deepEqual(openedSettings, ["jupyterBrowserKernel.cdpHost"]);
 });

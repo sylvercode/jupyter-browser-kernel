@@ -40,8 +40,11 @@ function isLoopbackHost(host: string): boolean {
 export function readEndpointConfig(
   config: EndpointConfigurationReader,
 ): EndpointConfig {
-  const host = String(config.get<string>("cdpHost", "localhost") ?? "").trim();
-  const port = Number(config.get<number>("cdpPort", 9222));
+  const rawHost = config.get<string>("cdpHost", "");
+  const host = (typeof rawHost === "string" ? rawHost : "").trim();
+
+  const rawPort = config.get<number>("cdpPort", Number.NaN);
+  const port = typeof rawPort === "number" ? rawPort : Number.NaN;
 
   return { host, port };
 }

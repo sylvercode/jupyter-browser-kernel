@@ -44,6 +44,7 @@
           "description": "%configuration.cdpPort.description%",
           "minimum": 1,
           "maximum": 65535,
+          "multipleOf": 1,
           "markdownDescription": "%configuration.cdpPort.markdownDescription%"
         },
         "jupyterBrowserKernel.watchAutoRefreshInterval": {
@@ -70,6 +71,7 @@
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.92.0",
+    "@vscode/l10n": "^0.0.18",
     "@vscode/test-electron": "^2.3.8",
     "esbuild": "^0.20.0",
     "eslint": "^9.0.0",

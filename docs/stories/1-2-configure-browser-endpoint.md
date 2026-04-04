@@ -206,7 +206,26 @@ GPT-5.3-Codex
 - tests/unit/config/endpoint-config.test.ts
 - tsconfig.test.json
 
+### Review Findings
+
+- [x] [Review][Patch] NFR15 defaults — `readEndpointConfig` silently falls back to `localhost:9222` when settings are unset. Remove programmatic defaults; treat missing/empty host and NaN/zero port as validation failures so the user is always in explicit control of the endpoint. [`src/config/endpoint-config.ts`]
+- [x] [Review][Dismissed] AC2 scope — port schema constraints (`minimum: 1`, `maximum: 65535`) prevent saving an out-of-range port in the settings UI. Host connect-time field-specific validation is sufficient (no practical pattern constraint for arbitrary hostnames). AC2 met.
+- [x] [Review][Patch] `field` ternary has no fallback for future variants — `validation.error.field === "host" ? "cdpHost" : "cdpPort"` silently opens the wrong settings pane if `EndpointValidationField` gains a third value. Use a Record lookup with an explicit fallback. [`src/commands/connect-command.ts`]
+- [x] [Review][Patch] `cdpPort` missing `multipleOf: 1` — JSON schema `"type": "number"` with only `minimum`/`maximum` allows `9222.5` in the settings UI. Add `"multipleOf": 1` to the `cdpPort` property. [`package.json`]
+- [x] [Review][Patch] No test for user-dismissal path — when `showErrorMessage` returns `undefined` (user closes the dialog without clicking "Open Settings"), `openSettings` must NOT be called. This behavioral contract is entirely untested. [`tests/unit/commands/connect-command.test.ts`]
+- [x] [Review][Patch] `summarizeEndpointForDisplay` has zero test coverage — loopback vs. non-loopback branching and port formatting are untested despite being observable behaviors. [`tests/unit/config/endpoint-config.test.ts`]
+- [x] [Review][Patch] Unhandled rejection from VS Code API calls — `showErrorMessage` and `openSettings` are awaited inside `executeConnectCommand` with no try/catch. A VS Code API rejection propagates to the extension host as an uncaught error. [`src/commands/connect-command.ts`]
+- [x] [Review][Patch] `createDefaultConnectCommandRuntime` inline structural type — replace 30-line hand-rolled parameter type with `typeof import("vscode")`, eliminating duplication and gaining breaking-change detection. [`src/commands/connect-command.ts`]
+- [x] [Review][Patch] `ConnectCommandRuntime` return types use `PromiseLike<unknown> | Promise<unknown> | unknown` which collapses to `unknown` — replace with `Thenable<string | undefined>` for message methods and `Thenable<void>` for `openSettings` to match VS Code API types. [`src/commands/connect-command.ts`]
+- [x] [Review][Defer] `isLoopbackHost` incomplete loopback detection — `127.x.x.x` block and IPv6 variants (`::ffff:127.0.0.1`, long-form `0:0:0:0:0:0:0:1`) are shown as `[redacted-host]`. [`src/config/endpoint-config.ts`] — deferred, expanded display safety is post-MVP
+- [x] [Review][Defer] `watchAutoRefreshInterval` missing `markdownDescription` and min/max — sibling numeric setting lacks format guidance and range constraints. [`package.json`] — deferred, outside Story 1.2 task scope
+- [x] [Review][Defer] Generic `"{0} {1}"` l10n key limits targeted translations — any two-argument composition shares this key. [`l10n/bundle.l10n.json`] — deferred, not a functional bug
+- [x] [Review][Superseded] Hand-rolled vscode API structural interface — superseded by patch findings for inline type replacement and `Thenable<T>` return types. [`src/commands/connect-command.ts`]
+- [x] [Review][Resolved] `format` test helper re-implements `vscode.l10n.t` substitution — replaced with direct import of `@vscode/l10n` (the canonical standalone package). [`tests/unit/commands/connect-command.test.ts`]
+- [x] [Review][Defer] `config.get` returning a non-string object for `cdpHost` results in `"[object Object]"` passing host validation. [`src/config/endpoint-config.ts`] — deferred, configuration corruption scenario prevented by VS Code settings infrastructure
+
 ## Change Log
 
 - 2026-04-04: Implemented endpoint configuration schema hardening, runtime validation, connect fail-fast behavior, and test coverage for Story 1.2.
 - 2026-04-04: Moved Story 1.2 tests from source folders to top-level tests folders to satisfy architecture test-organization rules.
+- 2026-04-04: Code review complete — findings written above.
