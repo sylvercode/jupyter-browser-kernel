@@ -38,7 +38,7 @@ If the PRD and the existing code disagree, preserve working code unless the task
 - Runtime: VS Code extension APIs.
 - CDP client library: `chrome-remote-interface`.
 - Bundling: esbuild to a single ESM extension entry (`dist/extension.mjs`).
-- Notebook dependency: `ms-toolsai.jupyter` must remain in `extensionDependencies`.
+- Notebook dependency: `ms-toolsai.jupyter` is NOT in `extensionDependencies`. It was removed because no current code calls Jupyter APIs and the dependency forced the extension into the container workspace host, blocking CDP access. When the NotebookController is implemented (Epic 2), users need Jupyter installed, but it does not need to be a hard extension dependency — `vscode.notebooks.createNotebookController` is a core VS Code API.
 - Activation event should remain scoped to `onCommand:jupyterBrowserKernel.connect` unless requirements change.
 - Settings use the `jupyterBrowserKernel.*` namespace.
 

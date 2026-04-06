@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import { t as localize } from "@vscode/l10n";
 
 import {
+  createConnectionStateStore,
+  type ConnectionState,
+} from "../../../src/transport/connection-state";
+import {
   executeConnectCommand,
   type ConnectCommandRuntime,
 } from "../../../src/commands/connect-command";
@@ -16,6 +20,16 @@ function createRuntime(
       endpoint: { host: "localhost", port: 9222 },
     }),
     localize: localize,
+    connectionStateStore: createConnectionStateStore(),
+    setConnectionState: () => undefined,
+    connectToTarget: async () => ({
+      ok: true,
+      endpoint: { host: "localhost", port: 9222 },
+      connectedTarget: {
+        targetId: "target-1",
+        sessionId: "session-1",
+      },
+    }),
     showInformationMessage: () => undefined,
     showErrorMessage: () => undefined,
     openSettings: () => undefined,
@@ -23,13 +37,18 @@ function createRuntime(
   };
 }
 
-test("executeConnectCommand uses persisted endpoint values on success", async () => {
+test("executeConnectCommand sets deterministic connecting -> connected transition on success", async () => {
+  const stateTransitions: ConnectionState[] = [];
   const infoMessages: string[] = [];
+
   const runtime = createRuntime({
     readAndValidate: () => ({
       ok: true,
       endpoint: { host: "127.0.0.1", port: 9333 },
     }),
+    setConnectionState: (state) => {
+      stateTransitions.push(state);
+    },
     showInformationMessage: (message) => {
       infoMessages.push(message);
       return undefined;
@@ -38,8 +57,9 @@ test("executeConnectCommand uses persisted endpoint values on success", async ()
 
   await executeConnectCommand(runtime);
 
+  assert.deepEqual(stateTransitions, ["connecting", "connected"]);
   assert.equal(infoMessages.length, 1);
-  assert.match(infoMessages[0], /127\.0\.0\.1:9333/);
+  assert.match(infoMessages[0], /Connected/);
 });
 
 test("executeConnectCommand blocks invalid endpoint and offers actionable settings path", async () => {
@@ -126,4 +146,33 @@ test("executeConnectCommand falls back to host settings key for unknown validati
   await executeConnectCommand(runtime);
 
   assert.deepEqual(openedSettings, ["jupyterBrowserKernel.cdpHost"]);
+});
+
+test("executeConnectCommand sets deterministic connecting -> error transition for categorized failures", async () => {
+  const stateTransitions: ConnectionState[] = [];
+  const errorMessages: string[] = [];
+
+  const runtime = createRuntime({
+    setConnectionState: (state) => {
+      stateTransitions.push(state);
+    },
+    connectToTarget: async (_endpoint, _localize) => ({
+      ok: false,
+      endpoint: { host: "localhost", port: 9222 },
+      failure: {
+        category: "target-mismatch",
+        message: "No valid browser target matched profile.",
+      },
+    }),
+    showErrorMessage: (message, action) => {
+      errorMessages.push(message);
+      return action;
+    },
+  });
+
+  await executeConnectCommand(runtime);
+
+  assert.deepEqual(stateTransitions, ["connecting", "error"]);
+  assert.equal(errorMessages.length, 1);
+  assert.match(errorMessages[0], /target-mismatch/);
 });

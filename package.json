@@ -9,7 +9,6 @@
     "vscode": "^1.92.0"
   },
   "extensionKind": [
-    "workspace",
     "ui"
   ],
   "categories": [
@@ -17,11 +16,9 @@
     "Notebooks",
     "Other"
   ],
-  "main": "./dist/extension.mjs",
+  "main": "./dist/extension.js",
   "l10n": "./l10n",
-  "extensionDependencies": [
-    "ms-toolsai.jupyter"
-  ],
+  "extensionDependencies": [],
   "contributes": {
     "commands": [
       {
@@ -59,19 +56,29 @@
     "bmad:sync:build": "mkdir -p .tmp && esbuild scripts/bmad-github-sync.ts --bundle --platform=node --format=cjs --outfile=.tmp/bmad-github-sync.cjs",
     "bmad:sync": "npm run bmad:sync:build && node .tmp/bmad-github-sync.cjs",
     "bmad:sync:dry": "BMAD_SYNC_DRY_RUN=true npm run bmad:sync",
-    "compile": "node esbuild.config.js",
+    "clean": "node -e \"const fs=require('fs'); for (const d of ['dist','out']) fs.rmSync(d,{ recursive: true, force: true });\"",
+    "compile": "npm run clean && node esbuild.config.js",
     "watch": "node esbuild.config.js --watch",
+    "package:vsix": "npm run compile && vsce package --allow-missing-repository --skip-license",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "test:compile": "tsc -p tsconfig.test.json",
+    "test:unit": "npm run test:compile && node --test \"out/tests/unit/**/*.test.js\"",
+    "test:integration": "npm run test:compile && node --test \"out/tests/integration/**/*.test.js\"",
+    "test:integration:cdp": "npm run test:compile && RUN_CDP_INTEGRATION=1 node --test \"out/tests/integration/**/*.test.js\""
   },
   "dependencies": {
-    "chrome-remote-interface": "^0.33.2"
+    "chrome-remote-interface": "^0.34.0",
+    "ws": "^8.17.1"
   },
   "devDependencies": {
+    "@types/chrome-remote-interface": "^0.33.0",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.92.0",
+    "@types/ws": "^8.5.13",
     "@vscode/l10n": "^0.0.18",
+    "@vscode/vsce": "^3.7.1",
     "@vscode/test-electron": "^2.3.8",
     "esbuild": "^0.20.0",
     "eslint": "^9.0.0",

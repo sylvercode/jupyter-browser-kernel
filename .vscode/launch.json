@@ -7,8 +7,8 @@
     {
       "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
       "name": "Launch Extension",
-      "outFiles": ["${workspaceFolder}/dist/**/*.mjs"],
-      "preLaunchTask": "${defaultBuildTask}",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "preLaunchTask": "npm: compile",
       "request": "launch",
       "type": "extensionHost"
     },
@@ -19,6 +19,7 @@
       "type": "msedge",
       "runtimeArgs": [
         "--remote-debugging-port=9222",
+        "--remote-allow-origins=*",
         "--no-first-run",
         "--profile-directory=Debug"
       ],
@@ -31,6 +32,7 @@
       "type": "msedge",
       "runtimeArgs": [
         "--remote-debugging-port=9222",
+        "--remote-allow-origins=*",
         "--no-first-run",
         "--profile-directory=Debug"
       ],

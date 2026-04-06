@@ -3,15 +3,16 @@
   "tasks": [
     {
       "type": "npm",
+      "script": "compile",
+      "problemMatcher": []
+    },
+    {
+      "type": "npm",
       "script": "watch",
       "problemMatcher": "$esbuild-watch",
       "isBackground": true,
       "presentation": {
         "reveal": "never"
-      },
-      "group": {
-        "kind": "build",
-        "isDefault": true
       }
     }
   ]
