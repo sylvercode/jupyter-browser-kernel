@@ -97,6 +97,10 @@ async function runConnect(
 export async function executeConnectCommand(
   runtime: ConnectCommandRuntime,
 ): Promise<void> {
+  if (runtime.connectionStateStore.getState() === "connecting") {
+    return;
+  }
+
   const validation = runtime.readAndValidate();
 
   if (!validation.ok) {
@@ -125,7 +129,11 @@ export async function executeConnectCommand(
       runtime.localize,
     );
 
-    await showSettingsPrompt(runtime, message, "cdpHost");
+    const settingsKey =
+      connectResult.failure.category === "endpoint-connectivity"
+        ? "cdpPort"
+        : "cdpHost";
+    await showSettingsPrompt(runtime, message, settingsKey);
     return;
   }
 
@@ -166,7 +174,8 @@ export function createDefaultConnectCommandRuntime(
     },
     connectToTarget:
       options.connectToTarget ??
-      ((endpoint, localize) => connectToBrowserTarget(endpoint, undefined, localize)),
+      ((endpoint, localize) =>
+        connectToBrowserTarget(endpoint, undefined, localize)),
     showInformationMessage: (message) =>
       vscodeApi.window.showInformationMessage(message),
     showErrorMessage: (message, action) =>

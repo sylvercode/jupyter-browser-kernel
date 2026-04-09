@@ -2,7 +2,7 @@
 storyId: "1.3"
 storyKey: "1-3-connect-to-a-valid-browser-target"
 title: "Connect to a Valid Browser Target"
-status: "review"
+status: "done"
 created: "2026-04-04"
 epic: "1"
 priority: "p0"
@@ -10,7 +10,7 @@ priority: "p0"
 
 # Story 1.3: Connect to a Valid Browser Target
 
-**Status:** review
+**Status:** done
 
 ## Story
 
@@ -94,6 +94,14 @@ So that I can begin notebook execution quickly.
   - [x] Failure category is included in diagnostic output.
   - [x] `target-mismatch` guidance includes actionable next steps.
 - [x] Keep tests under top-level `tests/` folders, not under `src/`.
+
+### Review Findings
+
+- [x] [Review][Decision] No concurrency guard on rapid connect invocations — Resolved: added early-return in `executeConnectCommand` when state is `connecting`.
+- [x] [Review][Patch] Status indicator labels bypass localization — Resolved: replaced `labelByState` map with `localizedLabel()` switch using `vscodeApi.l10n.t`.
+- [x] [Review][Patch] Connect failure always routes to `cdpHost` settings key — Resolved: routes `endpoint-connectivity` failures to `cdpPort` settings key, others to `cdpHost`.
+- [x] [Review][Defer] Partial attach leaves potential orphaned CDP session on probe failure — If `Target.attachToTarget` succeeds but `verifyRuntimeProbe` fails, the attached session is not explicitly detached before `safeClose`. CDP library closes the session when the WS connection drops, making this low-risk. Deferred, pre-existing CDP cleanup pattern.
+- [x] [Review][Defer] `connectionStateStore.getState()` is unused interface surface — `getState()` is defined on `ConnectionStateStore` but never called in command or extension code. State is pushed via callbacks, not pulled. Deferred, benign unused API.
 
 ## Dev Notes
 
