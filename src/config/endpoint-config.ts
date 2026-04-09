@@ -46,7 +46,10 @@ export function readEndpointConfig(
   const rawPort = config.get<number>("cdpPort", Number.NaN);
   const port = typeof rawPort === "number" ? rawPort : Number.NaN;
 
-  return { host, port };
+  return {
+    host,
+    port,
+  };
 }
 
 export function validateEndpointConfig(

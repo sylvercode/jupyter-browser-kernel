@@ -5,9 +5,9 @@
  * esbuild configuration for the Jupyter Browser Kernel VS Code extension.
  *
  * Output format: ESM
- * Rationale: VS Code 1.92+ supports ESM extensions natively. Targeting
- * current VS Code with an .mjs output entry point satisfies the architecture
- * decision to use ESM (docs/architecture.md#module-system-decision-esm).
+ * Rationale: VS Code 1.92+ supports ESM extensions natively. Transport
+ * dependencies remain externalized so the bundle does not emit dynamic
+ * require(...) shims that fail during activation.
  */
 
 const esbuild = require('esbuild');
@@ -20,7 +20,7 @@ const buildOptions = {
     entryPoints: ['src/extension.ts'],
     bundle: true,
     outfile: 'dist/extension.mjs',
-    external: ['vscode'],
+    external: ['vscode', 'chrome-remote-interface', 'ws'],
     format: 'esm',
     platform: 'node',
     target: 'node20',

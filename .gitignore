@@ -28,6 +28,9 @@ _bmad/**/config.yaml
 # Keep tracked only if you intentionally want shared repo-level memory/preferences
 # _bmad/_memory/
 
+# External Exemples
+exemples/
+
 # OS
 .DS_Store
 Thumbs.db
