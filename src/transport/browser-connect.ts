@@ -155,6 +155,19 @@ async function safeClose(client: CDP.Client | undefined): Promise<void> {
   }
 }
 
+type TargetDetachClient = Pick<CDP.Client, "Target">;
+
+export async function safeDetachFromTarget(
+  client: TargetDetachClient,
+  sessionId: string,
+): Promise<void> {
+  try {
+    await client.Target.detachFromTarget({ sessionId });
+  } catch {
+    // Non-fatal cleanup error.
+  }
+}
+
 async function verifyRuntimeProbe(
   client: CDP.Client,
   localize: Localize,
@@ -267,6 +280,7 @@ async function connectViaBrowserTargetAttach(
     try {
       await verifyRuntimeProbe(client, localize, attachResult.sessionId);
     } catch (error) {
+      await safeDetachFromTarget(client, attachResult.sessionId);
       throw createStepError("Runtime.evaluate(probe)", error);
     }
 

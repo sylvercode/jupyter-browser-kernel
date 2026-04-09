@@ -10,5 +10,4 @@
 
 ## Deferred from: code review of 1-3-connect-to-a-valid-browser-target (2026-04-08)
 
-- Partial attach leaves potential orphaned CDP session on probe failure — If `Target.attachToTarget` succeeds but `verifyRuntimeProbe` fails, the attached session is not explicitly detached before `safeClose`. CDP library closes the session when the WS connection drops, making this low-risk.
 - `connectionStateStore.getState()` is unused interface surface — `getState()` is defined on `ConnectionStateStore` but never called in command or extension code. State is pushed via callbacks, not pulled. Benign unused API.

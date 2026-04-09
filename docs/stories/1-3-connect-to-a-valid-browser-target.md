@@ -100,7 +100,7 @@ So that I can begin notebook execution quickly.
 - [x] [Review][Decision] No concurrency guard on rapid connect invocations — Resolved: added early-return in `executeConnectCommand` when state is `connecting`.
 - [x] [Review][Patch] Status indicator labels bypass localization — Resolved: replaced `labelByState` map with `localizedLabel()` switch using `vscodeApi.l10n.t`.
 - [x] [Review][Patch] Connect failure always routes to `cdpHost` settings key — Resolved: routes `endpoint-connectivity` failures to `cdpPort` settings key, others to `cdpHost`.
-- [x] [Review][Defer] Partial attach leaves potential orphaned CDP session on probe failure — If `Target.attachToTarget` succeeds but `verifyRuntimeProbe` fails, the attached session is not explicitly detached before `safeClose`. CDP library closes the session when the WS connection drops, making this low-risk. Deferred, pre-existing CDP cleanup pattern.
+- [x] [Review][Patch] Partial attach leaves potential orphaned CDP session on probe failure — Resolved: `connectViaBrowserTargetAttach` now calls `Target.detachFromTarget({ sessionId })` before closing the client when the runtime probe fails.
 - [x] [Review][Defer] `connectionStateStore.getState()` is unused interface surface — `getState()` is defined on `ConnectionStateStore` but never called in command or extension code. State is pushed via callbacks, not pulled. Deferred, benign unused API.
 
 ## Dev Notes
