@@ -19,7 +19,7 @@ import {
 import { createConnectionStatusIndicator } from "./ui/connection-status-indicator";
 import { disconnectActiveBrowserConnection } from "./transport/browser-connect";
 
-type subscriptionInfo<T> = {
+type SubscriptionInfo<T> = {
   command: string;
   runtimeFactory: (api: typeof vscode, handler: ConnectionStoreHandler) => T;
   callback: (runtime: T) => Promise<void>;
@@ -39,7 +39,7 @@ export function activate(context: vscode.ExtensionContext): void {
     command,
     runtimeFactory,
     callback,
-  }: subscriptionInfo<T>): void => {
+  }: SubscriptionInfo<T>): void => {
     const runtime = runtimeFactory(vscode, { connectionStateStore });
     context.subscriptions.push(
       vscode.commands.registerCommand(command, async () => {

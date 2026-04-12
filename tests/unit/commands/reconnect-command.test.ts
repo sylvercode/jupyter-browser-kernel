@@ -293,3 +293,29 @@ test("executeReconnectCommand routes endpoint-connectivity failures to cdpPort s
 
   assert.deepEqual(openedSettings, ["jupyterBrowserKernel.cdpPort"]);
 });
+
+test("executeReconnectCommand proceeds with connect attempt when teardown throws", async () => {
+  const calls: string[] = [];
+
+  const runtime = createRuntime({
+    disconnectActiveConnection: async () => {
+      calls.push("disconnect");
+      throw new Error("teardown failed");
+    },
+    connectToTarget: async () => {
+      calls.push("connect");
+      return {
+        ok: true,
+        endpoint: { host: "localhost", port: 9222 },
+        connectedTarget: {
+          targetId: "target-1",
+          sessionId: "session-1",
+        },
+      };
+    },
+  });
+
+  await executeReconnectCommand(runtime);
+
+  assert.deepEqual(calls, ["disconnect", "connect"]);
+});

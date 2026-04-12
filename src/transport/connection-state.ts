@@ -8,6 +8,7 @@ export interface ConnectionStateStoreTransitionHandler {
   beginTransition: (newState: ConnectionState) => number;
   transitionTo: (transitionId: number, state: ConnectionState) => boolean;
   cancelTransitions?: () => void;
+  onTransitionsCanceled?: (listener: () => void) => () => void;
 }
 
 export interface ConnectionStateStore extends Required<ConnectionStateStoreTransitionHandler> {
@@ -31,11 +32,12 @@ export function createConnectionStateStore({
   let state = initialState;
   const history: ConnectionState[] = [initialState ?? "disconnected"];
   let activeTransitionId = 0;
+  const transitionCancelListeners = new Set<() => void>();
 
   const setState = (nextState: ConnectionState) => {
-    onConnectionStateChanged?.(nextState);
     state = nextState;
     history.push(nextState);
+    onConnectionStateChanged?.(nextState);
   };
 
   return {
@@ -56,20 +58,45 @@ export function createConnectionStateStore({
     },
     cancelTransitions: () => {
       activeTransitionId += 1;
+      for (const listener of transitionCancelListeners) {
+        listener();
+      }
+    },
+    onTransitionsCanceled: (listener) => {
+      transitionCancelListeners.add(listener);
+      return () => {
+        transitionCancelListeners.delete(listener);
+      };
     },
   };
 }
 
 export async function withConnectTransition<T>(
   store: ConnectionStateStoreTransitionHandler,
-  connectAttempt: () => Promise<T>,
+  connectAttempt: (abortSignal: AbortSignal) => Promise<T>,
   isSuccess: (result: T) => boolean,
   onAborted: () => void,
 ): Promise<T> {
   const transitionId = store.beginTransition("connecting");
+  const abortController = new AbortController();
+  let aborted = false;
+
+  const emitAborted = () => {
+    if (aborted) {
+      return;
+    }
+
+    aborted = true;
+    onAborted();
+  };
+
+  const unsubscribeCanceled = store.onTransitionsCanceled?.(() => {
+    abortController.abort();
+    emitAborted();
+  });
 
   try {
-    const result = await connectAttempt();
+    const result = await connectAttempt(abortController.signal);
 
     const transitionApplied = store.transitionTo(
       transitionId,
@@ -77,7 +104,7 @@ export async function withConnectTransition<T>(
     );
 
     if (!transitionApplied) {
-      onAborted();
+      emitAborted();
     }
 
     return result;
@@ -85,9 +112,11 @@ export async function withConnectTransition<T>(
     const transitionApplied = store.transitionTo(transitionId, "error");
 
     if (!transitionApplied) {
-      onAborted();
+      emitAborted();
     }
 
     throw error;
+  } finally {
+    unsubscribeCanceled?.();
   }
 }

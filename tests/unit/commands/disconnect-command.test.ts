@@ -76,3 +76,22 @@ test("executeDisconnectCommand cancels in-flight transition before disconnect", 
 
   assert.deepEqual(order, ["cancel", "disconnect"]);
 });
+
+test("executeDisconnectCommand still transitions to disconnected when teardown throws", async () => {
+  const transitions: string[] = [];
+
+  const runtime = createRuntime(
+    {
+      disconnectActiveConnection: async () => {
+        throw new Error("teardown failed");
+      },
+    },
+    transitions.push.bind(transitions),
+  );
+
+  await assert.rejects(async () => {
+    await executeDisconnectCommand(runtime);
+  }, /teardown failed/);
+
+  assert.deepEqual(transitions, ["disconnected"]);
+});

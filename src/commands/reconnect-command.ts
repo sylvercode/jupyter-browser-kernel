@@ -38,7 +38,11 @@ export async function executeReconnectCommand(
   }
 
   runtime.cancelInFlightTransitions();
-  await runtime.disconnectActiveConnection();
+  try {
+    await runtime.disconnectActiveConnection();
+  } catch {
+    // best effort teardown before reconnect
+  }
 
   const endpointSummary = summarizeEndpointForDisplay(validation.endpoint);
   const { aborted, connectResult } = await runConnect(
@@ -77,8 +81,8 @@ export function createDefaultReconnectCommandRuntime(
     },
     connectToTarget:
       options.connectToTarget ??
-      ((endpoint, localize) =>
-        connectToBrowserTarget(endpoint, undefined, localize)),
+      ((endpoint, localize, abortSignal) =>
+        connectToBrowserTarget(endpoint, undefined, localize, abortSignal)),
     disconnectActiveConnection:
       options.disconnectActiveConnection ?? disconnectActiveBrowserConnection,
     showInformationMessage: (message) =>

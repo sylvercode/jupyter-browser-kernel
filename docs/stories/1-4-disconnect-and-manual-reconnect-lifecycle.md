@@ -2,7 +2,7 @@
 storyId: "1.4"
 storyKey: "1-4-disconnect-and-manual-reconnect-lifecycle"
 title: "Disconnect and Manual Reconnect Lifecycle"
-status: "review"
+status: "done"
 created: "2026-04-11"
 epic: "1"
 priority: "p0"
@@ -10,7 +10,7 @@ priority: "p0"
 
 # Story 1.4: Disconnect and Manual Reconnect Lifecycle
 
-**Status:** review
+**Status:** done
 
 ## Story
 
@@ -266,11 +266,11 @@ GPT-5.3-Codex
 
 ### Review Findings
 
-- [ ] [Review][Patch] D1: In-flight connect operation not truly cancelled — `cancelTransitions()` only suppresses the post-connect state write but `connectToBrowserTarget` still completes and sets `activeBrowserConnection`, creating a dangling connection. Add an `AbortSignal`-based cancellation or post-connect cleanup to `runConnect`/transport so the operation is truly cancelled, not just the transition. [src/commands/reconnect-command.ts, src/commands/connect-command.ts, src/transport/connection-state.ts]
-- [ ] [Review][Patch] P1: `executeDisconnectCommand` must guarantee disconnected state on teardown error — if `disconnectActiveConnection()` throws, `setState("disconnected")` is never reached. Wrap in try/finally. [src/commands/disconnect-command.ts:27-29]
-- [ ] [Review][Patch] P2: `executeReconnectCommand` must recover from teardown error — if `disconnectActiveConnection()` throws during reconnect teardown, reconnect aborts without state update. Wrap teardown in try/catch, continue with connect. [src/commands/reconnect-command.ts:40-41]
-- [ ] [Review][Patch] P3: State mutation ordering — `onConnectionStateChanged` fires before `state = nextState` in `createConnectionStateStore.setState`. If callback reads `getState()` or throws, internal state is stale. Reorder to mutate first. [src/transport/connection-state.ts:38-41]
-- [ ] [Review][Patch] P4: `subscriptionInfo<T>` should be `SubscriptionInfo<T>` per TypeScript PascalCase convention. [src/extension.ts:23]
+- [x] [Review][Patch] D1: In-flight connect operation not truly cancelled — `cancelTransitions()` only suppresses the post-connect state write but `connectToBrowserTarget` still completes and sets `activeBrowserConnection`, creating a dangling connection. Add an `AbortSignal`-based cancellation or post-connect cleanup to `runConnect`/transport so the operation is truly cancelled, not just the transition. [src/commands/reconnect-command.ts, src/commands/connect-command.ts, src/transport/connection-state.ts]
+- [x] [Review][Patch] P1: `executeDisconnectCommand` must guarantee disconnected state on teardown error — if `disconnectActiveConnection()` throws, `setState("disconnected")` is never reached. Wrap in try/finally. [src/commands/disconnect-command.ts:27-29]
+- [x] [Review][Patch] P2: `executeReconnectCommand` must recover from teardown error — if `disconnectActiveConnection()` throws during reconnect teardown, reconnect aborts without state update. Wrap teardown in try/catch, continue with connect. [src/commands/reconnect-command.ts:40-41]
+- [x] [Review][Patch] P3: State mutation ordering — `onConnectionStateChanged` fires before `state = nextState` in `createConnectionStateStore.setState`. If callback reads `getState()` or throws, internal state is stale. Reorder to mutate first. [src/transport/connection-state.ts:38-41]
+- [x] [Review][Patch] P4: `subscriptionInfo<T>` should be `SubscriptionInfo<T>` per TypeScript PascalCase convention. [src/extension.ts:23]
 - [x] [Review][Defer] W1: No explicit 5-second timeout wrapper for reconnect (NFR2/NFR4) — deferred, CDP library defaults are reasonable for MVP.
 
 ## Change Log

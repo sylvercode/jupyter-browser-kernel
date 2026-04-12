@@ -11,7 +11,10 @@ import {
   withConnectTransition,
   type ConnectionStateStore,
 } from "../transport/connection-state";
-import { connectToBrowserTarget } from "../transport/browser-connect";
+import {
+  connectToBrowserTarget,
+  disconnectActiveBrowserConnection,
+} from "../transport/browser-connect";
 import { formatConnectFailureMessage } from "../transport/connect-diagnostics";
 import type {
   ConnectFailureCategory,
@@ -147,19 +150,48 @@ export async function runConnect(
 }> {
   let aborted = false;
 
-  const connectResult = await withConnectTransition(
-    runtime.connectionStateStore,
-    () => runtime.connectToTarget(endpoint, runtime.localize),
-    (result) => result.ok,
-    () => {
-      aborted = true;
-    },
-  );
+  try {
+    const connectResult = await withConnectTransition(
+      runtime.connectionStateStore,
+      (abortSignal) =>
+        runtime.connectToTarget(endpoint, runtime.localize, abortSignal),
+      (result) => result.ok,
+      () => {
+        aborted = true;
+      },
+    );
 
-  return {
-    aborted,
-    connectResult,
-  };
+    if (aborted && connectResult.ok) {
+      await disconnectActiveBrowserConnection();
+    }
+
+    return {
+      aborted,
+      connectResult,
+    };
+  } catch (error) {
+    if (!aborted) {
+      throw error;
+    }
+
+    try {
+      await disconnectActiveBrowserConnection();
+    } catch {
+      // non-fatal: connect attempt was already aborted
+    }
+
+    return {
+      aborted: true,
+      connectResult: {
+        ok: false,
+        endpoint,
+        failure: {
+          category: "transport-failure",
+          message: runtime.localize("Connect attempt canceled."),
+        },
+      },
+    };
+  }
 }
 
 export async function executeConnectCommand(
@@ -208,8 +240,8 @@ export function createDefaultConnectCommandRuntime(
     connectionStateStore: options.connectionStateStore,
     connectToTarget:
       options.connectToTarget ??
-      ((endpoint, localize) =>
-        connectToBrowserTarget(endpoint, undefined, localize)),
+      ((endpoint, localize, abortSignal) =>
+        connectToBrowserTarget(endpoint, undefined, localize, abortSignal)),
     showInformationMessage: (message) =>
       vscodeApi.window.showInformationMessage(message),
     showErrorMessage: (message, action) =>

@@ -24,8 +24,11 @@ export async function executeDisconnectCommand(
   runtime: DisconnectCommandRuntime,
 ): Promise<void> {
   runtime.cancelInFlightTransitions();
-  await runtime.disconnectActiveConnection();
-  runtime.connectionStateStore.setState("disconnected");
+  try {
+    await runtime.disconnectActiveConnection();
+  } finally {
+    runtime.connectionStateStore.setState("disconnected");
+  }
 
   try {
     await runtime.showInformationMessage(

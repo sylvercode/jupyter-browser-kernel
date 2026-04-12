@@ -31,5 +31,6 @@ export interface ConnectToTargetOperation {
   (
     endpoint: EndpointConfig,
     localize: Localize,
+    abortSignal?: AbortSignal,
   ): Promise<ConnectToTargetResult>;
 }
