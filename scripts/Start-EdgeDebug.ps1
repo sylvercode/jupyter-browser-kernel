@@ -33,7 +33,7 @@ if ($ProfileName) {
 if ($Url) {
     $EdgeArgs += " $Url"
 }
-else {
+elseif (-not $Headless) {
     $EdgeArgs += " --no-startup-window"
 }
 if ($Headless) {

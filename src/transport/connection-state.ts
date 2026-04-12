@@ -90,10 +90,11 @@ export async function withConnectTransition<T>(
     onAborted();
   };
 
-  const unsubscribeCanceled = store.onTransitionsCanceled?.(() => {
-    abortController.abort();
-    emitAborted();
-  });
+  const unsubscribeCanceled =
+    store.onTransitionsCanceled?.(() => {
+      abortController.abort();
+      emitAborted();
+    }) ?? (() => undefined);
 
   try {
     const result = await connectAttempt(abortController.signal);
@@ -117,6 +118,6 @@ export async function withConnectTransition<T>(
 
     throw error;
   } finally {
-    unsubscribeCanceled?.();
+    unsubscribeCanceled();
   }
 }

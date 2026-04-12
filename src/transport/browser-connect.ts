@@ -49,7 +49,14 @@ async function withAbortSignal<T>(
   }
 
   return await new Promise<T>((resolve, reject) => {
+    let settled = false;
+
     const onAbort = () => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
       reject(createAbortError(localize));
     };
 
@@ -57,10 +64,20 @@ async function withAbortSignal<T>(
 
     operation.then(
       (result) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
         abortSignal.removeEventListener("abort", onAbort);
         resolve(result);
       },
       (error) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
         abortSignal.removeEventListener("abort", onAbort);
         reject(error);
       },

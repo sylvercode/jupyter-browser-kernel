@@ -162,7 +162,11 @@ export async function runConnect(
     );
 
     if (aborted && connectResult.ok) {
-      await disconnectActiveBrowserConnection();
+      try {
+        await disconnectActiveBrowserConnection();
+      } catch {
+        // non-fatal: connect attempt was already aborted
+      }
     }
 
     return {

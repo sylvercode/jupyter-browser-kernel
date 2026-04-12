@@ -198,27 +198,32 @@ test("executeReconnectCommand while connecting cancels in-flight transition then
   assert.deepEqual(calls, ["cancel", "disconnect", "connect"]);
 });
 
-test("executeReconnectCommand does not show reconnect notification after disconnect cancels it", async () => {
+test("executeReconnectCommand does not show reconnect notification after reconnect is aborted via AbortSignal", async () => {
   const infoMessages: string[] = [];
   const connectionStateStore = createConnectionStateStore({
     initialState: "connecting",
   });
+  let observedAbort = false;
 
   const runtime = createRuntime({
     connectionStateStore,
-    connectToTarget: async () => {
-      connectionStateStore.cancelTransitions();
-      connectionStateStore.setState("disconnected");
+    connectToTarget: async (_endpoint, _localize, abortSignal) =>
+      await new Promise<never>((_resolve, reject) => {
+        assert.ok(abortSignal);
 
-      return {
-        ok: true,
-        endpoint: { host: "localhost", port: 9222 },
-        connectedTarget: {
-          targetId: "target-1",
-          sessionId: "session-1",
-        },
-      };
-    },
+        abortSignal.addEventListener(
+          "abort",
+          () => {
+            observedAbort = true;
+            reject(new Error("Connect attempt canceled."));
+          },
+          { once: true },
+        );
+
+        queueMicrotask(() => {
+          connectionStateStore.cancelTransitions();
+        });
+      }),
     showInformationMessage: (message) => {
       infoMessages.push(message);
       return undefined;
@@ -227,32 +232,55 @@ test("executeReconnectCommand does not show reconnect notification after disconn
 
   await executeReconnectCommand(runtime);
 
-  assert.equal(connectionStateStore.getState(), "disconnected");
+  assert.equal(observedAbort, true);
   assert.deepEqual(infoMessages, []);
 });
 
-test("executeReconnectCommand does not show reconnect error prompt after reconnect is aborted", async () => {
+test("executeReconnectCommand does not show reconnect error prompt after reconnect is aborted via AbortSignal", async () => {
   const errorMessages: string[] = [];
   const openedSettings: string[] = [];
   const connectionStateStore = createConnectionStateStore({
     initialState: "connecting",
   });
+  let observedAbort = false;
 
   const runtime = createRuntime({
     connectionStateStore,
-    connectToTarget: async () => {
-      connectionStateStore.cancelTransitions();
-      connectionStateStore.setState("disconnected");
-
-      return {
-        ok: false,
-        endpoint: { host: "localhost", port: 9222 },
+    connectToTarget: async (_endpoint, _localize, abortSignal) =>
+      await new Promise<{
+        ok: false;
+        endpoint: { host: string; port: number };
         failure: {
-          category: "endpoint-connectivity",
-          message: "Browser attach failed: ECONNREFUSED.",
-        },
-      };
-    },
+          category: "endpoint-connectivity";
+          message: string;
+        };
+      }>((resolve) => {
+        assert.ok(abortSignal);
+
+        let settled = false;
+
+        const onAbort = () => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          observedAbort = true;
+          resolve({
+            ok: false,
+            endpoint: { host: "localhost", port: 9222 },
+            failure: {
+              category: "endpoint-connectivity",
+              message: "Browser attach failed: ECONNREFUSED.",
+            },
+          });
+        };
+
+        abortSignal.addEventListener("abort", onAbort, { once: true });
+
+        queueMicrotask(() => {
+          connectionStateStore.cancelTransitions();
+        });
+      }),
     showErrorMessage: (message, action) => {
       errorMessages.push(message);
       return action;
@@ -265,7 +293,7 @@ test("executeReconnectCommand does not show reconnect error prompt after reconne
 
   await executeReconnectCommand(runtime);
 
-  assert.equal(connectionStateStore.getState(), "disconnected");
+  assert.equal(observedAbort, true);
   assert.deepEqual(errorMessages, []);
   assert.deepEqual(openedSettings, []);
 });
