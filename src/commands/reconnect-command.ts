@@ -7,28 +7,34 @@ import {
   summarizeEndpointForDisplay,
 } from "../config/endpoint-config";
 import {
-  ConnectionStoreHandler,
   createConnectionStateStore,
   withConnectTransition,
   type ConnectionStateStore,
 } from "../transport/connection-state";
-import { connectToBrowserTarget } from "../transport/browser-connect";
+import {
+  connectToBrowserTarget,
+  disconnectActiveBrowserConnection,
+} from "../transport/browser-connect";
 import { formatConnectFailureMessage } from "../transport/connect-diagnostics";
+import type {
+  ConnectToTargetOperation,
+  ConnectToTargetResult,
+} from "../transport/connect-types";
 import {
   settingsKeyForConnectFailure,
   settingsKeyForEndpointFailure,
   showSettingsPrompt,
 } from "./command-utils";
-import type {
-  ConnectToTargetOperation,
-  ConnectToTargetResult,
-} from "../transport/connect-types";
+import { DisconnectCommandRuntimeOptions } from "./disconnect-command";
+import { ConnectCommandRuntimeOptions } from "./connect-command";
 
-export interface ConnectCommandRuntime {
+export interface ReconnectCommandRuntime {
   readAndValidate: () => EndpointValidationResult;
   localize: Localize;
   connectionStateStore: ConnectionStateStore;
+  cancelInFlightTransitions: () => void;
   connectToTarget: ConnectToTargetOperation;
+  disconnectActiveConnection: () => Promise<void>;
   showInformationMessage: (
     message: string,
   ) => PromiseLike<string | undefined> | void;
@@ -39,12 +45,11 @@ export interface ConnectCommandRuntime {
   openSettings: (query: string) => PromiseLike<unknown> | void;
 }
 
-export interface ConnectCommandRuntimeOptions extends ConnectionStoreHandler {
-  connectToTarget?: ConnectToTargetOperation;
-}
+export interface ReconnectCommandRuntimeOptions
+  extends ConnectCommandRuntimeOptions, DisconnectCommandRuntimeOptions {}
 
 async function runConnect(
-  runtime: ConnectCommandRuntime,
+  runtime: ReconnectCommandRuntime,
   endpoint: EndpointConfig,
 ): Promise<ConnectToTargetResult> {
   return withConnectTransition(
@@ -54,13 +59,9 @@ async function runConnect(
   );
 }
 
-export async function executeConnectCommand(
-  runtime: ConnectCommandRuntime,
+export async function executeReconnectCommand(
+  runtime: ReconnectCommandRuntime,
 ): Promise<void> {
-  if (runtime.connectionStateStore.getState() === "connecting") {
-    return;
-  }
-
   const validation = runtime.readAndValidate();
 
   if (!validation.ok) {
@@ -78,6 +79,9 @@ export async function executeConnectCommand(
     );
     return;
   }
+
+  runtime.cancelInFlightTransitions();
+  await runtime.disconnectActiveConnection();
 
   const endpointSummary = summarizeEndpointForDisplay(validation.endpoint);
   const connectResult = await runConnect(runtime, validation.endpoint);
@@ -99,7 +103,7 @@ export async function executeConnectCommand(
   try {
     await runtime.showInformationMessage(
       runtime.localize({
-        message: "Jupyter Browser Kernel: Connected to target {0} at {1}.",
+        message: "Jupyter Browser Kernel: Reconnected to target {0} at {1}.",
         args: [connectResult.connectedTarget.targetId, endpointSummary],
         comment: [
           "{0} is the connected target id.",
@@ -112,10 +116,10 @@ export async function executeConnectCommand(
   }
 }
 
-export function createDefaultConnectCommandRuntime(
+export function createDefaultReconnectCommandRuntime(
   vscodeApi: typeof vscode,
-  options: ConnectCommandRuntimeOptions = {},
-): ConnectCommandRuntime {
+  options: ReconnectCommandRuntimeOptions = {},
+): ReconnectCommandRuntime {
   const connectionStateStore =
     options.connectionStateStore ??
     createConnectionStateStore({
@@ -130,10 +134,15 @@ export function createDefaultConnectCommandRuntime(
       ),
     localize: vscodeApi.l10n.t,
     connectionStateStore,
+    cancelInFlightTransitions: () => {
+      connectionStateStore.cancelTransitions();
+    },
     connectToTarget:
       options.connectToTarget ??
       ((endpoint, localize) =>
         connectToBrowserTarget(endpoint, undefined, localize)),
+    disconnectActiveConnection:
+      options.disconnectActiveConnection ?? disconnectActiveBrowserConnection,
     showInformationMessage: (message) =>
       vscodeApi.window.showInformationMessage(message),
     showErrorMessage: (message, action) =>

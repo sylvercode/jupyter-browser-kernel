@@ -25,6 +25,14 @@
       {
         "command": "jupyterBrowserKernel.connect",
         "title": "%command.connect.title%"
+      },
+      {
+        "command": "jupyterBrowserKernel.disconnect",
+        "title": "%command.disconnect.title%"
+      },
+      {
+        "command": "jupyterBrowserKernel.reconnect",
+        "title": "%command.reconnect.title%"
       }
     ],
     "configuration": {

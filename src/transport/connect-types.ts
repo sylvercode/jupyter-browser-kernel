@@ -28,5 +28,8 @@ export type ConnectToTargetResult =
     };
 
 export interface ConnectToTargetOperation {
-  (endpoint: EndpointConfig, localize: Localize): Promise<ConnectToTargetResult>;
+  (
+    endpoint: EndpointConfig,
+    localize: Localize,
+  ): Promise<ConnectToTargetResult>;
 }

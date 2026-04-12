@@ -13,6 +13,7 @@ import {
 
 function createRuntime(
   overrides: Partial<ConnectCommandRuntime>,
+  onConnectionStateChanged?: (state: ConnectionState) => void,
 ): ConnectCommandRuntime {
   return {
     readAndValidate: () => ({
@@ -20,8 +21,9 @@ function createRuntime(
       endpoint: { host: "localhost", port: 9222 },
     }),
     localize: localize,
-    connectionStateStore: createConnectionStateStore(),
-    setConnectionState: () => undefined,
+    connectionStateStore: createConnectionStateStore({
+      onConnectionStateChanged,
+    }),
     connectToTarget: async () => ({
       ok: true,
       endpoint: { host: "localhost", port: 9222 },
@@ -41,19 +43,19 @@ test("executeConnectCommand sets deterministic connecting -> connected transitio
   const stateTransitions: ConnectionState[] = [];
   const infoMessages: string[] = [];
 
-  const runtime = createRuntime({
-    readAndValidate: () => ({
-      ok: true,
-      endpoint: { host: "127.0.0.1", port: 9333 },
-    }),
-    setConnectionState: (state) => {
-      stateTransitions.push(state);
+  const runtime = createRuntime(
+    {
+      readAndValidate: () => ({
+        ok: true,
+        endpoint: { host: "127.0.0.1", port: 9333 },
+      }),
+      showInformationMessage: (message) => {
+        infoMessages.push(message);
+        return undefined;
+      },
     },
-    showInformationMessage: (message) => {
-      infoMessages.push(message);
-      return undefined;
-    },
-  });
+    stateTransitions.push.bind(stateTransitions),
+  );
 
   await executeConnectCommand(runtime);
 
@@ -152,23 +154,23 @@ test("executeConnectCommand sets deterministic connecting -> error transition fo
   const stateTransitions: ConnectionState[] = [];
   const errorMessages: string[] = [];
 
-  const runtime = createRuntime({
-    setConnectionState: (state) => {
-      stateTransitions.push(state);
-    },
-    connectToTarget: async (_endpoint, _localize) => ({
-      ok: false,
-      endpoint: { host: "localhost", port: 9222 },
-      failure: {
-        category: "target-mismatch",
-        message: "No valid browser target matched profile.",
+  const runtime = createRuntime(
+    {
+      connectToTarget: async () => ({
+        ok: false,
+        endpoint: { host: "localhost", port: 9222 },
+        failure: {
+          category: "target-mismatch",
+          message: "No valid browser target matched profile.",
+        },
+      }),
+      showErrorMessage: (message, action) => {
+        errorMessages.push(message);
+        return action;
       },
-    }),
-    showErrorMessage: (message, action) => {
-      errorMessages.push(message);
-      return action;
     },
-  });
+    stateTransitions.push.bind(stateTransitions),
+  );
 
   await executeConnectCommand(runtime);
 

@@ -4,41 +4,78 @@ export type ConnectionState =
   | "connected"
   | "error";
 
-export interface ConnectionStateStore {
+export interface ConnectionStateStoreTransitionHandler {
+  beginTransition: (newState: ConnectionState) => number;
+  transitionTo: (transitionId: number, state: ConnectionState) => boolean;
+  cancelTransitions?: () => void;
+}
+
+export interface ConnectionStateStore extends Required<ConnectionStateStoreTransitionHandler> {
   getState: () => ConnectionState;
   setState: (state: ConnectionState) => void;
   getHistory: () => ConnectionState[];
 }
 
-export function createConnectionStateStore(
-  initialState: ConnectionState = "disconnected",
-): ConnectionStateStore {
+export interface ConnectionStoreHandler {
+  connectionStateStore?: ConnectionStateStore;
+  onConnectionStateChanged?: (state: ConnectionState) => void;
+}
+
+export function createConnectionStateStore({
+  initialState,
+  onConnectionStateChanged,
+}: {
+  initialState?: ConnectionState;
+  onConnectionStateChanged?: (state: ConnectionState) => void;
+} = {}): ConnectionStateStore {
   let state = initialState;
-  const history: ConnectionState[] = [initialState];
+  const history: ConnectionState[] = [initialState ?? "disconnected"];
+  let activeTransitionId = 0;
+
+  const setState = (nextState: ConnectionState) => {
+    onConnectionStateChanged?.(nextState);
+    state = nextState;
+    history.push(nextState);
+  };
 
   return {
-    getState: () => state,
-    setState: (nextState) => {
-      state = nextState;
-      history.push(nextState);
-    },
+    getState: () => state ?? "disconnected",
+    setState,
     getHistory: () => [...history],
+    beginTransition: (newState: ConnectionState) => {
+      activeTransitionId += 1;
+      setState(newState);
+      return activeTransitionId;
+    },
+    transitionTo: (transitionId, state) => {
+      if (transitionId === activeTransitionId) {
+        setState(state);
+        return true;
+      }
+      return false;
+    },
+    cancelTransitions: () => {
+      activeTransitionId += 1;
+    },
   };
 }
 
 export async function withConnectTransition<T>(
-  store: Pick<ConnectionStateStore, "setState">,
+  store: ConnectionStateStoreTransitionHandler,
   connectAttempt: () => Promise<T>,
   isSuccess: (result: T) => boolean,
 ): Promise<T> {
-  store.setState("connecting");
+  const transitionId = store.beginTransition("connecting");
 
   try {
     const result = await connectAttempt();
-    store.setState(isSuccess(result) ? "connected" : "error");
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    store.transitionTo(transitionId, isSuccess(result) ? "connected" : "error");
+
     return result;
   } catch (error) {
-    store.setState("error");
+    store.transitionTo(transitionId, "error");
+
     throw error;
   }
 }

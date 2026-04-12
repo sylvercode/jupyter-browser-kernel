@@ -53,3 +53,19 @@ test("withConnectTransition sets error when connect attempt throws", async () =>
 
   assert.deepEqual(store.getHistory(), ["disconnected", "connecting", "error"]);
 });
+
+test("withConnectTransition does not write terminal state when transition is canceled", async () => {
+  const store = createConnectionStateStore();
+
+  const result = await withConnectTransition(
+    store,
+    async () => {
+      store.cancelTransitions();
+      return { ok: true as const };
+    },
+    (attemptResult: { ok: true }) => attemptResult.ok,
+  );
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(store.getHistory(), ["disconnected", "connecting"]);
+});

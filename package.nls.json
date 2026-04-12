@@ -2,6 +2,8 @@
   "extension.displayName": "Jupyter Browser Kernel",
   "extension.description": "Connect to a running Browser instance via CDP for variable watching, JS scratchpad execution, and log streaming.",
   "command.connect.title": "Jupyter Browser Kernel: Connect via CDP",
+  "command.disconnect.title": "Jupyter Browser Kernel: Disconnect",
+  "command.reconnect.title": "Jupyter Browser Kernel: Reconnect",
   "configuration.title": "Jupyter Browser Kernel",
   "configuration.cdpHost.description": "CDP endpoint host name or IP address.",
   "configuration.cdpHost.markdownDescription": "Host for the Browser CDP endpoint. Use a resolvable hostname or IP address, for example `localhost` or `127.0.0.1`.",

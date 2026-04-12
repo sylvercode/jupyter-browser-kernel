@@ -2,12 +2,6 @@
   "name": "jupyter-browser-kernel",
   "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
   "features": {},
-  "forwardPorts": [
-    // CDP remote debugging port — FoundryVTT must be launched on the host
-    // with --remote-debugging-port=9222. Inside the container connect to
-    // host.docker.internal:9222 (Docker Desktop) or the host gateway IP.
-    9222
-  ],
   "postCreateCommand": "sudo apt-get update && sudo apt-get install -y --no-install-recommends chromium && npm install",
   "customizations": {
     "vscode": {
