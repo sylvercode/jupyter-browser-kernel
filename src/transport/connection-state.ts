@@ -64,17 +64,29 @@ export async function withConnectTransition<T>(
   store: ConnectionStateStoreTransitionHandler,
   connectAttempt: () => Promise<T>,
   isSuccess: (result: T) => boolean,
+  onAborted: () => void,
 ): Promise<T> {
   const transitionId = store.beginTransition("connecting");
 
   try {
     const result = await connectAttempt();
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    store.transitionTo(transitionId, isSuccess(result) ? "connected" : "error");
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    const transitionApplied = store.transitionTo(
+      transitionId,
+      isSuccess(result) ? "connected" : "error",
+    );
+
+    if (!transitionApplied) {
+      onAborted();
+    }
 
     return result;
   } catch (error) {
-    store.transitionTo(transitionId, "error");
+    const transitionApplied = store.transitionTo(transitionId, "error");
+
+    if (!transitionApplied) {
+      onAborted();
+    }
 
     throw error;
   }

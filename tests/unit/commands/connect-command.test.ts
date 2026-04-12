@@ -178,3 +178,34 @@ test("executeConnectCommand sets deterministic connecting -> error transition fo
   assert.equal(errorMessages.length, 1);
   assert.match(errorMessages[0], /target-mismatch/);
 });
+
+test("executeConnectCommand does not show connect notification after connect is aborted", async () => {
+  const infoMessages: string[] = [];
+  const connectionStateStore = createConnectionStateStore();
+
+  const runtime = createRuntime({
+    connectionStateStore,
+    connectToTarget: async () => {
+      connectionStateStore.cancelTransitions();
+      connectionStateStore.setState("disconnected");
+
+      return {
+        ok: true,
+        endpoint: { host: "localhost", port: 9222 },
+        connectedTarget: {
+          targetId: "target-1",
+          sessionId: "session-1",
+        },
+      };
+    },
+    showInformationMessage: (message) => {
+      infoMessages.push(message);
+      return undefined;
+    },
+  });
+
+  await executeConnectCommand(runtime);
+
+  assert.equal(connectionStateStore.getState(), "disconnected");
+  assert.deepEqual(infoMessages, []);
+});

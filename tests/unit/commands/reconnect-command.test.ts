@@ -198,6 +198,78 @@ test("executeReconnectCommand while connecting cancels in-flight transition then
   assert.deepEqual(calls, ["cancel", "disconnect", "connect"]);
 });
 
+test("executeReconnectCommand does not show reconnect notification after disconnect cancels it", async () => {
+  const infoMessages: string[] = [];
+  const connectionStateStore = createConnectionStateStore({
+    initialState: "connecting",
+  });
+
+  const runtime = createRuntime({
+    connectionStateStore,
+    connectToTarget: async () => {
+      connectionStateStore.cancelTransitions();
+      connectionStateStore.setState("disconnected");
+
+      return {
+        ok: true,
+        endpoint: { host: "localhost", port: 9222 },
+        connectedTarget: {
+          targetId: "target-1",
+          sessionId: "session-1",
+        },
+      };
+    },
+    showInformationMessage: (message) => {
+      infoMessages.push(message);
+      return undefined;
+    },
+  });
+
+  await executeReconnectCommand(runtime);
+
+  assert.equal(connectionStateStore.getState(), "disconnected");
+  assert.deepEqual(infoMessages, []);
+});
+
+test("executeReconnectCommand does not show reconnect error prompt after reconnect is aborted", async () => {
+  const errorMessages: string[] = [];
+  const openedSettings: string[] = [];
+  const connectionStateStore = createConnectionStateStore({
+    initialState: "connecting",
+  });
+
+  const runtime = createRuntime({
+    connectionStateStore,
+    connectToTarget: async () => {
+      connectionStateStore.cancelTransitions();
+      connectionStateStore.setState("disconnected");
+
+      return {
+        ok: false,
+        endpoint: { host: "localhost", port: 9222 },
+        failure: {
+          category: "endpoint-connectivity",
+          message: "Browser attach failed: ECONNREFUSED.",
+        },
+      };
+    },
+    showErrorMessage: (message, action) => {
+      errorMessages.push(message);
+      return action;
+    },
+    openSettings: (query) => {
+      openedSettings.push(query);
+      return undefined;
+    },
+  });
+
+  await executeReconnectCommand(runtime);
+
+  assert.equal(connectionStateStore.getState(), "disconnected");
+  assert.deepEqual(errorMessages, []);
+  assert.deepEqual(openedSettings, []);
+});
+
 test("executeReconnectCommand routes endpoint-connectivity failures to cdpPort settings", async () => {
   const openedSettings: string[] = [];
 

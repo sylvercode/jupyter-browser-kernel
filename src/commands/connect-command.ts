@@ -46,12 +46,25 @@ export interface ConnectCommandRuntimeOptions extends ConnectionStoreHandler {
 async function runConnect(
   runtime: ConnectCommandRuntime,
   endpoint: EndpointConfig,
-): Promise<ConnectToTargetResult> {
-  return withConnectTransition(
+): Promise<{
+  aborted: boolean;
+  connectResult: ConnectToTargetResult;
+}> {
+  let aborted = false;
+
+  const connectResult = await withConnectTransition(
     runtime.connectionStateStore,
     () => runtime.connectToTarget(endpoint, runtime.localize),
     (result) => result.ok,
+    () => {
+      aborted = true;
+    },
   );
+
+  return {
+    aborted,
+    connectResult,
+  };
 }
 
 export async function executeConnectCommand(
@@ -80,7 +93,14 @@ export async function executeConnectCommand(
   }
 
   const endpointSummary = summarizeEndpointForDisplay(validation.endpoint);
-  const connectResult = await runConnect(runtime, validation.endpoint);
+  const { aborted, connectResult } = await runConnect(
+    runtime,
+    validation.endpoint,
+  );
+
+  if (aborted) {
+    return;
+  }
 
   if (!connectResult.ok) {
     const message = formatConnectFailureMessage(
