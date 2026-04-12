@@ -7,39 +7,20 @@ import {
   summarizeEndpointForDisplay,
 } from "../config/endpoint-config";
 import {
-  createConnectionStateStore,
+  ConnectionStoreHandler,
   withConnectTransition,
-  type ConnectionState,
   type ConnectionStateStore,
 } from "../transport/connection-state";
-import { connectToBrowserTarget } from "../transport/browser-connect";
+import {
+  connectToBrowserTarget,
+  disconnectActiveBrowserConnection,
+} from "../transport/browser-connect";
 import { formatConnectFailureMessage } from "../transport/connect-diagnostics";
 import type {
+  ConnectFailureCategory,
   ConnectToTargetOperation,
   ConnectToTargetResult,
 } from "../transport/connect-types";
-
-export interface ConnectCommandRuntime {
-  readAndValidate: () => EndpointValidationResult;
-  localize: Localize;
-  connectionStateStore: ConnectionStateStore;
-  setConnectionState: (state: ConnectionState) => void;
-  connectToTarget: ConnectToTargetOperation;
-  showInformationMessage: (
-    message: string,
-  ) => PromiseLike<string | undefined> | void;
-  showErrorMessage: (
-    message: string,
-    action: string,
-  ) => PromiseLike<string | undefined> | string | undefined;
-  openSettings: (query: string) => PromiseLike<unknown> | void;
-}
-
-export interface ConnectCommandRuntimeOptions {
-  connectionStateStore?: ConnectionStateStore;
-  onConnectionStateChanged?: (state: ConnectionState) => void;
-  connectToTarget?: ConnectToTargetOperation;
-}
 
 async function showSettingsPrompt(
   runtime: ConnectCommandRuntime,
@@ -81,47 +62,55 @@ function settingsKeyForEndpointFailure(
   return settingsKeyByField[validation.error.field] ?? "cdpHost";
 }
 
-async function runConnect(
+function settingsKeyForConnectFailure(
+  category: ConnectFailureCategory,
+): "cdpHost" | "cdpPort" {
+  return category === "endpoint-connectivity" ? "cdpPort" : "cdpHost";
+}
+
+export interface ConnectCommandRuntime {
+  readAndValidate: () => EndpointValidationResult;
+  localize: Localize;
+  connectionStateStore: ConnectionStateStore;
+  connectToTarget: ConnectToTargetOperation;
+  showInformationMessage: (
+    message: string,
+  ) => PromiseLike<string | undefined> | void;
+  showErrorMessage: (
+    message: string,
+    action: string,
+  ) => PromiseLike<string | undefined> | string | undefined;
+  openSettings: (query: string) => PromiseLike<unknown> | void;
+}
+
+export interface ConnectCommandRuntimeOptions extends ConnectionStoreHandler {
+  connectToTarget?: ConnectToTargetOperation;
+}
+
+export async function showEndpointValidationSettingsPrompt(
   runtime: ConnectCommandRuntime,
-  endpoint: EndpointConfig,
-): Promise<ConnectToTargetResult> {
-  return withConnectTransition(
-    {
-      setState: (state) => runtime.setConnectionState(state),
-    },
-    () => runtime.connectToTarget(endpoint, runtime.localize),
-    (result) => result.ok,
+  validation: Extract<EndpointValidationResult, { ok: false }>,
+): Promise<void> {
+  await showSettingsPrompt(
+    runtime,
+    runtime.localize({
+      message: "{0} {1}",
+      args: [validation.error.message, validation.error.correctiveAction],
+      comment: [
+        "{0} is the validation failure message.",
+        "{1} is the corrective action the user should take.",
+      ],
+    }),
+    settingsKeyForEndpointFailure(validation),
   );
 }
 
-export async function executeConnectCommand(
+export async function showConnectOutcome(
   runtime: ConnectCommandRuntime,
+  connectResult: ConnectToTargetResult,
+  endpointSummary: string,
+  successMessage: string,
 ): Promise<void> {
-  if (runtime.connectionStateStore.getState() === "connecting") {
-    return;
-  }
-
-  const validation = runtime.readAndValidate();
-
-  if (!validation.ok) {
-    await showSettingsPrompt(
-      runtime,
-      runtime.localize({
-        message: "{0} {1}",
-        args: [validation.error.message, validation.error.correctiveAction],
-        comment: [
-          "{0} is the validation failure message.",
-          "{1} is the corrective action the user should take.",
-        ],
-      }),
-      settingsKeyForEndpointFailure(validation),
-    );
-    return;
-  }
-
-  const endpointSummary = summarizeEndpointForDisplay(validation.endpoint);
-  const connectResult = await runConnect(runtime, validation.endpoint);
-
   if (!connectResult.ok) {
     const message = formatConnectFailureMessage(
       connectResult.failure,
@@ -129,10 +118,9 @@ export async function executeConnectCommand(
       runtime.localize,
     );
 
-    const settingsKey =
-      connectResult.failure.category === "endpoint-connectivity"
-        ? "cdpPort"
-        : "cdpHost";
+    const settingsKey = settingsKeyForConnectFailure(
+      connectResult.failure.category,
+    );
     await showSettingsPrompt(runtime, message, settingsKey);
     return;
   }
@@ -140,7 +128,7 @@ export async function executeConnectCommand(
   try {
     await runtime.showInformationMessage(
       runtime.localize({
-        message: "Jupyter Browser Kernel: Connected to target {0} at {1}.",
+        message: successMessage,
         args: [connectResult.connectedTarget.targetId, endpointSummary],
         comment: [
           "{0} is the connected target id.",
@@ -153,13 +141,99 @@ export async function executeConnectCommand(
   }
 }
 
+export async function runConnect(
+  runtime: ConnectCommandRuntime,
+  endpoint: EndpointConfig,
+): Promise<{
+  aborted: boolean;
+  connectResult: ConnectToTargetResult;
+}> {
+  let aborted = false;
+
+  try {
+    const connectResult = await withConnectTransition(
+      runtime.connectionStateStore,
+      (abortSignal) =>
+        runtime.connectToTarget(endpoint, runtime.localize, abortSignal),
+      (result) => result.ok,
+      () => {
+        aborted = true;
+      },
+    );
+
+    if (aborted && connectResult.ok) {
+      try {
+        await disconnectActiveBrowserConnection();
+      } catch {
+        // non-fatal: connect attempt was already aborted
+      }
+    }
+
+    return {
+      aborted,
+      connectResult,
+    };
+  } catch (error) {
+    if (!aborted) {
+      throw error;
+    }
+
+    try {
+      await disconnectActiveBrowserConnection();
+    } catch {
+      // non-fatal: connect attempt was already aborted
+    }
+
+    return {
+      aborted: true,
+      connectResult: {
+        ok: false,
+        endpoint,
+        failure: {
+          category: "transport-failure",
+          message: runtime.localize("Connect attempt canceled."),
+        },
+      },
+    };
+  }
+}
+
+export async function executeConnectCommand(
+  runtime: ConnectCommandRuntime,
+): Promise<void> {
+  if (runtime.connectionStateStore.getState() === "connecting") {
+    return;
+  }
+
+  const validation = runtime.readAndValidate();
+
+  if (!validation.ok) {
+    await showEndpointValidationSettingsPrompt(runtime, validation);
+    return;
+  }
+
+  const endpointSummary = summarizeEndpointForDisplay(validation.endpoint);
+  const { aborted, connectResult } = await runConnect(
+    runtime,
+    validation.endpoint,
+  );
+
+  if (aborted) {
+    return;
+  }
+
+  await showConnectOutcome(
+    runtime,
+    connectResult,
+    endpointSummary,
+    "Jupyter Browser Kernel: Connected to target {0} at {1}.",
+  );
+}
+
 export function createDefaultConnectCommandRuntime(
   vscodeApi: typeof vscode,
-  options: ConnectCommandRuntimeOptions = {},
+  options: ConnectCommandRuntimeOptions,
 ): ConnectCommandRuntime {
-  const connectionStateStore =
-    options.connectionStateStore ?? createConnectionStateStore();
-
   return {
     readAndValidate: () =>
       readAndValidateEndpointConfig(
@@ -167,15 +241,11 @@ export function createDefaultConnectCommandRuntime(
         vscodeApi.l10n.t,
       ),
     localize: vscodeApi.l10n.t,
-    connectionStateStore,
-    setConnectionState: (state) => {
-      connectionStateStore.setState(state);
-      options.onConnectionStateChanged?.(state);
-    },
+    connectionStateStore: options.connectionStateStore,
     connectToTarget:
       options.connectToTarget ??
-      ((endpoint, localize) =>
-        connectToBrowserTarget(endpoint, undefined, localize)),
+      ((endpoint, localize, abortSignal) =>
+        connectToBrowserTarget(endpoint, undefined, localize, abortSignal)),
     showInformationMessage: (message) =>
       vscodeApi.window.showInformationMessage(message),
     showErrorMessage: (message, action) =>

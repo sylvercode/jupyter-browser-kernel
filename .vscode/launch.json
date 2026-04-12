@@ -24,7 +24,8 @@
         "--profile-directory=Debug"
       ],
       "url": "about:blank",
-      "webRoot": "${workspaceFolder}"
+      "webRoot": "${workspaceFolder}",
+      "port": 9222
     },
     {
       "name": "Launch Edge",

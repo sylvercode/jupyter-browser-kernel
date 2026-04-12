@@ -13,5 +13,15 @@ export default tseslint.config(
                 project: './tsconfig.json',
             },
         },
+        rules: {
+            '@typescript-eslint/no-unused-vars': [
+                'error',
+                {
+                    argsIgnorePattern: '^_',
+                    varsIgnorePattern: '^_',
+                    caughtErrorsIgnorePattern: '^_',
+                },
+            ],
+        },
     }
 );

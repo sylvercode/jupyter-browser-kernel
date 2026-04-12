@@ -12,3 +12,7 @@
 
 - `connectionStateStore.getState()` is unused interface surface — `getState()` is defined on `ConnectionStateStore` but never called in command or extension code. State is pushed via callbacks, not pulled. Benign unused API.
 - `extensionKind` in `package.json` is set to `"ui"` and `"workspace"` instead of `"ui"` only to make the extention debuggable. When adding CI packaging (**story 1.7**), the `extentionKind` must be patch in the pipeline.
+
+## Deferred from: code review of 1-4-disconnect-and-manual-reconnect-lifecycle (2026-04-11)
+
+- No explicit 5-second timeout wrapper for reconnect (NFR2/NFR4). AC 2 requires "reports success or failure within 5 seconds." Implementation relies on CDP library default timeouts. No `Promise.race` timeout guard. CDP defaults are reasonable for MVP.

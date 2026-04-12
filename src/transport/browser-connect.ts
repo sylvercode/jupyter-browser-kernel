@@ -22,6 +22,69 @@ let activeBrowserConnection: ActiveBrowserConnection | undefined;
 
 const passthroughLocalize = ((input: string): string => input) as Localize;
 
+function createAbortError(localize: Localize): Error {
+  return new Error(localize("Connect attempt canceled."));
+}
+
+function throwIfCanceled(
+  abortSignal: AbortSignal | undefined,
+  localize: Localize,
+): void {
+  if (abortSignal?.aborted) {
+    throw createAbortError(localize);
+  }
+}
+
+async function withAbortSignal<T>(
+  operation: Promise<T>,
+  abortSignal: AbortSignal | undefined,
+  localize: Localize,
+): Promise<T> {
+  if (!abortSignal) {
+    return operation;
+  }
+
+  if (abortSignal.aborted) {
+    throw createAbortError(localize);
+  }
+
+  return await new Promise<T>((resolve, reject) => {
+    let settled = false;
+
+    const onAbort = () => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      reject(createAbortError(localize));
+    };
+
+    abortSignal.addEventListener("abort", onAbort, { once: true });
+
+    operation.then(
+      (result) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        abortSignal.removeEventListener("abort", onAbort);
+        resolve(result);
+      },
+      (error) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        abortSignal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
+}
+
 async function clearActiveBrowserConnection(): Promise<void> {
   if (!activeBrowserConnection) {
     return;
@@ -200,14 +263,18 @@ async function connectViaBrowserTargetAttach(
   endpoint: EndpointConfig,
   profile: TargetProfile,
   localize: Localize,
+  abortSignal?: AbortSignal,
 ): Promise<ConnectToTargetResult> {
   let client: CDP.Client | undefined;
 
   try {
+    throwIfCanceled(abortSignal, localize);
+
     let browserWebSocketUrl = "";
     try {
-      browserWebSocketUrl = await resolveBrowserWebSocketUrl(
-        endpoint,
+      browserWebSocketUrl = await withAbortSignal(
+        resolveBrowserWebSocketUrl(endpoint, localize),
+        abortSignal,
         localize,
       );
     } catch (error) {
@@ -215,17 +282,25 @@ async function connectViaBrowserTargetAttach(
     }
 
     try {
-      client = await CDP({
-        target: browserWebSocketUrl,
-        local: true,
-      });
+      client = await withAbortSignal(
+        CDP({
+          target: browserWebSocketUrl,
+          local: true,
+        }),
+        abortSignal,
+        localize,
+      );
     } catch (error) {
       throw createStepError("browserWebSocketConnect", error);
     }
 
     let targetsResponse: { targetInfos?: BrowserTargetInfo[] };
     try {
-      targetsResponse = await client.Target.getTargets();
+      targetsResponse = await withAbortSignal(
+        client.Target.getTargets(),
+        abortSignal,
+        localize,
+      );
     } catch (error) {
       throw createStepError("Target.getTargets", error);
     }
@@ -246,20 +321,30 @@ async function connectViaBrowserTargetAttach(
 
     let attachResult: { sessionId: string };
     try {
-      attachResult = await client.Target.attachToTarget({
-        targetId: targetSelection.target.targetId,
-        flatten: true,
-      });
+      attachResult = await withAbortSignal(
+        client.Target.attachToTarget({
+          targetId: targetSelection.target.targetId,
+          flatten: true,
+        }),
+        abortSignal,
+        localize,
+      );
     } catch (error) {
       throw createStepError("Target.attachToTarget", error);
     }
 
     try {
-      await verifyRuntimeProbe(client, localize, attachResult.sessionId);
+      await withAbortSignal(
+        verifyRuntimeProbe(client, localize, attachResult.sessionId),
+        abortSignal,
+        localize,
+      );
     } catch (error) {
       await safeDetachFromTarget(client, attachResult.sessionId);
       throw createStepError("Runtime.evaluate(probe)", error);
     }
+
+    throwIfCanceled(abortSignal, localize);
 
     await clearActiveBrowserConnection();
 
@@ -292,14 +377,25 @@ export async function connectToBrowserTarget(
   endpoint: EndpointConfig,
   profile: TargetProfile = getActiveProfile(),
   localize: Localize = passthroughLocalize,
+  abortSignal?: AbortSignal,
 ): Promise<ConnectToTargetResult> {
   let lastError: unknown;
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      return await connectViaBrowserTargetAttach(endpoint, profile, localize);
+      return await connectViaBrowserTargetAttach(
+        endpoint,
+        profile,
+        localize,
+        abortSignal,
+      );
     } catch (error) {
       lastError = error;
+
+      if (abortSignal?.aborted) {
+        throw error;
+      }
+
       if (!shouldRetryTransportError(error) || attempt === 1) {
         break;
       }

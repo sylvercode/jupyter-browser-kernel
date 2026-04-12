@@ -3,30 +3,68 @@ import {
   createDefaultConnectCommandRuntime,
   executeConnectCommand,
 } from "./commands/connect-command";
-import { createConnectionStateStore } from "./transport/connection-state";
+import {
+  createDefaultDisconnectCommandRuntime,
+  executeDisconnectCommand,
+} from "./commands/disconnect-command";
+import {
+  createDefaultReconnectCommandRuntime,
+  executeReconnectCommand,
+} from "./commands/reconnect-command";
+import {
+  ConnectionState,
+  ConnectionStoreHandler,
+  createConnectionStateStore,
+} from "./transport/connection-state";
 import { createConnectionStatusIndicator } from "./ui/connection-status-indicator";
 import { disconnectActiveBrowserConnection } from "./transport/browser-connect";
 
+type SubscriptionInfo<T> = {
+  command: string;
+  runtimeFactory: (api: typeof vscode, handler: ConnectionStoreHandler) => T;
+  callback: (runtime: T) => Promise<void>;
+};
+
 export function activate(context: vscode.ExtensionContext): void {
-  const connectionStateStore = createConnectionStateStore();
   const statusIndicator = createConnectionStatusIndicator(vscode);
   context.subscriptions.push(statusIndicator);
 
-  const runtime = createDefaultConnectCommandRuntime(vscode, {
-    connectionStateStore,
-    onConnectionStateChanged: (state) => {
+  const connectionStateStore = createConnectionStateStore({
+    onConnectionStateChanged: (state: ConnectionState) => {
       statusIndicator.setState(state);
     },
   });
 
-  context.subscriptions.push(
-    vscode.commands.registerCommand(
-      "jupyterBrowserKernel.connect",
-      async () => {
-        await executeConnectCommand(runtime);
-      },
-    ),
-  );
+  const registerCommand = <T>({
+    command,
+    runtimeFactory,
+    callback,
+  }: SubscriptionInfo<T>): void => {
+    const runtime = runtimeFactory(vscode, { connectionStateStore });
+    context.subscriptions.push(
+      vscode.commands.registerCommand(command, async () => {
+        await callback(runtime);
+      }),
+    );
+  };
+
+  registerCommand({
+    command: "jupyterBrowserKernel.connect",
+    runtimeFactory: createDefaultConnectCommandRuntime,
+    callback: executeConnectCommand,
+  });
+
+  registerCommand({
+    command: "jupyterBrowserKernel.disconnect",
+    runtimeFactory: createDefaultDisconnectCommandRuntime,
+    callback: executeDisconnectCommand,
+  });
+
+  registerCommand({
+    command: "jupyterBrowserKernel.reconnect",
+    runtimeFactory: createDefaultReconnectCommandRuntime,
+    callback: executeReconnectCommand,
+  });
 }
 
 export function deactivate(): Promise<void> {

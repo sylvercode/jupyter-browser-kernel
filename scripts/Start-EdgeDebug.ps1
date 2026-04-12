@@ -16,7 +16,11 @@ param (
 
     [Parameter(HelpMessage = "Profile name to use when launching Edge. If not specified, the default profile will be used.")]
     [string]
-    $ProfileName
+    $ProfileName,
+
+    [Parameter(HelpMessage = "No window will be opened, but Edge will start with the specified port for remote debugging. This is useful for scenarios where you want to attach a debugger without opening a new browser window.")]
+    [switch]
+    $Headless
 )
 
 # Start Microsoft Edge with the specified port for remote debugging.
@@ -28,6 +32,12 @@ if ($ProfileName) {
 }
 if ($Url) {
     $EdgeArgs += " $Url"
+}
+elseif (-not $Headless) {
+    $EdgeArgs += " --no-startup-window"
+}
+if ($Headless) {
+    $EdgeArgs += " --headless=new"
 }
 
 # Start Microsoft Edge with the constructed arguments
