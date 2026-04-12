@@ -1,12 +1,5 @@
 import type * as vscode from "vscode";
-import {
-  readAndValidateEndpointConfig,
-  summarizeEndpointForDisplay,
-} from "../config/endpoint-config";
-import {
-  connectToBrowserTarget,
-  disconnectActiveBrowserConnection,
-} from "../transport/browser-connect";
+import { summarizeEndpointForDisplay } from "../config/endpoint-config";
 import {
   showConnectOutcome,
   showEndpointValidationSettingsPrompt,
@@ -14,10 +7,12 @@ import {
 import {
   DisconnectCommandRuntime,
   DisconnectCommandRuntimeOptions,
+  createDefaultDisconnectCommandRuntime,
 } from "./disconnect-command";
 import {
   ConnectCommandRuntime,
   ConnectCommandRuntimeOptions,
+  createDefaultConnectCommandRuntime,
   runConnect,
 } from "./connect-command";
 
@@ -66,30 +61,14 @@ export function createDefaultReconnectCommandRuntime(
   vscodeApi: typeof vscode,
   options: ReconnectCommandRuntimeOptions,
 ): ReconnectCommandRuntime {
-  const connectionStateStore = options.connectionStateStore;
+  const connectRuntime = createDefaultConnectCommandRuntime(vscodeApi, options);
+  const disconnectRuntime = createDefaultDisconnectCommandRuntime(
+    vscodeApi,
+    options,
+  );
 
   return {
-    readAndValidate: () =>
-      readAndValidateEndpointConfig(
-        vscodeApi.workspace.getConfiguration("jupyterBrowserKernel"),
-        vscodeApi.l10n.t,
-      ),
-    localize: vscodeApi.l10n.t,
-    connectionStateStore,
-    cancelInFlightTransitions: () => {
-      connectionStateStore.cancelTransitions();
-    },
-    connectToTarget:
-      options.connectToTarget ??
-      ((endpoint, localize, abortSignal) =>
-        connectToBrowserTarget(endpoint, undefined, localize, abortSignal)),
-    disconnectActiveConnection:
-      options.disconnectActiveConnection ?? disconnectActiveBrowserConnection,
-    showInformationMessage: (message) =>
-      vscodeApi.window.showInformationMessage(message),
-    showErrorMessage: (message, action) =>
-      vscodeApi.window.showErrorMessage(message, action),
-    openSettings: (query) =>
-      vscodeApi.commands.executeCommand("workbench.action.openSettings", query),
+    ...connectRuntime,
+    ...disconnectRuntime,
   };
 }
