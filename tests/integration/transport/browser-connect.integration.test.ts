@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import CDP from "chrome-remote-interface";
 
-import { connectToBrowserTarget } from "../../../src/transport/browser-connect.js";
+import {
+  connectToBrowserTarget,
+  createAttachToTargetParams,
+} from "../../../src/transport/browser-connect.js";
 import { coreTargetProfile } from "../../../src/profile/core-target-profile.js";
 import { startHeadlessChromium } from "../helpers/headless-chromium.js";
 
@@ -78,6 +81,139 @@ test(
       assert.equal(typeof result.connectedTarget.sessionId, "string");
       assert.equal(result.connectedTarget.targetId.length > 0, true);
       assert.equal(result.connectedTarget.sessionId.length > 0, true);
+    }
+  },
+);
+
+test(
+  "browser-level flat sessions allow concurrent attach and isolated session-scoped events",
+  { skip: !runIntegration },
+  async () => {
+    const browser = await CDP({ host, port: cdpPort });
+
+    try {
+      const { targetInfos } = await browser.Target.getTargets();
+      const pageTarget = targetInfos.find(
+        (target) =>
+          target.type === "page" &&
+          typeof target.url === "string" &&
+          target.url.includes("/game"),
+      );
+
+      assert.ok(pageTarget?.targetId);
+
+      const sessionA = await browser.Target.attachToTarget(
+        createAttachToTargetParams(pageTarget.targetId),
+      );
+      const sessionB = await browser.Target.attachToTarget(
+        createAttachToTargetParams(pageTarget.targetId),
+      );
+
+      assert.notEqual(sessionA.sessionId, sessionB.sessionId);
+
+      await browser.send("Runtime.enable", undefined, sessionA.sessionId);
+      await browser.send("Runtime.enable", undefined, sessionB.sessionId);
+
+      const eventsA: string[] = [];
+      const eventsB: string[] = [];
+
+      browser.on(
+        `Runtime.consoleAPICalled.${sessionA.sessionId}`,
+        (event: { args?: Array<{ value?: unknown }> }) => {
+          const values = event.args
+            ?.map((arg) => String(arg.value ?? ""))
+            .join(" ");
+          eventsA.push(values ?? "");
+        },
+      );
+
+      browser.on(
+        `Runtime.consoleAPICalled.${sessionB.sessionId}`,
+        (event: { args?: Array<{ value?: unknown }> }) => {
+          const values = event.args
+            ?.map((arg) => String(arg.value ?? ""))
+            .join(" ");
+          eventsB.push(values ?? "");
+        },
+      );
+
+      await browser.send(
+        "Runtime.evaluate",
+        {
+          expression: "console.log('coexist-a'); 2 + 2;",
+          awaitPromise: true,
+          returnByValue: true,
+        },
+        sessionA.sessionId,
+      );
+
+      await browser.send(
+        "Runtime.evaluate",
+        {
+          expression: "console.log('coexist-b'); 3 + 3;",
+          awaitPromise: true,
+          returnByValue: true,
+        },
+        sessionB.sessionId,
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      assert.ok(eventsA.some((entry) => entry.includes("coexist-a")));
+      assert.ok(eventsB.some((entry) => entry.includes("coexist-b")));
+    } finally {
+      await browser.close();
+    }
+  },
+);
+
+test(
+  "connectToBrowserTarget remains viable while an external DevTools-like session stays attached",
+  { skip: !runIntegration },
+  async () => {
+    const externalBrowser = await CDP({ host, port: cdpPort });
+
+    try {
+      const { targetInfos } = await externalBrowser.Target.getTargets();
+      const pageTarget = targetInfos.find(
+        (target) =>
+          target.type === "page" &&
+          typeof target.url === "string" &&
+          target.url.includes("/game"),
+      );
+
+      assert.ok(pageTarget?.targetId);
+
+      const externalSession = await externalBrowser.Target.attachToTarget(
+        createAttachToTargetParams(pageTarget.targetId),
+      );
+
+      const initial = await connectToBrowserTarget(
+        { host, port: cdpPort },
+        coreTargetProfile,
+      );
+      assert.equal(initial.ok, true);
+
+      const reattached = await connectToBrowserTarget(
+        { host, port: cdpPort },
+        coreTargetProfile,
+      );
+      assert.equal(reattached.ok, true);
+
+      const probe = await externalBrowser.send(
+        "Runtime.evaluate",
+        {
+          expression: "1 + 7",
+          awaitPromise: true,
+          returnByValue: true,
+        },
+        externalSession.sessionId,
+      );
+
+      const value = (probe as { result?: { value?: unknown } }).result?.value;
+      assert.equal(value, 8);
+    } finally {
+      await externalBrowser.close();
     }
   },
 );

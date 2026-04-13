@@ -18,6 +18,23 @@ export interface ActiveBrowserConnection {
   close: () => Promise<void>;
 }
 
+export function createAttachToTargetParams(targetId: string): {
+  targetId: string;
+  flatten: true;
+} {
+  return {
+    targetId,
+    flatten: true,
+  };
+}
+
+export function toSessionScopedEventName(
+  eventName: string,
+  sessionId: string,
+): string {
+  return `${eventName}.${sessionId}`;
+}
+
 let activeBrowserConnection: ActiveBrowserConnection | undefined;
 
 const passthroughLocalize = ((input: string): string => input) as Localize;
@@ -322,10 +339,11 @@ async function connectViaBrowserTargetAttach(
     let attachResult: { sessionId: string };
     try {
       attachResult = await withAbortSignal(
-        client.Target.attachToTarget({
-          targetId: targetSelection.target.targetId,
-          flatten: true,
-        }),
+        // Flat sessions are required for browser-level CDP multiplexing and
+        // coexistence with other DevTools clients on the same target.
+        client.Target.attachToTarget(
+          createAttachToTargetParams(targetSelection.target.targetId),
+        ),
         abortSignal,
         localize,
       );

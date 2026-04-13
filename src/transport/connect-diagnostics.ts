@@ -28,7 +28,11 @@ export function formatConnectFailureMessage(
     }
 
     if (failure.category !== "endpoint-connectivity") {
-      return baseMessage;
+      const coexistenceGuidance = localize(
+        "If DevTools is attached, keep browser-level CDP attachment with flat sessions enabled and retry reconnect.",
+      );
+
+      return `${baseMessage} ${coexistenceGuidance}`;
     }
 
     const endpointGuidance = [

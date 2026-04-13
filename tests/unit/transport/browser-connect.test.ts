@@ -1,7 +1,25 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { safeDetachFromTarget } from "../../../src/transport/browser-connect.js";
+import {
+  createAttachToTargetParams,
+  safeDetachFromTarget,
+  toSessionScopedEventName,
+} from "../../../src/transport/browser-connect.js";
+
+test("createAttachToTargetParams always enforces flatten mode", () => {
+  assert.deepEqual(createAttachToTargetParams("target-1"), {
+    targetId: "target-1",
+    flatten: true,
+  });
+});
+
+test("toSessionScopedEventName builds isolated event keys", () => {
+  assert.equal(
+    toSessionScopedEventName("Runtime.consoleAPICalled", "session-1"),
+    "Runtime.consoleAPICalled.session-1",
+  );
+});
 
 test("safeDetachFromTarget detaches an attached session", async () => {
   const detachCalls: Array<{ sessionId: string }> = [];
