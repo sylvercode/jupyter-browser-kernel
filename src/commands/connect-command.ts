@@ -112,6 +112,15 @@ export async function showConnectOutcome(
   successMessage: string,
 ): Promise<void> {
   if (!connectResult.ok) {
+    runtime.connectionStateStore.setErrorContext({
+      category: connectResult.failure.category,
+      guidance: formatConnectFailureMessage(
+        connectResult.failure,
+        endpointSummary,
+        runtime.localize,
+      ),
+    });
+
     const message = formatConnectFailureMessage(
       connectResult.failure,
       endpointSummary,
@@ -124,6 +133,8 @@ export async function showConnectOutcome(
     await showSettingsPrompt(runtime, message, settingsKey);
     return;
   }
+
+  runtime.connectionStateStore.setErrorContext(undefined);
 
   try {
     await runtime.showInformationMessage(

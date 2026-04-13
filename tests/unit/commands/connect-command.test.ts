@@ -60,6 +60,7 @@ test("executeConnectCommand sets deterministic connecting -> connected transitio
   await executeConnectCommand(runtime);
 
   assert.deepEqual(stateTransitions, ["connecting", "connected"]);
+  assert.equal(runtime.connectionStateStore.getErrorContext(), undefined);
   assert.equal(infoMessages.length, 1);
   assert.match(infoMessages[0], /Connected/);
 });
@@ -177,6 +178,10 @@ test("executeConnectCommand sets deterministic connecting -> error transition fo
   assert.deepEqual(stateTransitions, ["connecting", "error"]);
   assert.equal(errorMessages.length, 1);
   assert.match(errorMessages[0], /target-mismatch/);
+  assert.deepEqual(runtime.connectionStateStore.getErrorContext(), {
+    category: "target-mismatch",
+    guidance: errorMessages[0],
+  });
 });
 
 test("executeConnectCommand does not show connect notification after connect is aborted", async () => {

@@ -4,6 +4,11 @@ export type ConnectionState =
   | "connected"
   | "error";
 
+export interface ConnectionErrorContext {
+  category: string;
+  guidance: string;
+}
+
 export interface ConnectionStateStoreTransitionHandler {
   beginTransition: (newState: ConnectionState) => number;
   transitionTo: (transitionId: number, state: ConnectionState) => boolean;
@@ -15,21 +20,27 @@ export interface ConnectionStateStore extends Required<ConnectionStateStoreTrans
   getState: () => ConnectionState;
   setState: (state: ConnectionState) => void;
   getHistory: () => ConnectionState[];
+  getErrorContext: () => ConnectionErrorContext | undefined;
+  setErrorContext: (context: ConnectionErrorContext | undefined) => void;
 }
 
 export interface ConnectionStoreHandler {
   connectionStateStore: ConnectionStateStore;
   onConnectionStateChanged?: (state: ConnectionState) => void;
+  onErrorContextChanged?: (context: ConnectionErrorContext | undefined) => void;
 }
 
 export function createConnectionStateStore({
   initialState,
   onConnectionStateChanged,
+  onErrorContextChanged,
 }: {
   initialState?: ConnectionState;
   onConnectionStateChanged?: (state: ConnectionState) => void;
+  onErrorContextChanged?: (context: ConnectionErrorContext | undefined) => void;
 } = {}): ConnectionStateStore {
   let state = initialState;
+  let errorContext: ConnectionErrorContext | undefined;
   const history: ConnectionState[] = [initialState ?? "disconnected"];
   let activeTransitionId = 0;
   const transitionCancelListeners = new Set<() => void>();
@@ -40,10 +51,17 @@ export function createConnectionStateStore({
     onConnectionStateChanged?.(nextState);
   };
 
+  const setErrorContext = (context: ConnectionErrorContext | undefined) => {
+    errorContext = context;
+    onErrorContextChanged?.(context);
+  };
+
   return {
     getState: () => state ?? "disconnected",
     setState,
     getHistory: () => [...history],
+    getErrorContext: () => errorContext,
+    setErrorContext,
     beginTransition: (newState: ConnectionState) => {
       activeTransitionId += 1;
       setState(newState);

@@ -39,11 +39,16 @@ test("executeDisconnectCommand closes active session and transitions to disconne
     },
     transitions.push.bind(transitions),
   );
+  runtime.connectionStateStore.setErrorContext({
+    category: "transport-failure",
+    guidance: "Retry reconnect.",
+  });
 
   await executeDisconnectCommand(runtime);
 
   assert.deepEqual(calls, ["cancel", "disconnect"]);
   assert.deepEqual(transitions, ["disconnected"]);
+  assert.equal(runtime.connectionStateStore.getErrorContext(), undefined);
 });
 
 test("executeDisconnectCommand remains idempotent when no active session exists", async () => {

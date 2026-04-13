@@ -113,3 +113,44 @@ test("withConnectTransition invokes aborted callback when thrown attempt is canc
   assert.equal(aborted, true);
   assert.deepEqual(store.getHistory(), ["disconnected", "connecting"]);
 });
+
+test("createConnectionStateStore stores and returns error context", () => {
+  const store = createConnectionStateStore();
+
+  store.setErrorContext({
+    category: "target-mismatch",
+    guidance: "Retry reconnect.",
+  });
+
+  assert.deepEqual(store.getErrorContext(), {
+    category: "target-mismatch",
+    guidance: "Retry reconnect.",
+  });
+
+  store.setErrorContext(undefined);
+  assert.equal(store.getErrorContext(), undefined);
+});
+
+test("createConnectionStateStore emits error context changes through callback", () => {
+  const contexts: Array<{ category: string; guidance: string } | undefined> =
+    [];
+  const store = createConnectionStateStore({
+    onErrorContextChanged: (context) => {
+      contexts.push(context);
+    },
+  });
+
+  store.setErrorContext({
+    category: "endpoint-connectivity",
+    guidance: "Check cdpPort and retry.",
+  });
+  store.setErrorContext(undefined);
+
+  assert.deepEqual(contexts, [
+    {
+      category: "endpoint-connectivity",
+      guidance: "Check cdpPort and retry.",
+    },
+    undefined,
+  ]);
+});
