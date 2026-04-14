@@ -2,7 +2,7 @@
 storyId: "1.2"
 storyKey: "1-2-configure-browser-endpoint"
 title: "Configure Browser Endpoint"
-status: "review"
+status: "done"
 created: "2026-04-04"
 epic: "1"
 priority: "p0"
