@@ -49,7 +49,7 @@ So that I can install the extension manually from a known-good packaged build.
 - [x] Configure trigger: `on: push: tags: ['v*']` — fires only when a tag prefixed by `v` (like `v0.1.0`) is pushed.
 - [x] Define a single job (`release`) running on `ubuntu-latest`.
 - [x] Use `actions/checkout@v4` to check out the tagged commit.
-- [x] Use `actions/setup-node@v4` with `node-version: 20` and `cache: 'npm'` to match the project's Node 20 target.
+- [x] Use `actions/setup-node@v5` with `node-version: 24` and `cache: 'npm'` so CI matches the dev container runtime.
 - [x] Run `npm ci` for deterministic dependency install.
 - [x] Run `npm run lint` — fail the workflow on lint errors.
 - [x] Run `npm run test:compile && npm run test:unit` — fail on test failures. Integration tests are excluded (they require a live browser).
@@ -91,7 +91,7 @@ So that I can install the extension manually from a known-good packaged build.
 - **Packaging command:** `npx vsce package` is the canonical packaging command. It's also available as `npm run package:vsix` (which runs compile first). [Source: package.json scripts]
 - **External dependencies:** `chrome-remote-interface` and `ws` are externalized in esbuild and must be in `dependencies` (not `devDependencies`) so `vsce` bundles them into the VSIX `node_modules`. [Source: esbuild.config.js external array, package.json dependencies]
 - **`.vscodeignore`:** Already correctly configured to exclude source, tests, docs, build configs, and sourcemaps from the VSIX package. Only `dist/`, `l10n/`, `package.json`, `package.nls.json`, `LICENSE`, `README.md`, and runtime `node_modules` should be included. [Source: .vscodeignore]
-- **Node version:** Target is Node 20 (`target: 'node20'` in esbuild.config.js). CI must use Node 20.
+- **Node version:** CI and the dev container now standardize on Node 24 for the toolchain runtime. The bundle target in `esbuild.config.js` remains a separate compatibility decision.
 - **Test runner:** Unit tests use Node's built-in test runner — `npm run test:unit` runs `npm run test:compile && node --test "out/tests/unit/**/*.test.js"`. The `test:compile` step uses `tsconfig.test.json`. [Source: package.json scripts]
 - **No secrets required:** This workflow produces a publicly-attachable artifact. No Marketplace PAT or signing keys are needed.
 
@@ -101,7 +101,7 @@ So that I can install the extension manually from a known-good packaged build.
 - **No Marketplace publishing:** Architecture explicitly defers this. The VSIX is attached to a GitHub Release for manual sideload installation.
 - **Lint + unit test gates:** Run before packaging to catch regressions. Integration tests are excluded because they require a live browser with CDP.
 - **`softprops/action-gh-release`:** Well-maintained GitHub Action for creating releases and uploading assets. Avoids hand-rolling the GitHub API.
-- **Single job, not matrix:** There is only one target platform (Node 20 on ubuntu-latest). No need for matrix builds.
+- **Single job, not matrix:** There is only one target platform (Node 24 on ubuntu-latest). No need for matrix builds.
 
 ### Workflow File Structure
 
@@ -123,9 +123,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           cache: "npm"
       - run: npm ci
       - run: npm run lint
@@ -153,7 +153,7 @@ jobs:
 - Do NOT add `VSCE_PAT` or any secrets — no marketplace tokens needed.
 - Do NOT run integration tests in CI — they require a live browser and CDP connection.
 - Do NOT use `npm run package:vsix` in the workflow — it redundantly runs compile again. Run compile and vsce package as separate steps so failures are attributable.
-- Do NOT add complex matrix builds — single Node 20 / ubuntu-latest is sufficient.
+- Do NOT add complex matrix builds — single Node 24 / ubuntu-latest is sufficient.
 - Do NOT modify any extension source code (`src/`) — this story is purely CI infrastructure.
 
 ### Previous Story Intelligence (Story 1.6)
@@ -199,7 +199,7 @@ GPT-5.3-Codex
 
 ### Completion Notes List
 
-- Implemented `.github/workflows/release.yml` with `v*` tag trigger, Node 20 setup, lint/test/compile gates, VSIX packaging, and release asset upload.
+- Implemented `.github/workflows/release.yml` with `v*` tag trigger, Node 24 setup, lint/test/compile gates, VSIX packaging, and release asset upload.
 - Added explicit VSIX existence verification step prior to release publishing to prevent empty release assets.
 - Confirmed `permissions: contents: write` is set for release creation/upload.
 - Verified local gates pass: lint, test compile, unit tests, compile, and VSIX packaging.

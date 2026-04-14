@@ -1,6 +1,6 @@
 {
   "name": "jupyter-browser-kernel",
-  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:4.0-24-bookworm",
   "features": {},
   "postCreateCommand": "sudo apt-get update && sudo apt-get install -y --no-install-recommends chromium && npm install",
   "customizations": {
