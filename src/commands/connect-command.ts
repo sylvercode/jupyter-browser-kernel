@@ -118,12 +118,19 @@ export async function showConnectOutcome(
       runtime.localize,
     );
 
+    runtime.connectionStateStore.setErrorContext({
+      category: connectResult.failure.category,
+      guidance: message,
+    });
+
     const settingsKey = settingsKeyForConnectFailure(
       connectResult.failure.category,
     );
     await showSettingsPrompt(runtime, message, settingsKey);
     return;
   }
+
+  runtime.connectionStateStore.setErrorContext(undefined);
 
   try {
     await runtime.showInformationMessage(

@@ -7,5 +7,11 @@
   "Invalid CDP port: port must be an integer between 1 and 65535.": "Invalid CDP port: port must be an integer between 1 and 65535.",
   "Set jupyterBrowserKernel.cdpPort to a whole number between 1 and 65535.": "Set jupyterBrowserKernel.cdpPort to a whole number between 1 and 65535.",
   "Jupyter Browser Kernel: Disconnected from browser target.": "Jupyter Browser Kernel: Disconnected from browser target.",
-  "Jupyter Browser Kernel: Reconnected to target {0} at {1}.": "Jupyter Browser Kernel: Reconnected to target {0} at {1}."
+  "Jupyter Browser Kernel: Reconnected to target {0} at {1}.": "Jupyter Browser Kernel: Reconnected to target {0} at {1}.",
+  "Endpoint unavailable (check settings).": "Endpoint unavailable (check settings).",
+  "Disconnected. Click to reconnect. Endpoint: {0}.": "Disconnected. Click to reconnect. Endpoint: {0}.",
+  "Connecting. Connection attempt in progress...": "Connecting. Connection attempt in progress...",
+  "Connected to browser target. Endpoint: {0}.": "Connected to browser target. Endpoint: {0}.",
+  "Error ({0}). {1}": "Error ({0}). {1}",
+  "Error. Run Reconnect command or check settings.": "Error. Run Reconnect command or check settings."
 }

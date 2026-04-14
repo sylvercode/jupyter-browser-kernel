@@ -58,6 +58,7 @@ test("executeReconnectCommand transitions to connecting then connected on succes
   await executeReconnectCommand(runtime);
 
   assert.deepEqual(transitions, ["connecting", "connected"]);
+  assert.equal(runtime.connectionStateStore.getErrorContext(), undefined);
   assert.equal(infoMessages.length, 1);
   assert.match(infoMessages[0], /Reconnected/);
 });
@@ -95,6 +96,10 @@ test("executeReconnectCommand transitions to connecting then error on categorize
   assert.equal(errorMessages.length, 1);
   assert.match(errorMessages[0], /target-mismatch/);
   assert.deepEqual(openedSettings, ["jupyterBrowserKernel.cdpHost"]);
+  assert.deepEqual(runtime.connectionStateStore.getErrorContext(), {
+    category: "target-mismatch",
+    guidance: errorMessages[0],
+  });
 });
 
 test("executeReconnectCommand blocks invalid endpoint and opens field-specific settings", async () => {

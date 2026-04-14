@@ -27,6 +27,7 @@ export async function executeDisconnectCommand(
   try {
     await runtime.disconnectActiveConnection();
   } finally {
+    runtime.connectionStateStore.setErrorContext(undefined);
     runtime.connectionStateStore.setState("disconnected");
   }
 
