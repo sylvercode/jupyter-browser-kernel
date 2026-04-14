@@ -2,7 +2,7 @@
 storyId: "1.7"
 storyKey: "1-7-automate-vsix-release-via-ci"
 title: "Automate VSIX Release via CI"
-status: "review"
+status: "done"
 created: "2026-04-13"
 epic: "1"
 priority: "p1"
@@ -10,7 +10,7 @@ priority: "p1"
 
 # Story 1.7: Automate VSIX Release via CI
 
-**Status:** review
+**Status:** done
 
 ## Story
 
