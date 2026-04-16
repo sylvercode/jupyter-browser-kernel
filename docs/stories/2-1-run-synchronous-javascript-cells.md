@@ -2,7 +2,7 @@
 storyId: "2.1"
 storyKey: "2-1-run-synchronous-javascript-cells"
 title: "Run Synchronous JavaScript Cells"
-status: "ready-for-dev"
+status: "review"
 created: "2026-04-14"
 epic: "2"
 priority: "p0"
@@ -10,7 +10,7 @@ priority: "p0"
 
 # Story 2.1: Run Synchronous JavaScript Cells
 
-**Status:** ready-for-dev
+**Status:** review
 
 ## Story
 
@@ -45,20 +45,20 @@ So that I can validate browser state and behavior directly from notebook cells.
 
 ### 1. Register a Notebook Controller (AC: 1, 2, 3)
 
-- [ ] Create `src/notebook/kernel-controller.ts`.
-- [ ] Call `vscode.notebooks.createNotebookController()` with:
+- [x] Create `src/notebook/kernel-controller.ts`.
+- [x] Call `vscode.notebooks.createNotebookController()` with:
   - `id`: `"jupyter-browser-kernel"`
   - `notebookType`: `"jupyter-notebook"`
   - `label`: localized display name (e.g., `"Browser Kernel"`)
   - `supportedLanguages`: `["javascript"]`
-- [ ] Implement `controller.executeHandler` that receives `NotebookCell[]` and a `NotebookController`.
-- [ ] Register the controller in `extension.ts` `activate()` and push to `context.subscriptions`.
-- [ ] **Do NOT** add `ms-toolsai.jupyter` to `extensionDependencies` — `vscode.notebooks.createNotebookController` is a core VS Code API; users install Jupyter separately.
+- [x] Implement `controller.executeHandler` that receives `NotebookCell[]` and a `NotebookController`.
+- [x] Register the controller in `extension.ts` `activate()` and push to `context.subscriptions`.
+- [x] **Do NOT** add `ms-toolsai.jupyter` to `extensionDependencies` — `vscode.notebooks.createNotebookController` is a core VS Code API; users install Jupyter separately.
 
 ### 2. Implement Cell Execution Pipeline (AC: 1, 2)
 
-- [ ] Create `src/kernel/execution-kernel.ts` with an `executeCell` function.
-- [ ] The execute handler in the notebook controller must:
+- [x] Create `src/kernel/execution-kernel.ts` with an `executeCell` function.
+- [x] The execute handler in the notebook controller must:
   1. Check for an active browser connection (`getActiveBrowserConnection()`).
   2. If connected, extract cell text from `cell.document.getText()`.
   3. Create a `NotebookCellExecution` via `controller.createNotebookCellExecution(cell)`.
@@ -79,15 +79,15 @@ So that I can validate browser state and behavior directly from notebook cells.
 
 ### 3. Handle No-Session Execution Block (AC: 3)
 
-- [ ] In `executeHandler`, before evaluation, check `getActiveBrowserConnection()`.
-- [ ] If `undefined`, write an error output to the cell with a clear reconnect message using `vscode.NotebookCellOutputItem.error()` or a text output item.
-- [ ] The message must be localized and direct the user to run the Reconnect command.
-- [ ] Call `execution.end(false, Date.now())` to mark the cell as failed.
-- [ ] Do NOT attempt silent reconnect — manual reconnect is the MVP model. [Source: docs/prd.md#Technical-Constraints]
+- [x] In `executeHandler`, before evaluation, check `getActiveBrowserConnection()`.
+- [x] If `undefined`, write an error output to the cell with a clear reconnect message using `vscode.NotebookCellOutputItem.error()` or a text output item.
+- [x] The message must be localized and direct the user to run the Reconnect command.
+- [x] Call `execution.end(false, Date.now())` to mark the cell as failed.
+- [x] Do NOT attempt silent reconnect — manual reconnect is the MVP model. [Source: docs/prd.md#Technical-Constraints]
 
 ### 4. Normalize Execution Results (AC: 1, 2)
 
-- [ ] Create `src/kernel/execution-result.ts` with the normalized result contract:
+- [x] Create `src/kernel/execution-result.ts` with the normalized result contract:
 
   ```typescript
   interface ExecutionSuccess {
@@ -113,59 +113,59 @@ So that I can validate browser state and behavior directly from notebook cells.
   type ExecutionResult = ExecutionSuccess | ExecutionFailure;
   ```
 
-- [ ] Implement a `normalizeEvaluationResult` function that maps CDP `Runtime.evaluate` responses to `ExecutionResult`:
+- [x] Implement a `normalizeEvaluationResult` function that maps CDP `Runtime.evaluate` responses to `ExecutionResult`:
   - If `result.exceptionDetails` is present → extract name, message, stack from the exception and classify as `syntax-error` (if `exceptionDetails.exception.className === "SyntaxError"`) or `runtime-error`.
   - If `result.result` is present without exception → map `result.result.value` and `result.result.type`/`result.result.subtype` into `ExecutionSuccess`.
   - If CDP call throws (e.g., session dropped) → wrap in `ExecutionFailure` with `kind: "transport-error"`.
-- [ ] **Do NOT** leak raw CDP `RemoteObject` fields or `exceptionDetails` structures into cell output. [Source: docs/architecture.md#Error-Handling-Patterns]
+- [x] **Do NOT** leak raw CDP `RemoteObject` fields or `exceptionDetails` structures into cell output. [Source: docs/architecture.md#Error-Handling-Patterns]
 
 ### 5. Render Cell Output (AC: 1, 2, 3)
 
-- [ ] For `ExecutionSuccess`:
+- [x] For `ExecutionSuccess`:
   - Use `NotebookCellOutputItem.text(value, 'text/plain')` for primitive string representations.
   - For `undefined` return values, show a localized `"undefined"` text output.
   - Call `execution.end(true, Date.now())`.
-- [ ] For `ExecutionFailure`:
+- [x] For `ExecutionFailure`:
   - Use `NotebookCellOutputItem.error()` with an `Error` object constructed from the normalized failure (name, message, stack).
   - Call `execution.end(false, Date.now())`.
-- [ ] For no-session:
+- [x] For no-session:
   - Use `NotebookCellOutputItem.error()` with a localized reconnect prompt message.
   - Call `execution.end(false, Date.now())`.
 
 ### 6. Expose CDP Evaluation Through Transport Interface (AC: 1, 2)
 
-- [ ] The notebook controller needs a way to call `Runtime.evaluate` on the active CDP session. The current `ActiveBrowserConnection` stores `targetId`, `sessionId`, and `endpoint` but does NOT expose the CDP client.
-- [ ] Add an `evaluate` method to `ActiveBrowserConnection` (or create a transport-facing `evaluateOnTarget` function in `src/transport/browser-connect.ts`) that:
+- [x] The notebook controller needs a way to call `Runtime.evaluate` on the active CDP session. The current `ActiveBrowserConnection` stores `targetId`, `sessionId`, and `endpoint` but does NOT expose the CDP client.
+- [x] Add an `evaluate` method to `ActiveBrowserConnection` (or create a transport-facing `evaluateOnTarget` function in `src/transport/browser-connect.ts`) that:
   - Accepts an expression string.
   - Calls `client.send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: false }, sessionId)`.
   - Returns the raw CDP result (which the kernel then normalizes).
-- [ ] **Keep the CDP client reference internal to transport** — the kernel must NOT import `chrome-remote-interface` directly. [Source: docs/architecture.md#Architectural-Boundaries — "Kernel communicates with transport through interfaces only"]
-- [ ] Update the `close` function on `ActiveBrowserConnection` to remain the sole lifecycle control.
+- [x] **Keep the CDP client reference internal to transport** — the kernel must NOT import `chrome-remote-interface` directly. [Source: docs/architecture.md#Architectural-Boundaries — "Kernel communicates with transport through interfaces only"]
+- [x] Update the `close` function on `ActiveBrowserConnection` to remain the sole lifecycle control.
 
 ### 7. Add Unit Tests (AC: 1, 2, 3)
 
-- [ ] Create `tests/unit/kernel/execution-result.test.ts`:
+- [x] Create `tests/unit/kernel/execution-result.test.ts`:
   - Test `normalizeEvaluationResult` with successful primitive results (number, string, boolean, null, undefined).
   - Test with `SyntaxError` exception → `kind: "syntax-error"`.
   - Test with `TypeError`/`ReferenceError` exception → `kind: "runtime-error"`.
   - Test with transport-level error → `kind: "transport-error"`.
   - Test stack extraction from `exceptionDetails.exception.description` or `exceptionDetails.stackTrace`.
-- [ ] Create `tests/unit/kernel/execution-kernel.test.ts`:
+- [x] Create `tests/unit/kernel/execution-kernel.test.ts`:
   - Test successful cell execution calls evaluate and writes success output.
   - Test error cell execution writes error output.
   - Test no-session returns reconnect prompt error.
   - Use a mock/fake transport that returns controlled CDP responses.
-- [ ] Create `tests/unit/notebook/kernel-controller.test.ts`:
+- [x] Create `tests/unit/notebook/kernel-controller.test.ts`:
   - Test controller registration with correct notebook type and language.
   - Test execute handler dispatches to kernel.
-- [ ] Follow existing test patterns: Node.js built-in `test` module, `assert/strict`, localize mock from `tests/unit/test-utils/localize-mock.ts`.
-- [ ] Tests go under `tests/unit/` — NOT co-located with source. [Source: docs/architecture.md#File-Structure-Patterns]
+- [x] Follow existing test patterns: Node.js built-in `test` module, `assert/strict`, localize mock from `tests/unit/test-utils/localize-mock.ts`.
+- [x] Tests go under `tests/unit/` — NOT co-located with source. [Source: docs/architecture.md#File-Structure-Patterns]
 
 ### 8. Run Full Validation Suite (AC: 1, 2, 3)
 
-- [ ] Run `npm run lint` — no new warnings or errors.
-- [ ] Run `npm run test:unit` — all unit tests pass including new tests.
-- [ ] Run `npm run compile` — clean compilation with no type errors.
+- [x] Run `npm run lint` — no new warnings or errors.
+- [x] Run `npm run test:unit` — all unit tests pass including new tests.
+- [x] Run `npm run compile` — clean compilation with no type errors.
 - [ ] Manually verify in Extension Development Host (if available):
   - [ ] Open a `.ipynb` notebook with Jupyter extension installed.
   - [ ] Select "Browser Kernel" as the kernel.
@@ -367,8 +367,33 @@ This story creates two new source directories (`src/kernel/`, `src/notebook/`) a
 
 ### Agent Model Used
 
+GPT-5.3-Codex
+
 ### Debug Log References
+
+- `npm run lint && npm run test:unit && npm run compile`
 
 ### Completion Notes List
 
+- Implemented notebook controller registration for `jupyter-notebook` with `javascript` language support and sequential execution ordering.
+- Added kernel execution pipeline that evaluates synchronous JavaScript through transport, normalizes outcomes, and writes inline success/error output.
+- Added no-session blocking with localized reconnect guidance in notebook cell output.
+- Added transport-layer `evaluate(expression)` on active connections while retaining CDP client encapsulation.
+- Added localization keys for kernel label and no-session messaging.
+- Added unit tests for result normalization, kernel execution behavior, and notebook controller registration/dispatch.
+- Validation passed: `npm run lint`, `npm run test:unit` (75 tests), and `npm run compile`.
+- Manual Extension Development Host verification remains pending.
+
 ### File List
+
+- src/kernel/execution-result.ts
+- src/kernel/execution-kernel.ts
+- src/kernel/index.ts
+- src/notebook/kernel-controller.ts
+- src/notebook/index.ts
+- src/transport/browser-connect.ts
+- src/extension.ts
+- l10n/bundle.l10n.json
+- tests/unit/kernel/execution-result.test.ts
+- tests/unit/kernel/execution-kernel.test.ts
+- tests/unit/notebook/kernel-controller.test.ts

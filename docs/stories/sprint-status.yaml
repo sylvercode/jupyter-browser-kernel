@@ -55,7 +55,7 @@ development_status:
 
   # ── Epic 2: Execute JavaScript Cells (No Intentional Capture) ─────────────
   epic-2: in-progress
-  2-1-run-synchronous-javascript-cells: ready-for-dev
+  2-1-run-synchronous-javascript-cells: review
   2-2-run-asynchronous-javascript-cells: backlog
   2-3-normalize-success-and-failure-output-contracts: backlog
   2-4-support-fast-rerun-and-iteration-patterns: backlog

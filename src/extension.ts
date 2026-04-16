@@ -22,6 +22,7 @@ import {
 import { createConnectionLogger } from "./logging/connection-logger";
 import { createConnectionStatusIndicator } from "./ui/connection-status-indicator";
 import { disconnectActiveBrowserConnection } from "./transport/browser-connect";
+import { registerKernelController } from "./notebook";
 
 type SubscriptionInfo<T> = {
   command: string;
@@ -89,6 +90,9 @@ export function activate(context: vscode.ExtensionContext): void {
     runtimeFactory: createDefaultReconnectCommandRuntime,
     callback: executeReconnectCommand,
   });
+
+  const kernelController = registerKernelController(vscode);
+  context.subscriptions.push(kernelController);
 }
 
 export function deactivate(): Promise<void> {

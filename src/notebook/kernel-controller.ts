@@ -1,0 +1,57 @@
+import type * as vscode from "vscode";
+import type { Localize } from "../config/endpoint-config";
+import { executeCell, createKernelRuntime } from "../kernel";
+
+let executionOrder = 0;
+
+export interface NotebookApi {
+  notebooks: Pick<typeof vscode.notebooks, "createNotebookController">;
+  NotebookCellOutput: typeof vscode.NotebookCellOutput;
+  NotebookCellOutputItem: typeof vscode.NotebookCellOutputItem;
+}
+
+export interface LocalizationApi {
+  t: Localize;
+}
+
+export interface KernelControllerApi extends NotebookApi {
+  l10n: LocalizationApi;
+}
+
+export function registerKernelController(
+  api: KernelControllerApi,
+): vscode.NotebookController {
+  const controller = api.notebooks.createNotebookController(
+    "jupyter-browser-kernel",
+    "jupyter-notebook",
+    api.l10n.t("Browser Kernel"),
+  );
+
+  controller.supportedLanguages = ["javascript"];
+
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: api.NotebookCellOutput,
+      NotebookCellOutputItem: api.NotebookCellOutputItem,
+    },
+    api.l10n.t,
+  );
+
+  controller.executeHandler = async (cells, _notebook, executionController) => {
+    for (const cell of cells) {
+      executionOrder += 1;
+      await executeCell({
+        cell,
+        controller: executionController,
+        executionOrder,
+        runtime,
+      });
+    }
+  };
+
+  return controller;
+}
+
+export function resetExecutionOrderForTests(): void {
+  executionOrder = 0;
+}

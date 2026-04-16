@@ -13,5 +13,8 @@
   "Connecting. Connection attempt in progress...": "Connecting. Connection attempt in progress...",
   "Connected to browser target. Endpoint: {0}.": "Connected to browser target. Endpoint: {0}.",
   "Error ({0}). {1}": "Error ({0}). {1}",
-  "Error. Run Reconnect command or check settings.": "Error. Run Reconnect command or check settings."
+  "Error. Run Reconnect command or check settings.": "Error. Run Reconnect command or check settings.",
+  "Browser Kernel": "Browser Kernel",
+  "No active browser session. Run Jupyter Browser Kernel: Reconnect and try again.": "No active browser session. Run Jupyter Browser Kernel: Reconnect and try again.",
+  "undefined": "undefined"
 }
