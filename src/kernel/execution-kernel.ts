@@ -60,42 +60,51 @@ export async function executeCell({
   execution.start(Date.now());
   execution.executionOrder = executionOrder;
 
-  const connection = runtime.getActiveConnection();
-  if (!connection) {
-    const noSessionFailure = createNoSessionFailure(runtime.localize);
-    reportFailureAsync(runtime, noSessionFailure);
-    await clearCellOutput(execution);
-    execution.end(false, Date.now());
-    return;
-  }
+  try {
+    const connection = runtime.getActiveConnection();
+    if (!connection) {
+      const noSessionFailure = createNoSessionFailure(runtime.localize);
+      reportFailureAsync(runtime, noSessionFailure);
+      await writeFailureOutput(
+        execution,
+        noSessionFailure,
+        runtime.notebookOutputApi,
+        runtime.localize,
+      );
+      execution.end(false, Date.now());
+      return;
+    }
 
-  const expression = cell.document.getText();
+    const expression = cell.document.getText();
 
-  const result = await evaluateCellExpression(connection, expression);
+    const result = await evaluateCellExpression(connection, expression);
 
-  if (result.ok) {
-    const renderedValue =
-      result.value.length > 0 ? result.value : runtime.localize("undefined");
-    await writeSuccessOutput(
+    if (result.ok) {
+      const renderedValue =
+        result.value.length > 0 ? result.value : runtime.localize("undefined");
+      await writeSuccessOutput(
+        execution,
+        renderedValue,
+        runtime.notebookOutputApi,
+      );
+      execution.end(true, Date.now());
+      return;
+    }
+
+    if (shouldReportFailure(result)) {
+      reportFailureAsync(runtime, result);
+    }
+
+    await writeFailureOutput(
       execution,
-      renderedValue,
+      result,
       runtime.notebookOutputApi,
+      runtime.localize,
     );
-    execution.end(true, Date.now());
-    return;
+    execution.end(false, Date.now());
+  } catch {
+    execution.end(false, Date.now());
   }
-
-  if (shouldReportFailure(result)) {
-    reportFailureAsync(runtime, result);
-  }
-
-  await writeFailureOutput(
-    execution,
-    result,
-    runtime.notebookOutputApi,
-    runtime.localize,
-  );
-  execution.end(false, Date.now());
 }
 
 function createNoSessionFailure(localize: Localize): ExecutionFailure {
@@ -115,7 +124,12 @@ function reportFailureAsync(
   runtime: KernelRuntime,
   failure: ExecutionFailure,
 ): void {
-  const reportPromise = runtime.reportTransportError?.(failure);
+  let reportPromise: Promise<void> | void;
+  try {
+    reportPromise = runtime.reportTransportError?.(failure);
+  } catch {
+    return;
+  }
 
   if (!reportPromise) {
     return;
@@ -155,12 +169,6 @@ async function writeSuccessOutput(
       notebookOutputApi.NotebookCellOutputItem.text(value, "text/plain"),
     ]),
   ]);
-}
-
-async function clearCellOutput(
-  execution: vscode.NotebookCellExecution,
-): Promise<void> {
-  await execution.replaceOutput([]);
 }
 
 async function writeFailureOutput(

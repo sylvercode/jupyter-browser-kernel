@@ -2,7 +2,7 @@
 storyId: "2.1"
 storyKey: "2-1-run-synchronous-javascript-cells"
 title: "Run Synchronous JavaScript Cells"
-status: "review"
+status: "done"
 created: "2026-04-14"
 epic: "2"
 priority: "p0"
@@ -10,7 +10,7 @@ priority: "p0"
 
 # Story 2.1: Run Synchronous JavaScript Cells
 
-**Status:** review
+**Status:** done
 
 ## Story
 
@@ -323,6 +323,13 @@ Use a simple module-scoped counter. The counter persists across cell executions 
 ```typescript
 let executionOrder = 0;
 ```
+
+### Review Findings
+
+- [x] [Review][Patch] Missing l10n keys — 5 localized strings in `execution-messages.ts` and `kernel-transport-failure-reporter.ts` are not present in `bundle.l10n.json` [`l10n/bundle.l10n.json`]
+- [x] [Review][Patch] No-session cell output cleared instead of showing reconnect prompt — violates AC 3: "a clear reconnect prompt is shown in the cell output" [`src/kernel/execution-kernel.ts:54-62`]
+- [x] [Review][Patch] Sync throw from `reportTransportError` unguarded — if `reportTransportError` is a sync function that throws, `reportFailureAsync` propagates that throw uncaught [`src/kernel/execution-kernel.ts:107-115`]
+- [x] [Review][Patch] `execution.end()` not guaranteed if `replaceOutput` throws — cell stays in perpetual "running" state if output writes fail [`src/kernel/execution-kernel.ts:56-97`]
 
 #### Timeout Handling
 

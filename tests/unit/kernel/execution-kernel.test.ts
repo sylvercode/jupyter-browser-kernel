@@ -212,7 +212,12 @@ test("executeCell reports reconnect prompt when no active session", async () => 
         "No active browser session. Run Jupyter Browser Kernel: Reconnect and try again.",
     },
   ]);
-  assert.equal(execution.outputs.length, 0);
+  assert.equal(execution.outputs.length, 1);
+  assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
+  assert.match(
+    String(execution.outputs[0]?.items[0]?.value),
+    /No active browser session/,
+  );
 });
 
 test("executeCell reports transport failures to callback and avoids stack-style cell output", async () => {
