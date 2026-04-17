@@ -44,20 +44,24 @@ interface RecordedExecution {
   outputs: FakeNotebookCellOutput[];
 }
 
-function createExecutionRecorder(): {
+interface RecordedNotebookExecution {
+  start: (startTime: number) => void;
+  end: (success: boolean, endTime: number) => void;
+  replaceOutput: (outputs: FakeNotebookCellOutput[]) => Promise<void>;
+  executionOrder?: number;
+}
+
+interface ExecutionRecorder {
   execution: RecordedExecution;
-  notebookExecution: {
-    start: (startTime: number) => void;
-    end: (success: boolean, endTime: number) => void;
-    replaceOutput: (outputs: FakeNotebookCellOutput[]) => Promise<void>;
-    executionOrder?: number;
-  };
-} {
+  notebookExecution: RecordedNotebookExecution;
+}
+
+function createExecutionRecorder(): ExecutionRecorder {
   const execution: RecordedExecution = {
     outputs: [],
   };
 
-  const notebookExecution = {
+  const notebookExecution: RecordedNotebookExecution = {
     start: (startTime: number) => {
       execution.startedAt = startTime;
     },

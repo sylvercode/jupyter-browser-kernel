@@ -20,11 +20,17 @@ export interface NotebookOutputApi {
   NotebookCellOutputItem: typeof vscode.NotebookCellOutputItem;
 }
 
+export type GetActiveConnection = () => ActiveBrowserConnection | undefined;
+
+export type ReportTransportError = (
+  failure: ExecutionFailure,
+) => Promise<void> | void;
+
 export interface KernelRuntime {
   notebookOutputApi: NotebookOutputApi;
   localize: Localize;
-  getActiveConnection: () => ActiveBrowserConnection | undefined;
-  reportTransportError?: (failure: ExecutionFailure) => Promise<void> | void;
+  getActiveConnection: GetActiveConnection;
+  reportTransportError?: ReportTransportError;
 }
 
 export interface ExecuteCellRequest {
@@ -37,10 +43,8 @@ export interface ExecuteCellRequest {
 export function createKernelRuntime(
   notebookOutputApi: NotebookOutputApi,
   localize: Localize,
-  getActiveConnection: () =>
-    | ActiveBrowserConnection
-    | undefined = getActiveBrowserConnection,
-  reportTransportError?: (failure: ExecutionFailure) => Promise<void> | void,
+  getActiveConnection: GetActiveConnection = getActiveBrowserConnection,
+  reportTransportError?: ReportTransportError,
 ): KernelRuntime {
   return {
     notebookOutputApi,

@@ -27,16 +27,24 @@ class FakeNotebookCellOutput {
   constructor(public readonly items: FakeNotebookCellOutputItem[]) {}
 }
 
+type FakeNotebookCell = { document: { getText: () => string } };
+
+type FakeNotebookExecutionController = {
+  createNotebookCellExecution: (cell: unknown) => unknown;
+};
+
+type FakeExecuteHandler = (
+  cells: FakeNotebookCell[],
+  notebook: unknown,
+  controller: FakeNotebookExecutionController,
+) => Promise<void> | void;
+
 interface FakeNotebookController {
   id: string;
   notebookType: string;
   label: string;
   supportedLanguages: string[];
-  executeHandler?: (
-    cells: Array<{ document: { getText: () => string } }>,
-    notebook: unknown,
-    controller: { createNotebookCellExecution: (cell: unknown) => unknown },
-  ) => Promise<void> | void;
+  executeHandler?: FakeExecuteHandler;
 }
 
 test("registerKernelController creates expected notebook controller", () => {

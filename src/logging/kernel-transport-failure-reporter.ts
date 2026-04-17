@@ -18,6 +18,10 @@ export interface KernelTransportFailureReporterDeps {
   now?: () => Date;
 }
 
+export type ReportKernelTransportFailure = (
+  failure: ExecutionFailure,
+) => Promise<void>;
+
 export function createKernelTransportFailureReporter({
   connectionStateStore,
   disconnectActiveConnection,
@@ -25,9 +29,7 @@ export function createKernelTransportFailureReporter({
   localize,
   showErrorMessage,
   now = () => new Date(),
-}: KernelTransportFailureReporterDeps): (
-  failure: ExecutionFailure,
-) => Promise<void> {
+}: KernelTransportFailureReporterDeps): ReportKernelTransportFailure {
   return async (failure: ExecutionFailure): Promise<void> => {
     const categoryLabel = getKernelFailureCategoryLabel(localize, failure.kind);
 
