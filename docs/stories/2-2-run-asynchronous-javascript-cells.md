@@ -212,6 +212,18 @@ When `Runtime.evaluate` is called with `awaitPromise: true`:
 - **Rejected Promise** (e.g., `Promise.reject(new TypeError("boom"))`) → waits for rejection, returns `exceptionDetails`. The `exceptionDetails.text` is prefixed with `"Uncaught (in promise)"` instead of just `"Uncaught"`.
 - **Unresolved Promise with timeout** → CDP terminates evaluation and returns `exceptionDetails` with timeout indication.
 
+#### Post-Implementation CDP Findings From Headless Browser Validation
+
+The integration tests added after implementation refined several assumptions above:
+
+- `Runtime.evaluate(..., { awaitPromise: true, timeout })` is **not a reliable wall-clock timeout for Promise settlement**. A Promise such as `new Promise((resolve) => setTimeout(() => resolve("ok"), 250))` can still resolve successfully even when `timeout` is set lower (for example `50`).
+- The `timeout` parameter **does** reliably terminate synchronous blocking work, including Promise executors that block synchronously before resolving.
+- Timeout-like failures do **not** consistently surface as `exceptionDetails.text` containing `"timed out"`. In headless Chromium they were observed as transport-level rejections such as `"Execution was terminated"` and `"Internal error"`.
+- Promise rejection detection via `exceptionDetails.text.includes("(in promise)")` remains valid.
+- For async rejections, the useful rejection signal is in `exceptionDetails.text`; `result.description` may be empty and `result.value` may be `{}`.
+
+**Implication for follow-up work:** base code should not rely exclusively on CDP's `timeout` parameter or `exceptionDetails.text.includes("timed out")` for timeout classification. A higher-level evaluation timeout wrapper and broader timeout transport-error mapping are likely required.
+
 #### Promise Rejection Detection via CDP
 
 CDP distinguishes promise rejections from sync throws in `exceptionDetails.text`:
@@ -356,6 +368,7 @@ None.
 - Added new l10n strings for timeout messages and `"evaluation timeout"` category label to `l10n/bundle.l10n.json`.
 - Downstream reporter (`kernel-transport-failure-reporter.ts`) verified correct end-to-end — no changes needed.
 - 99 unit tests pass (7 new normalization tests, 3 new kernel pipeline tests, 10 new message function tests).
+- Post-implementation headless-CDP integration coverage refined two assumptions in the original story: Promise settlement is not reliably bounded by CDP's `timeout` parameter alone, and timeout failures may surface as transport-level errors like `"Execution was terminated"` or `"Internal error"` rather than `exceptionDetails.text` containing `"timed out"`.
 
 ### File List
 
