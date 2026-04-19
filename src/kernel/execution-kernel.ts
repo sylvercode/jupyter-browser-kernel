@@ -23,6 +23,10 @@ export interface NotebookOutputApi {
 
 export type GetActiveConnection = () => ActiveBrowserConnection | undefined;
 
+type EvaluationCompletion =
+  | { kind: "result"; result: ExecutionResult }
+  | { kind: "cancelled" };
+
 export type ReportTransportError = (
   failure: ExecutionFailure,
 ) => Promise<void> | void;
@@ -108,9 +112,13 @@ export async function executeCell({
     });
 
     const evaluationPromise = evaluateCellExpression(connection, expression);
-    const completion = await Promise.race([
-      evaluationPromise.then((result) => ({ kind: "result" as const, result })),
-      cancellationSignal.then(() => ({ kind: "cancelled" as const })),
+    const completion: EvaluationCompletion = await Promise.race([
+      evaluationPromise.then(
+        (result): EvaluationCompletion => ({ kind: "result", result }),
+      ),
+      cancellationSignal.then(
+        (): EvaluationCompletion => ({ kind: "cancelled" }),
+      ),
     ]);
     cancellationListener.dispose();
 

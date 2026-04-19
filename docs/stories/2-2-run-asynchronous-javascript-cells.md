@@ -185,6 +185,11 @@ So that notebook execution supports real runtime workflows that use async APIs.
 - [x] [Review][Patch] `raceWithTimeout` now cancels in-flight CDP execution on timeout via `Runtime.terminateExecution`, preventing background script continuation after timeout. [src/transport/browser-connect.ts:16-38, src/transport/browser-connect.ts:420-428]
 - [x] [Review][Defer] Magic string coupling between transport timeout message (`"CDP evaluation timed out"`) and kernel regex (`TIMEOUT_ERROR_PATTERN`) — fragile contract via string matching instead of typed error [src/transport/browser-connect.ts:8, src/kernel/execution-result.ts:44] — deferred, requires design decision on shared error contract
 
+#### Review 2 — Cancellation / Stop-Button Patch (278c2b9)
+
+- [x] [Review][Patch] Ad hoc discriminated union for `Promise.race` completion type — `{ kind: "result", result }` / `{ kind: "cancelled" }` should be a named type per coding standard ("Prefer named type aliases or interfaces for non-trivial shapes") [src/kernel/execution-kernel.ts:112-114]
+- [x] [Review][Defer] Second `isCancellationRequested` check after race resolution is undocumented and untested — guards a narrow timing window between evaluation completing and output writing, but has no comment or test explaining the intent [src/kernel/execution-kernel.ts:125-128] — deferred, add explanatory comment and/or test in a future pass
+
 ## Dev Notes
 
 ### Story Context and Scope
