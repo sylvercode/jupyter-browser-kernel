@@ -432,6 +432,20 @@ test("normalizeEvaluationResult Infinity via unserializableValue", () => {
   });
 });
 
+test("normalizeEvaluationResult -Infinity via unserializableValue", () => {
+  const result = normalizeEvaluationResult(
+    createResponse({
+      result: { type: "number", unserializableValue: "-Infinity" },
+    }),
+  );
+
+  assert.deepEqual(result, {
+    ok: true,
+    type: "number",
+    value: "-Infinity",
+  });
+});
+
 test("normalizeEvaluationResult NaN via unserializableValue", () => {
   const result = normalizeEvaluationResult(
     createResponse({

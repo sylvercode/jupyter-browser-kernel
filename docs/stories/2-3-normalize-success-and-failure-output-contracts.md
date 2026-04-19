@@ -2,7 +2,7 @@
 storyId: "2.3"
 storyKey: "2-3-normalize-success-and-failure-output-contracts"
 title: "Normalize Success and Failure Output Contracts"
-status: "review"
+status: "done"
 created: "2026-04-19"
 epic: "2"
 priority: "p0"
@@ -10,7 +10,7 @@ priority: "p0"
 
 # Story 2.3: Normalize Success and Failure Output Contracts
 
-**Status:** review
+**Status:** done
 
 ## Story
 
@@ -449,3 +449,11 @@ GPT-5.3-Codex
 - docs/stories/sprint-status.yaml
 - package.json
 - package-lock.json
+
+### Review Findings
+
+- [x] [Review][Decision] `test` script change + `@vscode/test-cli` dependency — accepted. `vscode-test` is deprecated; `@vscode/test-cli` is its official successor. `"test": "npm run test:unit"` restores a working `npm test`. Both changes kept as-is.
+- [x] [Review][Patch] Missing `-Infinity` serialization edge-case test — added coverage for the remaining CDP numeric `unserializableValue` case in the result contract suite. [tests/unit/kernel/execution-result.test.ts]
+- [x] [Review][Patch] Missing MIME assertion on transport-error cell output (AC 3) — added `text/plain` MIME verification for the transport-error output path. [tests/unit/kernel/execution-kernel.test.ts]
+- [x] [Review][Patch] Error output no-leak test doesn't verify absence of extra properties (AC 1/3) — added assertions that the rendered `Error` object does not expose `kind` or raw CDP fields. [tests/unit/kernel/execution-kernel.test.ts]
+- [x] [Review][Defer] No test for Symbol/Function without `description` field — CDP can theoretically return symbols/functions where `description` is undefined, causing fallthrough to `JSON.stringify(undefined)` → `"undefined"`. Deferred: CDP always provides `description` for these types in practice. [tests/unit/kernel/execution-result.test.ts]

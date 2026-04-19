@@ -321,6 +321,10 @@ test("executeCell writes structured error output for runtime exception", async (
   // Task 5 (AC 1, AC 3): Error output contract - Error object with name, message, optional stack
   assert.equal(typeof renderedError.name, "string");
   assert.equal(typeof renderedError.message, "string");
+  assert.ok(!("kind" in renderedError));
+  assert.ok(!("exceptionDetails" in renderedError));
+  assert.ok(!("objectId" in renderedError));
+  assert.ok(!("className" in renderedError));
 });
 
 test("executeCell reports reconnect prompt when no active session", async () => {
@@ -404,6 +408,7 @@ test("executeCell reports transport failures to callback and avoids stack-style 
     },
   ]);
   assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
+  assert.equal(execution.outputs[0]?.items[0]?.mime, "text/plain");
   assert.match(
     String(execution.outputs[0]?.items[0]?.value),
     /Transport error while running this cell/,
