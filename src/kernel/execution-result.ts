@@ -76,6 +76,7 @@ interface RemoteObjectLike {
   subtype?: string;
   value?: unknown;
   description?: string;
+  unserializableValue?: string;
 }
 
 interface ExceptionClassification {
@@ -100,6 +101,10 @@ function serializeRemoteValue(result: RemoteObjectLike): string {
     return "undefined";
   }
 
+  if (result.unserializableValue !== undefined) {
+    return result.unserializableValue;
+  }
+
   if (typeof result.value === "string") {
     return result.value;
   }
@@ -114,10 +119,6 @@ function serializeRemoteValue(result: RemoteObjectLike): string {
     result.value === null
   ) {
     return String(result.value);
-  }
-
-  if (typeof result.value === "bigint") {
-    return `${String(result.value)}n`;
   }
 
   const serialized = JSON.stringify(result.value);

@@ -413,3 +413,277 @@ test("normalizeEvaluationResult resolved Promise value produces ExecutionSuccess
     value: "42",
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Task 2: Serialization Edge-Case Tests (AC: 1)
+// ──────────────────────────────────────────────────────────────────────────────
+
+test("normalizeEvaluationResult Infinity via unserializableValue", () => {
+  const result = normalizeEvaluationResult(
+    createResponse({
+      result: { type: "number", unserializableValue: "Infinity" },
+    }),
+  );
+
+  assert.deepEqual(result, {
+    ok: true,
+    type: "number",
+    value: "Infinity",
+  });
+});
+
+test("normalizeEvaluationResult NaN via unserializableValue", () => {
+  const result = normalizeEvaluationResult(
+    createResponse({
+      result: { type: "number", unserializableValue: "NaN" },
+    }),
+  );
+
+  assert.deepEqual(result, {
+    ok: true,
+    type: "number",
+    value: "NaN",
+  });
+});
+
+test("normalizeEvaluationResult -0 via unserializableValue", () => {
+  const result = normalizeEvaluationResult(
+    createResponse({
+      result: { type: "number", unserializableValue: "-0" },
+    }),
+  );
+
+  assert.deepEqual(result, {
+    ok: true,
+    type: "number",
+    value: "-0",
+  });
+});
+
+test("normalizeEvaluationResult BigInt via unserializableValue", () => {
+  const result = normalizeEvaluationResult(
+    createResponse({
+      result: { type: "bigint", unserializableValue: "123n" },
+    }),
+  );
+
+  assert.deepEqual(result, {
+    ok: true,
+    type: "bigint",
+    value: "123n",
+  });
+});
+
+test("normalizeEvaluationResult Symbol with description", () => {
+  const result = normalizeEvaluationResult(
+    createResponse({
+      result: { type: "symbol", description: "Symbol(foo)" },
+    }),
+  );
+
+  assert.deepEqual(result, {
+    ok: true,
+    type: "symbol",
+    value: "Symbol(foo)",
+  });
+});
+
+test("normalizeEvaluationResult Function with description", () => {
+  const result = normalizeEvaluationResult(
+    createResponse({
+      result: {
+        type: "function",
+        description: "function greet() { ... }",
+      },
+    }),
+  );
+
+  assert.deepEqual(result, {
+    ok: true,
+    type: "function",
+    value: "function greet() { ... }",
+  });
+});
+
+test("normalizeEvaluationResult Array via returnByValue", () => {
+  const result = normalizeEvaluationResult(
+    createResponse({
+      result: { type: "object", subtype: "array", value: [1, 2, 3] },
+    }),
+  );
+
+  assert.deepEqual(result, {
+    ok: true,
+    type: "array",
+    value: "[1,2,3]",
+  });
+});
+
+test("normalizeEvaluationResult Object via returnByValue", () => {
+  const result = normalizeEvaluationResult(
+    createResponse({
+      result: { type: "object", value: { a: 1, b: "two" } },
+    }),
+  );
+
+  assert.deepEqual(result, {
+    ok: true,
+    type: "object",
+    value: '{"a":1,"b":"two"}',
+  });
+});
+
+test("normalizeEvaluationResult empty string value (edge case)", () => {
+  const result = normalizeEvaluationResult(
+    createResponse({
+      result: { type: "string", value: "" },
+    }),
+  );
+
+  assert.deepEqual(result, {
+    ok: true,
+    type: "string",
+    value: "",
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Task 3: Contract Shape Invariant Tests (AC: 1, 2, 3, 4)
+// ──────────────────────────────────────────────────────────────────────────────
+
+test("normalizeEvaluationResult success contract: exact shape, no extra properties", () => {
+  const result = normalizeEvaluationResult(
+    createResponse({
+      result: {
+        type: "object",
+        subtype: "array",
+        value: [1],
+        className: "Array",
+        description: "Array(1)",
+        objectId: "1234",
+      },
+    }),
+  );
+
+  assert.equal(result.ok, true);
+  if (!result.ok) {
+    return;
+  }
+
+  const keys = Object.keys(result).sort();
+  assert.deepEqual(keys, ["ok", "type", "value"]);
+  assert.equal(typeof result.value, "string");
+  assert.equal(typeof result.type, "string");
+  assert.equal(result.ok, true);
+});
+
+test("normalizeEvaluationResult failure contract: exact shape, no extra properties", () => {
+  const result = normalizeEvaluationResult(
+    createResponse({
+      result: { type: "undefined" },
+      exceptionDetails: {
+        exceptionId: 100,
+        text: "Uncaught TypeError: bad",
+        lineNumber: 0,
+        columnNumber: 0,
+        exception: {
+          type: "object",
+          className: "TypeError",
+          description: "TypeError: bad\n    at <anonymous>:1:1",
+        },
+      },
+    }),
+  );
+
+  assert.equal(result.ok, false);
+  if (result.ok) {
+    return;
+  }
+
+  const keys = Object.keys(result).sort();
+  assert.deepEqual(keys, ["kind", "message", "name", "ok", "stack"]);
+  assert.equal(result.ok, false);
+  assert.equal(typeof result.name, "string");
+  assert.equal(typeof result.message, "string");
+  assert.equal(typeof result.kind, "string");
+  assert.equal(typeof result.stack, "string");
+});
+
+test("normalizeTransportError contract: exact shape, no extra properties", () => {
+  const result = normalizeTransportError(new Error("socket closed"));
+
+  assert.equal(result.ok, false);
+  if (result.ok) {
+    return;
+  }
+
+  const keys = Object.keys(result).sort();
+  assert.deepEqual(keys, ["kind", "message", "name", "ok", "stack"]);
+  assert.equal(result.ok, false);
+  assert.equal(typeof result.name, "string");
+  assert.equal(typeof result.message, "string");
+  assert.equal(typeof result.kind, "string");
+  assert.equal(typeof result.stack, "string");
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Task 4: Classification Parity Tests (AC: 4)
+// ──────────────────────────────────────────────────────────────────────────────
+
+test("normalizeEvaluationResult classification parity: sync throw vs async rejection produce identical shapes except kind", () => {
+  // Sync throw: "Uncaught TypeError: boom"
+  const syncResult = normalizeEvaluationResult(
+    createResponse({
+      result: { type: "undefined" },
+      exceptionDetails: {
+        exceptionId: 20,
+        text: "Uncaught TypeError: boom",
+        lineNumber: 0,
+        columnNumber: 0,
+        exception: {
+          type: "object",
+          className: "TypeError",
+          description: "TypeError: boom\n    at <anonymous>:1:1",
+        },
+      },
+    }),
+  );
+
+  // Async rejection: "Uncaught (in promise) TypeError: boom"
+  const asyncResult = normalizeEvaluationResult(
+    createResponse({
+      result: { type: "undefined" },
+      exceptionDetails: {
+        exceptionId: 21,
+        text: "Uncaught (in promise) TypeError: boom",
+        lineNumber: 0,
+        columnNumber: 0,
+        exception: {
+          type: "object",
+          className: "TypeError",
+          description: "TypeError: boom\n    at <anonymous>:1:1",
+        },
+      },
+    }),
+  );
+
+  // Both should be failures
+  assert.equal(syncResult.ok, false);
+  assert.equal(asyncResult.ok, false);
+  if (syncResult.ok || asyncResult.ok) {
+    return;
+  }
+
+  // Both should have identical name, message, stack
+  assert.equal(syncResult.name, asyncResult.name);
+  assert.equal(syncResult.name, "TypeError");
+
+  assert.equal(syncResult.message, asyncResult.message);
+  assert.equal(syncResult.message, "boom");
+
+  assert.equal(syncResult.stack, asyncResult.stack);
+
+  // The ONLY difference should be kind
+  assert.equal(syncResult.kind, "runtime-error");
+  assert.equal(asyncResult.kind, "promise-rejection");
+});

@@ -172,6 +172,8 @@ test("executeCell evaluates expression and writes success output", async () => {
   assert.equal(execution.outputs.length, 1);
   assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
   assert.equal(execution.outputs[0]?.items[0]?.value, "4");
+  // Task 5 (AC 1): Success output uses text/plain MIME with no CDP fields
+  assert.equal(execution.outputs[0]?.items[0]?.mime, "text/plain");
 });
 
 test("executeCell exits before evaluation when cancellation was already requested", async () => {
@@ -316,6 +318,9 @@ test("executeCell writes structured error output for runtime exception", async (
   assert.ok(renderedError instanceof Error);
   assert.equal(renderedError.name, "TypeError");
   assert.equal(renderedError.message, "boom");
+  // Task 5 (AC 1, AC 3): Error output contract - Error object with name, message, optional stack
+  assert.equal(typeof renderedError.name, "string");
+  assert.equal(typeof renderedError.message, "string");
 });
 
 test("executeCell reports reconnect prompt when no active session", async () => {
@@ -533,6 +538,8 @@ test("executeCell writes text output and reports failure for timeout", async () 
   assert.equal(execution.success, false);
   assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
   assert.deepEqual(reportedFailures, ["timeout"]);
+  // Task 5 (AC 3): Infrastructure failure uses text/plain with localized message
+  assert.equal(execution.outputs[0]?.items[0]?.mime, "text/plain");
 });
 
 test("executeCell still produces success output for resolved async value (regression)", async () => {
