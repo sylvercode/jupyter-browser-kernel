@@ -26,7 +26,7 @@
 
 - ~~`raceWithTimeout` never cancels the underlying CDP evaluation — when the timeout fires, the browser continues executing the expression. `Runtime.terminateExecution` could be used for cleanup. Acceptable for MVP scope.~~ Resolved in Story 2.2 by issuing `Runtime.terminateExecution` on timeout.
 - Magic string coupling between transport timeout message (`"CDP evaluation timed out"`) and kernel regex (`TIMEOUT_ERROR_PATTERN`) — fragile contract via string matching instead of typed error. Requires design decision on shared error contract.
-- `replMode: true` was added to `Runtime.evaluate` params in Story 2.2 without spec authorization. It changes CDP evaluation semantics (top-level await, completion-value return). Flag for Story 2.4 planning to decide whether to keep or remove.
+- ~~`replMode: true` was added to `Runtime.evaluate` params in Story 2.2 without spec authorization. It changes CDP evaluation semantics (top-level await, completion-value return). Flag for Story 2.4 planning to decide whether to keep or remove.~~ Resolved: addressed by Story 2.5 (validate `replMode` against breakpoint binding; switch evaluation strategy if incompatible).
 
 ## Deferred from: code review of 2-3-normalize-success-and-failure-output-contracts (2026-04-19)
 
@@ -34,5 +34,5 @@
 
 ## Deferred from: breakpoint compatibility discovery (2026-04-19)
 
-- `addSourceLabeling` uses a static `//# sourceURL=cell.js` for all cells. Must be replaced with per-cell identity reflecting notebook file name and cell index (e.g., `notebook-name.cell-3.js`). Deferred to Story 2.4 — sourceURL scheme should be designed alongside wrapping lambda and breakpoint-compatibility decisions.
-- Breakpoint debugging was identified as an implicit MVP capability not covered by any existing FR or epic. Browser-level breakpoints require CDP `Debugger` domain integration and a stable source-name contract between VS Code notebook URIs and `sourceURL` directives. Run Correct Course (`bmad-correct-course`) before starting Story 2.4 to integrate this into PRD, architecture, and epic planning.
+- ~~`addSourceLabeling` uses a static `//# sourceURL=cell.js` for all cells. Must be replaced with per-cell identity reflecting notebook file name and cell index (e.g., `notebook-name.cell-3.js`). Deferred to Story 2.4 — sourceURL scheme should be designed alongside wrapping lambda and breakpoint-compatibility decisions.~~ Resolved: addressed by Story 2.4 per-cell sourceURL contract.
+- ~~Breakpoint debugging was identified as an implicit MVP capability not covered by any existing FR or epic. Browser-level breakpoints require CDP `Debugger` domain integration and a stable source-name contract between VS Code notebook URIs and `sourceURL` directives. Run Correct Course (`bmad-correct-course`) before starting Story 2.4 to integrate this into PRD, architecture, and epic planning.~~ Resolved: Sprint Change Proposal 2026-04-19 added FR38, Story 2.5, and architecture coverage.

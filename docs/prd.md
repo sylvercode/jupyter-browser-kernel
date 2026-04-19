@@ -37,7 +37,7 @@ documentCounts:
 workflowType: prd
 workflow: edit
 projectName: jupyter-browser-kernel
-lastEdited: 2026-03-21
+lastEdited: 2026-04-19
 editHistory:
   - date: 2026-03-18
     changes: Reframed the product as a browser execution platform with Foundry as the first MVP profile, split core platform and profile scope, and regrouped requirements.
@@ -69,13 +69,15 @@ editHistory:
     changes: Post-validation edits — replaced example-framing in FR23/FR29/FR30 with functional categories and architecture-scoped deferral, added measurement methods to NFR7 and NFR10, fixed RTM J1 scope numbering, and closed orphan FR traceability gap by mapping FR24–FR26 and FR37 to existing journeys as post-MVP expansions.
   - date: 2026-03-21
     changes: Aligned Integration Requirements output-helper bullet with FR23 functional-category style, clarified FR13 shared-runtime pattern (global namespace), and replaced opaque FR25 watcher terminology with plain-language equivalents.
+  - date: 2026-04-19
+    changes: Added FR38 establishing source-level breakpoint debugging as a core kernel MVP capability and updated J1 traceability to cover it.
 ---
 
 # Product Requirements Document - jupyter-browser-kernel
 
 **Author:** Sylvercode
 **Date:** 2026-03-15
-**Last Edited:** 2026-03-20
+**Last Edited:** 2026-04-19
 
 ## Executive Summary
 
@@ -442,7 +444,7 @@ This product is a VS Code-only developer tool. Its core job is deterministic Jav
 
 ## Functional Requirements
 
-Traceability highlights: FR1 through FR23 cover the platform execution contract used by MVP journeys; FR24 through FR26 (observation extensions) and FR37 (parameterized execution) are post-MVP core-platform enhancements mapped to existing journeys as post-MVP expansions; FR27 through FR36 cover post-MVP app-specific profile requirements (Foundry).
+Traceability highlights: FR1 through FR23 plus FR38 cover the platform execution contract used by MVP journeys; FR24 through FR26 (observation extensions) and FR37 (parameterized execution) are post-MVP core-platform enhancements mapped to existing journeys as post-MVP expansions; FR27 through FR36 cover post-MVP app-specific profile requirements (Foundry).
 
 ### Core Platform Requirements
 
@@ -464,6 +466,7 @@ Traceability highlights: FR1 through FR23 cover the platform execution contract 
 - FR11: The extension can surface syntax and runtime errors as notebook output with message, stack, and source location when available.
 - FR12: A user can rerun modified cells repeatedly in the same notebook workflow.
 - FR13: The extension can support execution isolation per cell while allowing explicit shared-runtime patterns such as a shared global namespace when the user chooses them.
+- FR38: A user can set source-level breakpoints in notebook cells from the browser's developer-tools Sources panel and have them bind to the executing cell code, with stable per-cell source identity that persists across re-execution within a session.
 
 #### Result Normalization and Output Contract
 
@@ -563,7 +566,7 @@ This table maps each user journey to the scope items, functional requirements, a
 
 | Journey                               | Scope Items              | FRs                                            | NFRs                         |
 | ------------------------------------- | ------------------------ | ---------------------------------------------- | ---------------------------- |
-| J1: Rapid Snippet Iteration           | Core 1–11                | FR1–FR18, FR22–FR23; post-MVP: FR24–FR26, FR37 | NFR1, NFR3, NFR5–9, NFR12–13 |
+| J1: Rapid Snippet Iteration           | Core 1–11                | FR1–FR18, FR22–FR23, FR38; post-MVP: FR24–FR26, FR37 | NFR1, NFR3, NFR5–9, NFR12–13 |
 | J2: Safe Experimentation and Reversal | Core 3–4, 10             | FR8–FR17, FR19–FR21; post-MVP: FR37            | NFR1, NFR3, NFR5–6           |
 | J3: Connection and Target Recovery    | Core 1–2, 4–5            | FR1–FR7                                        | NFR2, NFR4, NFR8–9           |
 | J4: Diagnosing Unexpected Behavior    | Core 2, 4, 7             | FR14–FR18; post-MVP: FR24–FR26                 | NFR3, NFR5–6, NFR8, NFR15–17 |

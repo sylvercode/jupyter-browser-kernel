@@ -1,6 +1,6 @@
 # Epic 2: Execute JavaScript Cells (No Intentional Capture)
 
-**Goal:** Enable reliable JavaScript cell execution against a live browser execution target, with normalized result contracts and fast iteration patterns.
+**Goal:** Enable reliable, breakpoint-debuggable JavaScript cell execution against a live browser execution target, with normalized result contracts and fast iteration patterns.
 
 **Stories:**
 
@@ -109,5 +109,52 @@ So that I can iterate rapidly without connection overhead or state confusion.
 **When** execution completes
 **Then** success or failure is visible inline without navigating away
 **And** the next edit-run cycle requires no additional navigation steps.
+
+**Given** any cell run
+**When** the kernel emits the cell to the browser
+**Then** the cell carries a per-cell `//# sourceURL` directive derived from the notebook URI and cell index
+**And** the directive is stable across reruns of the same cell within the session.
+
+**Given** wrapping-lambda introduction for variable-creation control
+**When** the wrapper is applied
+**Then** user-visible line numbers map 1:1 to the source visible in the browser's Sources panel
+**And** any synthesized lines do not shift user line numbers.
+
+**Scope Note (FR38 boundary):** Story 2.4 establishes the per-cell source identity contract and line-offset preservation. Story 2.5 enables the CDP Debugger domain and validates that browser-set breakpoints bind and fire on this identity.
+
+## Story 2.5: Enable Source-Level Breakpoint Debugging
+
+As a developer,
+I want to set breakpoints in notebook cells from the browser's developer-tools Sources panel and have them fire,
+So that I can debug cell code with the same workflow I use for any browser script.
+
+**Acceptance Criteria:**
+
+**Given** an active session with a valid browser execution target
+**When** the session attaches
+**Then** `Debugger.enable` is invoked on the per-target session
+**And** session attach failure for the Debugger domain surfaces as a normalized error.
+
+**Given** a cell with a per-cell `//# sourceURL` (Story 2.4 contract)
+**When** I set a breakpoint on a line of that cell in the browser's Sources panel
+**Then** the breakpoint binds to that cell's source identity
+**And** rerunning the cell hits the breakpoint at the expected line.
+
+**Given** the same cell is edited and rerun
+**When** I have a breakpoint set in the browser
+**Then** the breakpoint persists against the stable sourceURL
+**And** the breakpoint fires on the new execution if the line still exists.
+
+**Given** evaluation requires top-level await (Story 2.2 behavior)
+**When** the evaluation path is chosen for Story 2.5
+**Then** breakpoints bind reliably AND top-level await still resolves
+**And** the chosen path (`replMode: true` retained, or `Runtime.compileScript` + `Runtime.runScript`, or alternative) is documented in the story dev notes.
+
+**Given** Edge DevTools is attached to the same target
+**When** the extension enables the Debugger domain
+**Then** DevTools' own debugger session is not displaced
+**And** notebook execution continues to coexist with DevTools.
+
+**Traceability Note:** Implements FR38 and validates NFR8 (DevTools coexistence) under active debugger usage.
 
 ---

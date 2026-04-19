@@ -190,6 +190,38 @@ Deferred Decisions (Post-MVP):
   - vitest: 4.1.0 (modified 2026-03-12)
   - @vscode/test-cli: 0.0.12 (modified 2025-10-09)
 
+### Debugger Domain Integration
+
+The kernel must support source-level breakpoint debugging from the browser's developer-tools Sources panel. This is a cross-layer contract spanning transport, kernel, and notebook layers.
+
+Per-cell source identity contract:
+
+- Every evaluated cell carries a `//# sourceURL=` directive that is unique per cell and stable across re-execution within a session.
+- The directive is derived from the notebook URI and the cell index. The exact format is implementation-scoped within Story 2.5 but must satisfy the properties required for FR38 breakpoint binding to work: uniqueness per cell (so a breakpoint binds to one cell, not all cells sharing a name), stability across reruns of the same cell (so a breakpoint persists through edit-run cycles), and human-readable association with the notebook file (so the user can locate the cell source in the browser's Sources panel to set the breakpoint in the first place).
+- The notebook controller layer is the source of the notebook URI; the kernel applies the directive; the transport carries it unmodified.
+
+Debugger lifecycle:
+
+- `Debugger.enable` is invoked on each page session at session attach time, alongside existing `Runtime.enable` setup.
+- The extension does not own a breakpoint UI. Breakpoints are set in the browser's Sources panel against the cell sourceURL identity that the extension provides.
+- The extension does not need `Debugger.setBreakpointByUrl` for MVP; user-set browser breakpoints fire because the sourceURL contract is honored.
+
+Evaluation strategy and `replMode`:
+
+- Story 2.2 introduced `replMode: true` to enable top-level await. `replMode` may interfere with breakpoint binding because it wraps the expression in an IIFE.
+- Story 2.5 must validate `replMode` empirically. If breakpoints do not bind reliably, the evaluation path switches to `Runtime.compileScript` + `Runtime.runScript` (or another validated alternative) while preserving top-level await semantics.
+- This decision is recorded in Story 2.5; the architecture commits only to: top-level await must survive, and breakpoints must bind.
+
+Wrapping-lambda line offset:
+
+- Story 2.4 introduces a wrapping lambda for variable-creation control. The wrapper prepends a known number of lines before user code.
+- The sourceURL directive emission and any synthesized lines must keep user line N mapped to user line N in the source visible to the debugger. Mechanisms include: emitting the sourceURL after a leading newline budget, using `//# sourceURL` placement that does not shift user lines, or using source mappings if needed.
+- Story 2.5 owns the validation test that proves user-visible line numbers match Sources-panel line numbers.
+
+DevTools coexistence interaction:
+
+- The browser-level CDP multiplexing already used to coexist with DevTools is sufficient. `Debugger.enable` invoked from the extension's flat session does not displace or interfere with DevTools' own debugger session.
+
 ### Frontend Architecture
 
 - VS Code extension UI surface only (status and diagnostics), no standalone frontend app.
@@ -570,7 +602,7 @@ The architecture supports all MVP platform capabilities: connection and session 
 **Functional Requirements Coverage:**
 
 - FR1-FR7 (Connection and Session Control) are covered by `src/transport/`, `src/config/`, and `src/ui/status-bar`.
-- FR8-FR13 (Notebook Execution) are covered by `src/kernel/` and `src/notebook/`.
+- FR8-FR13, FR38 (Notebook Execution including breakpoint debugging) are covered by `src/kernel/`, `src/notebook/`, and `src/transport/` debugger-domain enablement.
 - FR14-FR17 (Result and Output Contract) are covered by `src/kernel/execution-result`, `src/kernel/output-collector`, and shared error/event types.
 - FR18 (Platform Testing and Validation) is covered by `tests/fixtures/`, `tests/integration/`, and `tests/contract/`.
 - FR19-FR22 (Experimentation Workflow and install path) are supported by notebook execution flow and session lifecycle design.
