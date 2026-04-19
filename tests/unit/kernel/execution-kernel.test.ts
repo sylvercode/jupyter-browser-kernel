@@ -172,6 +172,8 @@ test("executeCell evaluates expression and writes success output", async () => {
   assert.equal(execution.outputs.length, 1);
   assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
   assert.equal(execution.outputs[0]?.items[0]?.value, "4");
+  // Success output remains plain text with text/plain MIME.
+  assert.equal(execution.outputs[0]?.items[0]?.mime, "text/plain");
 });
 
 test("executeCell exits before evaluation when cancellation was already requested", async () => {
@@ -316,6 +318,13 @@ test("executeCell writes structured error output for runtime exception", async (
   assert.ok(renderedError instanceof Error);
   assert.equal(renderedError.name, "TypeError");
   assert.equal(renderedError.message, "boom");
+  // User-code errors are surfaced as Error objects without protocol-specific fields.
+  assert.equal(typeof renderedError.name, "string");
+  assert.equal(typeof renderedError.message, "string");
+  assert.ok(!("kind" in renderedError));
+  assert.ok(!("exceptionDetails" in renderedError));
+  assert.ok(!("objectId" in renderedError));
+  assert.ok(!("className" in renderedError));
 });
 
 test("executeCell reports reconnect prompt when no active session", async () => {
@@ -399,6 +408,7 @@ test("executeCell reports transport failures to callback and avoids stack-style 
     },
   ]);
   assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
+  assert.equal(execution.outputs[0]?.items[0]?.mime, "text/plain");
   assert.match(
     String(execution.outputs[0]?.items[0]?.value),
     /Transport error while running this cell/,
@@ -533,6 +543,8 @@ test("executeCell writes text output and reports failure for timeout", async () 
   assert.equal(execution.success, false);
   assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
   assert.deepEqual(reportedFailures, ["timeout"]);
+  // Infrastructure failures render localized plain text output.
+  assert.equal(execution.outputs[0]?.items[0]?.mime, "text/plain");
 });
 
 test("executeCell still produces success output for resolved async value (regression)", async () => {

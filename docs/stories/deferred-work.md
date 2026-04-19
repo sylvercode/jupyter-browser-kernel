@@ -28,6 +28,10 @@
 - Magic string coupling between transport timeout message (`"CDP evaluation timed out"`) and kernel regex (`TIMEOUT_ERROR_PATTERN`) — fragile contract via string matching instead of typed error. Requires design decision on shared error contract.
 - `replMode: true` was added to `Runtime.evaluate` params in Story 2.2 without spec authorization. It changes CDP evaluation semantics (top-level await, completion-value return). Flag for Story 2.4 planning to decide whether to keep or remove.
 
+## Deferred from: code review of 2-3-normalize-success-and-failure-output-contracts (2026-04-19)
+
+- No test for Symbol/Function without `description` field — CDP can theoretically return symbols/functions where `description` is undefined, causing `serializeRemoteValue` fallthrough to `JSON.stringify(undefined)` → `"undefined"`. CDP always provides `description` for these types in practice.
+
 ## Deferred from: breakpoint compatibility discovery (2026-04-19)
 
 - `addSourceLabeling` uses a static `//# sourceURL=cell.js` for all cells. Must be replaced with per-cell identity reflecting notebook file name and cell index (e.g., `notebook-name.cell-3.js`). Deferred to Story 2.4 — sourceURL scheme should be designed alongside wrapping lambda and breakpoint-compatibility decisions.
