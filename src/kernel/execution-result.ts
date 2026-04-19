@@ -50,18 +50,18 @@ function isTimeoutError(error: unknown): boolean {
 }
 
 export function normalizeTransportError(error: unknown): ExecutionFailure {
+  const message = error instanceof Error ? error.message : String(error);
+  const stack = error instanceof Error ? error.stack : undefined;
+
   if (isTimeoutError(error)) {
     return {
       ok: false,
       name: "EvaluationTimeout",
       kind: "timeout",
-      message: "Evaluation timed out.",
+      message: message || "Evaluation timed out.",
+      stack,
     };
   }
-
-  const message = error instanceof Error ? error.message : String(error);
-  const stack = error instanceof Error ? error.stack : undefined;
-
   return {
     ok: false,
     name: "TransportError",
