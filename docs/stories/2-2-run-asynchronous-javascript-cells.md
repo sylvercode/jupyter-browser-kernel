@@ -10,7 +10,7 @@ priority: "p0"
 
 # Story 2.2: Run Asynchronous JavaScript Cells
 
-**Status:** review
+**Status:** done
 
 ## Story
 
@@ -175,6 +175,15 @@ So that notebook execution supports real runtime workflows that use async APIs.
     - _Post-test note_: The cell must use `await` for the same reason as above — a bare `new Promise(() => {})` resolves immediately to `{}`.
   - [x] Run `2 + 2` (sync) → still see `4` inline (regression check).
   - [x] Run `throw new Error("sync boom")` (sync) → still see structured error (regression check).
+
+### Review Findings
+
+- [x] [Review][Defer] `replMode: true` added without spec authorization — Task 1 specifies only `awaitPromise: true` and `timeout`. Adding `replMode` changes CDP evaluation semantics (enables top-level `await`, changes return-value behavior for statements vs expressions). Deferred — flag for Story 2.4 planning to decide whether to keep or remove. [src/transport/browser-connect.ts:413]
+- [x] [Review][Dismiss] `TIMEOUT_ERROR_PATTERN` regex breadth accepted — broad match is intentional per dev notes. Network timeouts during active evaluation are rare and misclassification is acceptable. [src/kernel/execution-result.ts:44]
+- [x] [Review][Patch] Import ordering — `raceWithTimeout` function body placed between import groups, violating ES module convention [src/transport/browser-connect.ts:5-27]
+- [x] [Review][Patch] `evaluate` lambda changed from `async` to non-`async` — removes synchronous throw safety. If `retainedClient.send()` throws synchronously (bad client state), the caller gets a synchronous exception instead of a rejected Promise [src/transport/browser-connect.ts:404]
+- [x] [Review][Defer] `raceWithTimeout` never cancels the underlying CDP evaluation — when the timeout fires, the browser continues executing the expression. `Runtime.terminateExecution` could be used for cleanup. [src/transport/browser-connect.ts:5-27] — deferred, acceptable for MVP scope
+- [x] [Review][Defer] Magic string coupling between transport timeout message (`"CDP evaluation timed out"`) and kernel regex (`TIMEOUT_ERROR_PATTERN`) — fragile contract via string matching instead of typed error [src/transport/browser-connect.ts:8, src/kernel/execution-result.ts:44] — deferred, requires design decision on shared error contract
 
 ## Dev Notes
 

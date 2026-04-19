@@ -1,4 +1,16 @@
 import os from "node:os";
+import { isIP } from "node:net";
+import CDP from "chrome-remote-interface";
+import type ProtocolMappingApi from "devtools-protocol/types/protocol-mapping";
+
+import type { EndpointConfig, Localize } from "../config/endpoint-config";
+import {
+  getActiveProfile,
+  selectTarget,
+  type TargetProfile,
+  type BrowserTargetInfo,
+} from "../profile/target-profile";
+import type { ConnectToTargetResult } from "./connect-types";
 
 const CDP_EVALUATION_TIMEOUT_MS = 30_000;
 
@@ -23,18 +35,6 @@ function raceWithTimeout<T>(
     );
   });
 }
-import { isIP } from "node:net";
-import CDP from "chrome-remote-interface";
-import type ProtocolMappingApi from "devtools-protocol/types/protocol-mapping";
-
-import type { EndpointConfig, Localize } from "../config/endpoint-config";
-import {
-  getActiveProfile,
-  selectTarget,
-  type TargetProfile,
-  type BrowserTargetInfo,
-} from "../profile/target-profile";
-import type { ConnectToTargetResult } from "./connect-types";
 
 export type BrowserRuntimeEvaluateResult =
   ProtocolMappingApi.Commands["Runtime.evaluate"]["returnType"];
@@ -401,7 +401,7 @@ async function connectViaBrowserTargetAttach(
       targetId: targetSelection.target.targetId,
       sessionId: retainedSessionId,
       endpoint,
-      evaluate: (expression: string) =>
+      evaluate: async (expression: string) =>
         raceWithTimeout(
           retainedClient.send(
             "Runtime.evaluate",
