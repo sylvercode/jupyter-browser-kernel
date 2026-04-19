@@ -49,16 +49,41 @@ interface RecordedNotebookExecution {
   end: (success: boolean, endTime: number) => void;
   replaceOutput: (outputs: FakeNotebookCellOutput[]) => Promise<void>;
   executionOrder?: number;
+  token: {
+    readonly isCancellationRequested: boolean;
+    onCancellationRequested: (listener: () => void) => { dispose: () => void };
+  };
 }
 
 interface ExecutionRecorder {
   execution: RecordedExecution;
   notebookExecution: RecordedNotebookExecution;
+  cancel: () => void;
 }
 
-function createExecutionRecorder(): ExecutionRecorder {
+function createExecutionRecorder(options?: {
+  isCancellationRequested?: boolean;
+}): ExecutionRecorder {
   const execution: RecordedExecution = {
     outputs: [],
+  };
+
+  let isCancellationRequested = options?.isCancellationRequested ?? false;
+  const cancellationListeners = new Set<() => void>();
+
+  const token = {
+    get isCancellationRequested(): boolean {
+      return isCancellationRequested;
+    },
+    onCancellationRequested: (listener: () => void) => {
+      cancellationListeners.add(listener);
+
+      return {
+        dispose: () => {
+          cancellationListeners.delete(listener);
+        },
+      };
+    },
   };
 
   const notebookExecution: RecordedNotebookExecution = {
@@ -73,9 +98,19 @@ function createExecutionRecorder(): ExecutionRecorder {
       execution.outputs = outputs;
     },
     executionOrder: undefined as number | undefined,
+    token,
   };
 
-  return { execution, notebookExecution };
+  return {
+    execution,
+    notebookExecution,
+    cancel: () => {
+      isCancellationRequested = true;
+      for (const listener of cancellationListeners) {
+        listener();
+      }
+    },
+  };
 }
 
 function createFakeCell(text: string): { document: { getText: () => string } } {
@@ -94,6 +129,7 @@ function createFakeConnection(
     sessionId: "session-1",
     endpoint: { host: "localhost", port: 9222 },
     evaluate,
+    terminateExecution: async () => undefined,
     close: async () => undefined,
   };
 }
@@ -136,6 +172,105 @@ test("executeCell evaluates expression and writes success output", async () => {
   assert.equal(execution.outputs.length, 1);
   assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
   assert.equal(execution.outputs[0]?.items[0]?.value, "4");
+});
+
+test("executeCell exits before evaluation when cancellation was already requested", async () => {
+  const evaluateCalls: string[] = [];
+  const connection = createFakeConnection(async (expression) => {
+    evaluateCalls.push(expression);
+    return {
+      result: {
+        type: "number",
+        value: 10,
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder({
+    isCancellationRequested: true,
+  });
+
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  const wasCancelled = await executeCell({
+    cell: createFakeCell("5 + 5") as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 8,
+    runtime,
+  });
+
+  assert.equal(wasCancelled, true);
+  assert.deepEqual(evaluateCalls, []);
+  assert.equal(execution.success, false);
+  assert.equal(execution.outputs.length, 0);
+});
+
+test("executeCell terminates runtime evaluation when cancellation is requested", async () => {
+  let releaseEvaluation: (() => void) | undefined;
+  const continueEvaluation = new Promise<void>((resolve) => {
+    releaseEvaluation = resolve;
+  });
+  let markEvaluationStarted: (() => void) | undefined;
+  const evaluationStarted = new Promise<void>((resolve) => {
+    markEvaluationStarted = resolve;
+  });
+
+  let terminateCalls = 0;
+  const connection = {
+    ...createFakeConnection(async () => {
+      markEvaluationStarted?.();
+      await continueEvaluation;
+      return {
+        result: {
+          type: "number",
+          value: 99,
+        },
+      } as never;
+    }),
+    terminateExecution: async () => {
+      terminateCalls += 1;
+    },
+  } satisfies ActiveBrowserConnection;
+
+  const { execution, notebookExecution, cancel } = createExecutionRecorder();
+
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  const runPromise = executeCell({
+    cell: createFakeCell("await new Promise(() => {})") as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 9,
+    runtime,
+  });
+
+  await evaluationStarted;
+  cancel();
+
+  const wasCancelled = await runPromise;
+  releaseEvaluation?.();
+
+  assert.equal(wasCancelled, true);
+  assert.equal(terminateCalls, 1);
+  assert.equal(execution.success, false);
+  assert.equal(execution.outputs.length, 0);
 });
 
 test("executeCell writes structured error output for runtime exception", async () => {

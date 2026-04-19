@@ -288,8 +288,10 @@ test(
       assert.ok(activeConnection);
 
       const syncResult = await activeConnection.evaluate("6 * 7");
+      // In replMode, top-level await is required to get the resolved value.
+      // A bare Promise expression returns the Promise object, not the resolved value.
       const asyncResult = await activeConnection.evaluate(
-        "new Promise((resolve) => setTimeout(() => resolve(6 * 8), 0))",
+        "await new Promise((resolve) => setTimeout(() => resolve(6 * 8), 0))",
       );
 
       assert.equal(syncResult.result?.value, 42);
@@ -320,18 +322,29 @@ test(
       const syncException = await activeConnection.evaluate(
         "(() => { throw new Error('sync-fail'); })()",
       );
+      // In replMode, top-level await is required to surface rejection as exceptionDetails.
+      // A bare Promise.reject() expression is unhandled without await.
       const asyncException = await activeConnection.evaluate(
-        "Promise.reject(new Error('async-fail'))",
+        "await Promise.reject(new Error('async-fail'))",
       );
 
       assert.ok(syncException.exceptionDetails);
       assert.ok(asyncException.exceptionDetails);
+      // Under replMode, exception message surfaces in exceptionDetails.exception.description.
       assert.match(
-        String(syncException.result?.description ?? ""),
+        String(
+          syncException.exceptionDetails?.exception?.description ??
+            syncException.exceptionDetails?.text ??
+            "",
+        ),
         /sync-fail/i,
       );
       assert.match(
-        String(asyncException.exceptionDetails?.text ?? ""),
+        String(
+          asyncException.exceptionDetails?.exception?.description ??
+            asyncException.exceptionDetails?.text ??
+            "",
+        ),
         /async-fail/i,
       );
     } finally {

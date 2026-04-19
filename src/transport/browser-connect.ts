@@ -50,6 +50,7 @@ export interface ActiveBrowserConnection {
   sessionId: string;
   endpoint: EndpointConfig;
   evaluate: (expression: string) => Promise<BrowserRuntimeEvaluateResult>;
+  terminateExecution: () => Promise<void>;
   close: () => Promise<void>;
 }
 
@@ -403,6 +404,19 @@ async function connectViaBrowserTargetAttach(
 
     const retainedClient = client;
     const retainedSessionId = attachResult.sessionId;
+
+    const terminateExecution = async (): Promise<void> => {
+      try {
+        await retainedClient.send(
+          "Runtime.terminateExecution",
+          undefined,
+          retainedSessionId,
+        );
+      } catch {
+        // Non-fatal cleanup error.
+      }
+    };
+
     activeBrowserConnection = {
       targetId: targetSelection.target.targetId,
       sessionId: retainedSessionId,
@@ -425,13 +439,10 @@ async function connectViaBrowserTargetAttach(
           CDP_EVALUATION_TIMEOUT_MS,
           () => {
             // Best-effort cancellation of the in-flight evaluation.
-            void retainedClient
-              .send("Runtime.terminateExecution", undefined, retainedSessionId)
-              .catch(() => {
-                // Non-fatal cleanup error.
-              });
+            void terminateExecution();
           },
         ),
+      terminateExecution,
       close: async () => {
         await safeClose(retainedClient);
       },

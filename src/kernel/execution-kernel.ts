@@ -60,10 +60,25 @@ export async function executeCell({
   controller,
   executionOrder,
   runtime,
-}: ExecuteCellRequest): Promise<void> {
+}: ExecuteCellRequest): Promise<boolean> {
   const execution = controller.createNotebookCellExecution(cell);
+  let executionEnded = false;
+  const endExecution = (success: boolean): void => {
+    if (executionEnded) {
+      return;
+    }
+
+    execution.end(success, Date.now());
+    executionEnded = true;
+  };
+
   execution.start(Date.now());
   execution.executionOrder = executionOrder;
+
+  if (execution.token.isCancellationRequested) {
+    endExecution(false);
+    return true;
+  }
 
   try {
     const connection = runtime.getActiveConnection();
@@ -76,13 +91,39 @@ export async function executeCell({
         runtime.notebookOutputApi,
         runtime.localize,
       );
-      execution.end(false, Date.now());
-      return;
+      endExecution(false);
+      return false;
     }
 
     const expression = cell.document.getText();
+    let resolveCancellationSignal: (() => void) | undefined;
+    const cancellationSignal = new Promise<void>((resolve) => {
+      resolveCancellationSignal = resolve;
+    });
 
-    const result = await evaluateCellExpression(connection, expression);
+    const cancellationListener = execution.token.onCancellationRequested(() => {
+      void connection.terminateExecution();
+      endExecution(false);
+      resolveCancellationSignal?.();
+    });
+
+    const evaluationPromise = evaluateCellExpression(connection, expression);
+    const completion = await Promise.race([
+      evaluationPromise.then((result) => ({ kind: "result" as const, result })),
+      cancellationSignal.then(() => ({ kind: "cancelled" as const })),
+    ]);
+    cancellationListener.dispose();
+
+    if (completion.kind === "cancelled") {
+      return true;
+    }
+
+    const result = completion.result;
+
+    if (execution.token.isCancellationRequested) {
+      endExecution(false);
+      return true;
+    }
 
     if (result.ok) {
       const renderedValue =
@@ -92,8 +133,8 @@ export async function executeCell({
         renderedValue,
         runtime.notebookOutputApi,
       );
-      execution.end(true, Date.now());
-      return;
+      endExecution(true);
+      return false;
     }
 
     if (shouldReportFailure(result)) {
@@ -106,9 +147,11 @@ export async function executeCell({
       runtime.notebookOutputApi,
       runtime.localize,
     );
-    execution.end(false, Date.now());
+    endExecution(false);
+    return false;
   } catch {
-    execution.end(false, Date.now());
+    endExecution(false);
+    return execution.token.isCancellationRequested;
   }
 }
 
