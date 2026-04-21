@@ -2,7 +2,7 @@
 storyId: "spike-2.5"
 storyKey: "2-spike-cdp-sourceurl-debugger"
 title: "Spike: CDP `//# sourceURL`, line preservation, and Debugger-domain coexistence"
-status: "ready-for-dev"
+status: "review"
 created: "2026-04-19"
 epic: "2"
 priority: "p0"
@@ -12,7 +12,7 @@ timebox: "2 days"
 
 # Spike 2.x: CDP `//# sourceURL`, Line Preservation, and Debugger-Domain Coexistence
 
-**Status:** ready-for-dev
+**Status:** review
 
 ## Spike
 
@@ -95,110 +95,104 @@ Resolve all six Critical Documentation Gaps recorded in [docs/archives/technical
 
 ### 1. Bootstrap the Harness Skeleton (AC: 1, 2)
 
-- [ ] Create `spike/spike-cdp-sourceurl-debugger.js`. Use `'use strict'` and CommonJS, matching [spike/spike-cdp-multiplex.js](../../spike/spike-cdp-multiplex.js) precedent.
-- [ ] Reuse the connection pattern from the existing multiplex spike: fetch `/json/version`, connect to `webSocketDebuggerUrl` with `CDP({ target, local: true })`, list page targets with `Target.getTargets`, attach with `Target.attachToTarget({ targetId, flatten: true })`.
-- [ ] Pick a target deterministically: prefer `about:blank`. If none exists, attach to the first `type === "page"` target. Document that Foundry is NOT required.
-- [ ] Add an environment-variable surface mirroring the existing spike: `CDP_HOST`, `CDP_PORT`, `EXTERNAL_BROWSER`, plus new `INTERACTIVE` (default off) and `KEEP_OPEN` (pause on completion so operator can keep inspecting DevTools).
-- [ ] Add a `sendInSession(client, method, params, sessionId)` helper identical in shape to the multiplex spike's helper — domain-shorthand cannot carry `sessionId`, only raw `client.send()` can.
+- [x] Create `spike/spike-cdp-sourceurl-debugger.js`. Use `'use strict'` and CommonJS, matching [spike/spike-cdp-multiplex.js](../../spike/spike-cdp-multiplex.js) precedent.
+- [x] Reuse the connection pattern from the existing multiplex spike: fetch `/json/version`, connect to `webSocketDebuggerUrl` with `CDP({ target, local: true })`, list page targets with `Target.getTargets`, attach with `Target.attachToTarget({ targetId, flatten: true })`.
+- [x] Pick a target deterministically: prefer `about:blank`. If none exists, attach to the first `type === "page"` target. Document that Foundry is NOT required.
+- [x] Add an environment-variable surface mirroring the existing spike: `CDP_HOST`, `CDP_PORT`, `EXTERNAL_BROWSER`, plus new `INTERACTIVE` (default off) and `KEEP_OPEN` (pause on completion so operator can keep inspecting DevTools).
+- [x] Add a `sendInSession(client, method, params, sessionId)` helper identical in shape to the multiplex spike's helper — domain-shorthand cannot carry `sessionId`, only raw `client.send()` can.
 
 ### 2. Define a Stable Test sourceURL and the Cell Builder Used in the Harness (AC: 1)
 
-- [ ] Inside the harness, define a small utility `buildCellSource({ notebookUri, cellIndex, userCode, mode })` where `mode` is one of `"plain"` (no wrapper, replMode-eligible), `"async-iife-sameline"` (Pattern B), `"async-iife-multiline-sourcemap"` (Pattern B-alt for Q6).
-- [ ] Use `notebook-cell:<encoded-uri>/<cellIndex>` as the candidate URL scheme. Also implement an alternate-scheme runner that swaps in `vscode-notebook-cell://...` and `https://spike.local/cell/<index>` so Q5/Q6 can compare visual rendering across schemes.
-- [ ] **Important:** this harness builder is throwaway and lives only in `spike/`. Do NOT extract it into `src/` — that is Story 2.4's job, informed by the locked decisions from this spike.
+- [x] Inside the harness, define a small utility `buildCellSource({ notebookUri, cellIndex, userCode, mode })` where `mode` is one of `"plain"` (no wrapper, replMode-eligible), `"async-iife-sameline"` (Pattern B), `"async-iife-multiline-sourcemap"` (Pattern B-alt for Q6).
+- [x] Use `notebook-cell:<encoded-uri>/<cellIndex>` as the candidate URL scheme. Also implement an alternate-scheme runner that swaps in `vscode-notebook-cell://...` and `https://spike.local/cell/<index>` so Q5/Q6 can compare visual rendering across schemes.
+- [x] **Important:** this harness builder is throwaway and lives only in `spike/`. Do NOT extract it into `src/` — that is Story 2.4's job, informed by the locked decisions from this spike.
 
 ### 3. Q1 — `replMode` + Sources visibility + breakpoint binding (AC: 3)
 
-- [ ] **Procedure (headless mode):**
+- [x] **Procedure (headless mode):**
   - Open the "DevTools surrogate" CRI session: `Debugger.enable`, then `Debugger.setBreakpointByUrl({ url, lineNumber })` for the test cell's stable URL on a known line containing `debugger;` or a side-effect statement.
   - From the "extension surrogate" session, call `Runtime.evaluate({ expression: buildCellSource(..., mode: "plain"), replMode: true, awaitPromise: true, returnByValue: true })`.
   - Subscribe to `Debugger.paused.<surrogateSessionId>` on the surrogate; assert it fires for the test URL at the expected line.
   - Capture and log the `Debugger.scriptParsed` payload: `url`, `scriptId`, `startLine`, `endLine`, `hasSourceURL`.
-- [ ] **Procedure (interactive mode):** prompt operator to open DevTools on the target page, navigate to Sources, locate the cell URL in the tree, and confirm visibility. Operator types `y`/`n` to record.
-- [ ] **Pass criterion:** script appears in Sources under our `sourceURL`; surrogate-set breakpoint fires on rerun.
-- [ ] **Decision locked:** if pass → `replMode` is viable as default evaluation path. If fail → fall back to `Runtime.evaluate` + async-IIFE (no `replMode`) for Story 2.5 implementation.
+- [ ] **Procedure (interactive mode):** prompt operator to open DevTools on the target page, navigate to Sources, locate the cell URL in the tree, and confirm visibility. Operator types `y`/`n` to record. _(deferred — requires Windows host with Edge; harness has the prompt wired but no operator was available in this dev container)_
+- [x] **Pass criterion:** script appears in Sources under our `sourceURL`; surrogate-set breakpoint fires on rerun.
+- [x] **Decision locked:** if pass → `replMode` is viable as default evaluation path. If fail → fall back to `Runtime.evaluate` + async-IIFE (no `replMode`) for Story 2.5 implementation.
 
 ### 4. Q2 — Cross-client breakpoint firing without our `Debugger.enable` (AC: 3, 4)
 
-- [ ] **Procedure:**
+- [x] **Procedure:**
   - DevTools surrogate session calls `Debugger.enable` and sets breakpoint by URL.
   - Extension surrogate session does **NOT** call `Debugger.enable`.
   - Extension surrogate calls `Runtime.evaluate(...)` with the breakpointed cell.
   - Assert surrogate-DevTools session receives `Debugger.paused` with the expected URL/line.
-- [ ] **Pass criterion:** surrogate-DevTools breakpoint fires even though extension surrogate never enabled Debugger.
-- [ ] **Decision locked:** if pass → lock Debugger Posture to **Passive Provider**, mark Story 2.5 AC #1 for revision (likely removal). If fail → escalate to Q3.
+- [x] **Pass criterion:** surrogate-DevTools breakpoint fires even though extension surrogate never enabled Debugger.
+- [x] **Decision locked:** if pass → lock Debugger Posture to **Passive Provider**, mark Story 2.5 AC #1 for revision (likely removal). If fail → escalate to Q3.
 
 ### 5. Q3 — Multi-client `Debugger.enable` coexistence (AC: 3, 4) — only if Q2 fails
 
-- [ ] **Procedure (skip if Q2 passed):**
-  - DevTools surrogate session: `Debugger.enable`, set breakpoint, install handlers for `Debugger.paused`, `Debugger.breakpointResolved`, `Debugger.scriptParsed`.
-  - Extension surrogate session: `Debugger.enable`, install the same handlers (do NOT set breakpoints).
-  - Run the cell.
-  - Assert: both sessions observe `Debugger.paused`; neither's breakpoints are dropped from `Debugger.breakpointResolved`/state queries; no error responses on `Debugger.enable` second call.
-  - Run the cell a second time.
-  - Run a control: detach the extension surrogate and confirm DevTools surrogate continues to function (no shared lifetime).
-- [ ] **Operator sub-check (interactive mode, on Edge):** with Edge DevTools open, observe whether the breakpoint UI in DevTools remains stable, breakpoint markers persist, and the Sources panel does not desync.
-- [ ] **Pass criterion:** DevTools' debugger UI remains stable; no breakpoints lost; both sessions receive sane events.
-- [ ] **Decision locked:** if pass → posture can safely be **Diagnostic Observer**. If fail → must use **Passive Provider** even if it means losing observability; document the constraint explicitly.
+- [x] **Procedure (skip if Q2 passed):** Q2 passed, so Q3 was run for informational completeness rather than as a blocker. Headless harness drove both sessions through `Debugger.enable` and asserted two paused/resumed cycles plus stable `Debugger.breakpointResolved` events.
+- [ ] **Operator sub-check (interactive mode, on Edge):** with Edge DevTools open, observe whether the breakpoint UI in DevTools remains stable, breakpoint markers persist, and the Sources panel does not desync. _(deferred — requires Windows host with Edge)_
+- [x] **Pass criterion:** DevTools' debugger UI remains stable; no breakpoints lost; both sessions receive sane events. _(headless equivalent passed; visual UI confirmation deferred)_
+- [x] **Decision locked:** if pass → posture can safely be **Diagnostic Observer**. If fail → must use **Passive Provider** even if it means losing observability; document the constraint explicitly.
 
 ### 6. Q4 — First-evaluation breakpoint binding (AC: 3)
 
-- [ ] **Procedure:**
+- [x] **Procedure:**
   - Choose a never-before-evaluated `sourceURL` (e.g., append a fresh nonce to the test URL).
   - DevTools surrogate session: set breakpoint by that URL **before** any `Runtime.evaluate`.
   - Extension surrogate: evaluate the cell once.
   - Assert `Debugger.paused` fires on the first evaluation.
-- [ ] **Pass criterion:** breakpoint fires on first run.
-- [ ] **Decision locked:** if pass → no UX caveat needed. If fail → docs must include a "run the cell once first to register it in DevTools, then set the breakpoint" workaround for Story 2.5's user guidance.
+- [x] **Pass criterion:** breakpoint fires on first run.
+- [x] **Decision locked:** if pass → no UX caveat needed. If fail → docs must include a "run the cell once first to register it in DevTools, then set the breakpoint" workaround for Story 2.5's user guidance.
 
 ### 7. Q5 — Line-number fidelity under same-line wrapper (AC: 3)
 
-- [ ] **Procedure:**
+- [x] **Procedure:**
   - Build a multi-line user code containing `debugger;` at a known line (e.g., line 3 of user-visible code).
   - Wrap with `mode: "async-iife-sameline"`.
   - Extension surrogate evaluates with `replMode` set per Q1's outcome.
   - DevTools surrogate observes `Debugger.paused`. Capture `params.callFrames[0].location.lineNumber` (and `columnNumber`).
-- [ ] **Pass criterion:** `lineNumber` (0-based in CDP) corresponds exactly to the user-visible line — i.e., user line 3 reports CDP line 2 (0-based), with NO offset from the wrapper.
-- [ ] **Decision locked:** if pass → Pattern B (same-line concatenation) is sufficient; Story 2.4 wrapper builder uses this exact shape. If fail → diagnose whether the offset is constant (correctable) or variable (must use source maps), then escalate to Q6.
+- [x] **Pass criterion:** `lineNumber` (0-based in CDP) corresponds exactly to the user-visible line — i.e., user line 3 reports CDP line 2 (0-based), with NO offset from the wrapper.
+- [x] **Decision locked:** if pass → Pattern B (same-line concatenation) is sufficient; Story 2.4 wrapper builder uses this exact shape. If fail → diagnose whether the offset is constant (correctable) or variable (must use source maps), then escalate to Q6.
 
 ### 8. Q6 — Inline source-map honoring (AC: 3)
 
-- [ ] **Dev dependency:** add `source-map` to `devDependencies` (Mozilla's reference source-map package). If Q6 fails the dep is dropped; if Q6 passes the runtime-dep promotion is a follow-up decision.
-- [ ] **Procedure:**
+- [x] **Dev dependency:** add `source-map` to `devDependencies` (Mozilla's reference source-map package). If Q6 fails the dep is dropped; if Q6 passes the runtime-dep promotion is a follow-up decision. _(Q6 failed the source-map-honoring criterion. The dep is retained in `devDependencies` only — the harness still uses it to build the Pattern B-alt fixture that proves V8 doesn't honor inline source maps in Runtime.evaluate. Not promoted to runtime `dependencies`.)_
+- [x] **Procedure:**
   - Build a multi-line wrapper: prefix `(async () => {\n` + user code + `\n})();\n`. This deliberately shifts user lines by 1 vs raw cell editor.
   - Generate an inline source map mapping wrapper-line→user-line and append `//# sourceMappingURL=data:application/json;base64,<base64>`.
   - Append `//# sourceURL=<url>` after the source-map directive.
   - Extension surrogate evaluates.
   - DevTools surrogate sets breakpoint at the **mapped (user-visible) line** via `Debugger.setBreakpointByUrl({ url, lineNumber: userVisibleLine })`. Re-evaluate.
   - Assert: (a) `Debugger.paused.callFrames[0].location.lineNumber` reports the **original (mapped)** user line; (b) breakpoint binds and fires on rerun.
-- [ ] **Operator sub-check (interactive mode):** confirm the Sources panel displays the original (pre-wrapper) source, not the wrapped script.
-- [ ] **Pass criterion:** all three sub-criteria above met.
-- [ ] **Decision locked:** if pass → Pattern B-alt (multi-line wrapper + inline source map) becomes the default for Story 2.4; Pattern B is the documented fallback. If fail → Pattern B (same-line concatenation) locks as Story 2.4's only implementation.
+- [ ] **Operator sub-check (interactive mode):** confirm the Sources panel displays the original (pre-wrapper) source, not the wrapped script. _(deferred — requires Windows host with Edge)_
+- [x] **Pass criterion:** all three sub-criteria above met. _(Result: NO. `Debugger.paused.lineNumber` reports the wrapped-script line, not the mapped user line. This is itself the answer that locks Pattern B as the only wrapper strategy.)_
+- [x] **Decision locked:** if pass → Pattern B-alt (multi-line wrapper + inline source map) becomes the default for Story 2.4; Pattern B is the documented fallback. If fail → Pattern B (same-line concatenation) locks as Story 2.4's only implementation.
 
 ### 9. URL-Scheme Sub-Probe (AC: 3, 4)
 
-- [ ] As part of Q5/Q6 visual checks, run each scheme variant — `notebook-cell:`, `vscode-notebook-cell://`, `https://spike.local/cell/<index>` — and record:
-  - Does DevTools display the script in the Sources tree under a sensible label?
-  - Does `Debugger.setBreakpointByUrl` accept the URL string verbatim?
-  - Does `Debugger.scriptParsed.url` round-trip the string unchanged?
-- [ ] **Decision locked:** the scheme that displays cleanest AND round-trips cleanly becomes the recommendation for Story 2.4.
+- [x] As part of Q5/Q6 visual checks, run each scheme variant — `notebook-cell:`, `vscode-notebook-cell://`, `https://spike.local/cell/<index>` — and record:
+  - Does DevTools display the script in the Sources tree under a sensible label? _(deferred — requires interactive Edge run)_
+  - Does `Debugger.setBreakpointByUrl` accept the URL string verbatim? _(yes for all three schemes)_
+  - Does `Debugger.scriptParsed.url` round-trip the string unchanged? _(yes for all three schemes)_
+- [x] **Decision locked:** the scheme that displays cleanest AND round-trips cleanly becomes the recommendation for Story 2.4. _(Analytical recommendation: `notebook-cell:<encoded-uri>/<index>`. Pending interactive Edge confirmation before Story 2.4 commits to it.)_
 
 ### 10. Write the Findings Document (AC: 3, 4, 5, 7)
 
-- [ ] Create `spike/cdp-sourceurl-debugger-findings.md` mirroring the structure of [spike/cdp-multiplex-findings.md](../../spike/cdp-multiplex-findings.md): summary at the top, then one section per spike question, then a "Decisions Locked" section, then a "Story 2.5 AC adjustments" section, then a "CI eligibility & headless-vs-interactive divergence" section.
-- [ ] For each question include: procedure, observed events / UI state, answer, evidence (event payload snippets, code blocks), and the unlocked decision.
-- [ ] Cross-link back to the originating research doc: [docs/archives/technical-cdp-sourceurl-debugger-research-2026-04-19.md](../archives/technical-cdp-sourceurl-debugger-research-2026-04-19.md).
+- [x] Create `spike/cdp-sourceurl-debugger-findings.md` mirroring the structure of [spike/cdp-multiplex-findings.md](../../spike/cdp-multiplex-findings.md): summary at the top, then one section per spike question, then a "Decisions Locked" section, then a "Story 2.5 AC adjustments" section, then a "CI eligibility & headless-vs-interactive divergence" section.
+- [x] For each question include: procedure, observed events / UI state, answer, evidence (event payload snippets, code blocks), and the unlocked decision.
+- [x] Cross-link back to the originating research doc: [docs/archives/technical-cdp-sourceurl-debugger-research-2026-04-19.md](../archives/technical-cdp-sourceurl-debugger-research-2026-04-19.md).
 
 ### 11. Run the Spike End-to-End in Both Modes (AC: 1, 2, 3, 7)
 
-- [ ] **Headless mode:** `node spike/spike-cdp-sourceurl-debugger.js` against headless Chromium. Confirm Q2/Q3/Q4/Q5 and the CDP-introspectable parts of Q1/Q6 produce automated pass/fail.
-- [ ] **Interactive mode on Edge:** start Edge with `--remote-debugging-port=9222` (use [scripts/Start-EdgeDebug.ps1](../../scripts/Start-EdgeDebug.ps1) precedent), open DevTools on `about:blank`, run `INTERACTIVE=1 node spike/spike-cdp-sourceurl-debugger.js`. Operator records the visual sub-checks.
-- [ ] Compare results between modes; record any divergence in the findings doc per AC 7. Pay particular attention to Q1 panel visibility and Q6 mapped-source display since those are the visual-rendering questions.
+- [x] **Headless mode:** `node spike/spike-cdp-sourceurl-debugger.js` against headless Chromium. Confirm Q2/Q3/Q4/Q5 and the CDP-introspectable parts of Q1/Q6 produce automated pass/fail.
+- [ ] **Interactive mode on Edge:** start Edge with `--remote-debugging-port=9222` (use [scripts/Start-EdgeDebug.ps1](../../scripts/Start-EdgeDebug.ps1) precedent), open DevTools on `about:blank`, run `INTERACTIVE=1 node spike/spike-cdp-sourceurl-debugger.js`. Operator records the visual sub-checks. _(deferred — Linux dev container has no Edge; the harness has interactive prompts wired and ready for an operator on a Windows host)_
+- [x] Compare results between modes; record any divergence in the findings doc per AC 7. Pay particular attention to Q1 panel visibility and Q6 mapped-source display since those are the visual-rendering questions. _(documented in findings under "CI Eligibility & Headless-vs-Interactive Divergence" — divergence cannot be measured until interactive run is performed; recorded as follow-up)_
 
 ### 12. Optional: Sanity-Check Against the Existing Multiplex Pattern (AC: 1, 6)
 
-- [ ] Confirm the spike does NOT regress the multiplex finding: while Q3 is running with two `Debugger.enable` clients on the same target, the existing `sendInSession`-style multi-session evaluation pattern continues to work (run a benign `Runtime.evaluate({ expression: "1+1" })` from a third surrogate session and assert it returns).
-- [ ] Confirm no `src/` files are modified (`git status` clean of `src/` changes).
+- [x] Confirm the spike does NOT regress the multiplex finding: while Q3 is running with two `Debugger.enable` clients on the same target, the existing `sendInSession`-style multi-session evaluation pattern continues to work (run a benign `Runtime.evaluate({ expression: "1+1" })` from a third surrogate session and assert it returns).
+- [x] Confirm no `src/` files are modified (`git status` clean of `src/` changes).
 
 ## Dev Notes
 
@@ -326,10 +320,42 @@ Story 2.2 added `replMode: true` without authorization. The deferred-work entry 
 
 ### Agent Model Used
 
-(to be filled by dev agent)
+Claude Opus 4.7 (GitHub Copilot, BMAD dev workflow `bmad-dev-story`).
 
 ### Debug Log References
 
+- **Headless Chromium 147 binds to `[::1]` (IPv6 loopback) by default in this dev container.** The auto-launcher works because `--remote-debugging-port=9222` keeps the IPv4 path alive (matches the existing `spike/spike-cdp-multiplex.js` precedent). If a future operator hits a connection failure, add `--remote-debugging-address=127.0.0.1` to `launchChromium`.
+- **`Debugger.paused.callFrames[0].url` is an empty string in headless Chromium for scripts emitted via `Runtime.evaluate`.** First-pass URL matching with `find(p => p.url === url)` always failed silently. Fix in `openProbeContext`: resolve URL by looking up `frame.location.scriptId` in the per-session `scriptLog` populated by `Debugger.scriptParsed`. Without this, every probe falsely reported `paused=undefined`.
+- **`--single-process` Chromium flag was removed.** It interacts badly with `--headless=new` in some sandbox configurations. The launcher uses `--no-sandbox --disable-gpu --disable-dev-shm-usage` only.
+- **Diagnostic event mirror.** A temporary `browser.on('event', ...)` listener inside `openProbeContext` prints `[evt] <Domain.event> <devtools|extension>` rows. It is small enough to leave in for future debugging and survives shipping because the spike is operator-run, not user-facing.
+
 ### Completion Notes List
 
+- **All six Critical Documentation Gaps resolved empirically.** Final headless run summary: `pass=6 fail=1 info=1`. The single "fail" (Q6) is the answer the spike was designed to find: V8 does NOT remap `Debugger.paused.location.lineNumber` through inline `//# sourceMappingURL=` directives delivered via `Runtime.evaluate`. That outcome locks Pattern B as the only viable wrapper strategy for Story 2.4.
+- **Q1 PASS** — `replMode: true` produces `Debugger.scriptParsed` under our `//# sourceURL`. `replMode` retained as default evaluation path.
+- **Q2 PASS** — DevTools-set breakpoints fire under `Runtime.evaluate` from a session that never called `Debugger.enable`. **Story 2.5 AC #1 → REMOVED.** Posture locked as **Passive Provider**.
+- **Q3 PASS (informational)** — Spec made Q3 conditional on Q2 failing. Q2 passed, but Q3 was run anyway to characterize multi-client `Debugger.enable` coexistence for any future Diagnostic Observer feature. Two enabled clients coexist cleanly in headless Chromium.
+- **Q4 PASS** — First-evaluation breakpoint binding works. No "run-then-break" UX caveat needed.
+- **Q5 PASS** — Pattern B (same-line wrapper concatenation) preserves user line numbers exactly in `Debugger.paused.location.lineNumber`. Story 2.4 wrapper builder uses this shape.
+- **Q6 "FAIL" → answer NO.** V8 does not honor inline source maps for protocol-level line reporting. Pattern B-alt is rejected. `source-map` stays in `devDependencies` only because the harness uses it to build the rejection fixture.
+- **URL-scheme sub-probe INFO** — All three schemes round-trip cleanly via CDP. Analytical recommendation: `notebook-cell:<encoded-uri>/<index>`. Visual cleanliness in Edge DevTools' Sources tree is the open item that requires an operator with a Windows host to confirm before Story 2.4 can lock the scheme.
+- **Multiplex regression PASS** — Adding `Debugger.enable` callers does not regress the transport story from `spike/cdp-multiplex-findings.md`.
+- **Interactive Edge run was NOT performed.** Dev container is Linux; Edge is unavailable. Harness has `INTERACTIVE=1` plumbing wired and ready (Q1, Q3, Q6 prompt operator y/n at the right checkpoints). Recorded as a follow-up requirement before Story 2.4 enters dev. See `spike/cdp-sourceurl-debugger-findings.md` § "CI Eligibility & Headless-vs-Interactive Divergence".
+- **No `src/` changes confirmed.** `git status` shows changes only under `spike/`, `docs/stories/`, and `package.json` / `package-lock.json` (the `source-map` devDependency).
+- **Story 2.5 AC adjustments captured.** See `spike/cdp-sourceurl-debugger-findings.md` § "Story 2.5 AC Adjustments" for the full delta to apply when Story 2.5 is created.
+
 ### File List
+
+**New:**
+
+- `spike/spike-cdp-sourceurl-debugger.js` — research harness, two flat sessions, Q1–Q6 + URL-scheme + multiplex regression probes
+- `spike/cdp-sourceurl-debugger-findings.md` — answers, decisions locked, Story 2.5 AC adjustments, CI-eligibility matrix
+
+**Modified:**
+
+- `package.json` — added `source-map` to `devDependencies` (Q6 only, retained for harness even after Q6 "failed" because the harness still uses it)
+- `package-lock.json` — `source-map@0.7.6` lockfile entry
+- `docs/stories/sprint-status.yaml` — `2-spike-cdp-sourceurl-debugger`: `ready-for-dev` → `review`
+- `docs/stories/2-spike-cdp-sourceurl-debugger.md` — status flip, task checkboxes, Dev Agent Record
+
+**Unchanged (verified clean):** all of `src/`.
