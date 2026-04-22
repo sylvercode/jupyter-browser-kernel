@@ -2,7 +2,7 @@
 storyId: "spike-2.5"
 storyKey: "2-spike-cdp-sourceurl-debugger"
 title: "Spike: CDP `//# sourceURL`, line preservation, and Debugger-domain coexistence"
-status: "review"
+status: "in-progress"
 created: "2026-04-19"
 epic: "2"
 priority: "p0"
@@ -12,7 +12,7 @@ timebox: "2 days"
 
 # Spike 2.x: CDP `//# sourceURL`, Line Preservation, and Debugger-Domain Coexistence
 
-**Status:** review
+**Status:** in-progress
 
 ## Spike
 
@@ -67,7 +67,7 @@ Resolve all six Critical Documentation Gaps recorded in [docs/archives/technical
 - The chosen `Debugger`-domain posture: **Passive Provider** (extension never calls `Debugger.enable`), **Diagnostic Observer** (enables for read-only events), or **Active Debugger Client**.
 - The chosen wrapper strategy: **same-line concatenation (Pattern B)**, or **multi-line wrapper + inline source map (Pattern B-alt)**.
 - A go/no-go statement for Story 2.5 AC #1 (`Debugger.enable` on the per-target session) — confirmed-as-written, revised, or removed.
-- A go/no-go statement for the candidate per-cell URL scheme (`notebook-cell:<encoded-uri>/<index>` vs `vscode-notebook-cell://...` vs an `https://`-shaped variant), based on which renders cleanest in the Sources tree.
+- A go/no-go statement for the candidate per-cell URL scheme (`notebook-cell:<encoded-uri>/<index>` vs `vscode-notebook-cell://...` vs an `https://`-shaped variant), based on which scheme best preserves notebook-resource identity and can be matched to the debugger resource URI used for notebook breakpoints. Sources-tree rendering is secondary evidence only.
 
 ### AC 5: Story 2.5 Inputs Are Updated
 
@@ -175,7 +175,7 @@ Resolve all six Critical Documentation Gaps recorded in [docs/archives/technical
   - Does DevTools display the script in the Sources tree under a sensible label? _(deferred — requires interactive Edge run)_
   - Does `Debugger.setBreakpointByUrl` accept the URL string verbatim? _(yes for all three schemes)_
   - Does `Debugger.scriptParsed.url` round-trip the string unchanged? _(yes for all three schemes)_
-- [x] **Decision locked:** the scheme that displays cleanest AND round-trips cleanly becomes the recommendation for Story 2.4. _(Analytical recommendation: `notebook-cell:<encoded-uri>/<index>`. Pending interactive Edge confirmation before Story 2.4 commits to it.)_
+- [x] **Decision locked:** all three candidate schemes round-trip cleanly via CDP, but the exact per-cell URI shape is NOT locked by this spike alone. Story 2.4 must choose the scheme that matches notebook-resource identity as exposed by debugger breakpoint resource URIs; DevTools tree presentation is secondary evidence.
 
 ### 10. Write the Findings Document (AC: 3, 4, 5, 7)
 
@@ -186,7 +186,7 @@ Resolve all six Critical Documentation Gaps recorded in [docs/archives/technical
 ### 11. Run the Spike End-to-End in Both Modes (AC: 1, 2, 3, 7)
 
 - [x] **Headless mode:** `node spike/spike-cdp-sourceurl-debugger.js` against headless Chromium. Confirm Q2/Q3/Q4/Q5 and the CDP-introspectable parts of Q1/Q6 produce automated pass/fail.
-- [ ] **Interactive mode on Edge:** start Edge with `--remote-debugging-port=9222` (use [scripts/Start-EdgeDebug.ps1](../../scripts/Start-EdgeDebug.ps1) precedent), open DevTools on `about:blank`, run `INTERACTIVE=1 node spike/spike-cdp-sourceurl-debugger.js`. Operator records the visual sub-checks. _(deferred — Linux dev container has no Edge; the harness has interactive prompts wired and ready for an operator on a Windows host)_
+- [ ] **Interactive mode on Edge:** start Edge with `--remote-debugging-port=9222` (use [scripts/Start-EdgeDebug.ps1](../../scripts/Start-EdgeDebug.ps1) precedent), open DevTools on `about:blank`, run `INTERACTIVE=1 node spike/spike-cdp-sourceurl-debugger.js`. Operator records the visual sub-checks and the debugger resource URI form used when notebook breakpoints are created. _(partially completed for Q6; exact notebook breakpoint resource URI still needs confirmation)_
 - [x] Compare results between modes; record any divergence in the findings doc per AC 7. Pay particular attention to Q1 panel visibility and Q6 mapped-source display since those are the visual-rendering questions. _(documented in findings under "CI Eligibility & Headless-vs-Interactive Divergence" — divergence cannot be measured until interactive run is performed; recorded as follow-up)_
 
 ### 12. Optional: Sanity-Check Against the Existing Multiplex Pattern (AC: 1, 6)
@@ -316,6 +316,13 @@ Story 2.2 added `replMode: true` without authorization. The deferred-work entry 
 - The `source-map` dev-dependency addition is the only optional change outside `spike/` and `docs/stories/`.
 - No conflict with the architecture's File Structure Patterns — spikes are explicitly throwaway and live outside `src/` and `tests/`.
 
+### Review Findings
+
+- [x] [Review][Patch] URL-scheme selection criteria should be based on notebook-resource identity, not on whichever label renders cleanest in DevTools; update the story and findings wording accordingly.
+- [x] [Review][Patch] Notebook fixture metadata was changed even though this spike is scoped to `spike/`, story docs, and optional package files; revert the unrelated `tests/files/test1.ipynb` edits [tests/files/test1.ipynb:14]
+- [x] [Review][Patch] Breakpoint-binding probes pass on any pause, even when the script's own `debugger;` statement would pause without a bound breakpoint [spike/spike-cdp-sourceurl-debugger.js:290]
+- [x] [Review][Patch] Harness exits non-zero when the expected research answer is negative, so a successful spike run still reports failure [spike/spike-cdp-sourceurl-debugger.js:767]
+
 ## Dev Agent Record
 
 ### Agent Model Used
@@ -338,9 +345,9 @@ Claude Opus 4.7 (GitHub Copilot, BMAD dev workflow `bmad-dev-story`).
 - **Q4 PASS** — First-evaluation breakpoint binding works. No "run-then-break" UX caveat needed.
 - **Q5 PASS** — Pattern B (same-line wrapper concatenation) preserves user line numbers exactly in `Debugger.paused.location.lineNumber`. Story 2.4 wrapper builder uses this shape.
 - **Q6 "FAIL" → answer NO.** V8 does not honor inline source maps for protocol-level line reporting. Pattern B-alt is rejected. `source-map` stays in `devDependencies` only because the harness uses it to build the rejection fixture.
-- **URL-scheme sub-probe INFO** — All three schemes round-trip cleanly via CDP. Analytical recommendation: `notebook-cell:<encoded-uri>/<index>`. Visual cleanliness in Edge DevTools' Sources tree is the open item that requires an operator with a Windows host to confirm before Story 2.4 can lock the scheme.
+- **URL-scheme sub-probe INFO** — All three schemes round-trip cleanly via CDP, but the exact per-cell URI shape remains unresolved. Story 2.4 must choose the form that matches notebook-resource identity as exposed by debugger breakpoint resource URIs; DevTools rendering is secondary.
 - **Multiplex regression PASS** — Adding `Debugger.enable` callers does not regress the transport story from `spike/cdp-multiplex-findings.md`.
-- **Interactive Edge run was NOT performed.** Dev container is Linux; Edge is unavailable. Harness has `INTERACTIVE=1` plumbing wired and ready (Q1, Q3, Q6 prompt operator y/n at the right checkpoints). Recorded as a follow-up requirement before Story 2.4 enters dev. See `spike/cdp-sourceurl-debugger-findings.md` § "CI Eligibility & Headless-vs-Interactive Divergence".
+- **Partial interactive Edge evidence was later captured.** For Q6 on `notebook-cell:spike%3A%2F%2Fq6/0`, Edge showed the wrapped generated source, surfaced an authored sibling `notebook-cell:.../0.user`, and displayed a `Source map skipped for this file` banner on the generated source. This reinforces the rejection of Pattern B-alt, but the exact notebook breakpoint resource URI still needs confirmation before the per-cell `sourceURL` shape can be locked.
 - **No `src/` changes confirmed.** `git status` shows changes only under `spike/`, `docs/stories/`, and `package.json` / `package-lock.json` (the `source-map` devDependency).
 - **Story 2.5 AC adjustments captured.** See `spike/cdp-sourceurl-debugger-findings.md` § "Story 2.5 AC Adjustments" for the full delta to apply when Story 2.5 is created.
 

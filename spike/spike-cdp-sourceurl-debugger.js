@@ -286,9 +286,26 @@ async function openProbeContext(browser, targetId) {
 // ---------------------------------------------------------------------------
 
 const findings = [];
+
+function isBreakpointHitPause(pause, breakpointId) {
+    return !!pause && Array.isArray(pause.hitBreakpoints) && pause.hitBreakpoints.includes(breakpointId);
+}
+
+function findPauseForBreakpoint(pauseLog, url, breakpointId) {
+    return pauseLog.find((pause) => pause.url === url && isBreakpointHitPause(pause, breakpointId));
+}
+
+function countPausesForBreakpoint(pauseLog, url, breakpointId) {
+    return pauseLog.filter((pause) => pause.url === url && isBreakpointHitPause(pause, breakpointId)).length;
+}
+
 function record(question, result) {
     findings.push({ question, ...result });
-    const status = result.pass ? '✅ PASS' : (result.pass === false ? '❌ FAIL' : 'ℹ️ INFO');
+    const status = result.pass === true
+        ? '✅ PASS'
+        : result.pass === false
+            ? (result.expectedNegative ? 'ℹ️ ANSWERED-NO' : '❌ FAIL')
+            : 'ℹ️ INFO';
     console.log(`\n--- ${question} → ${status} ---`);
     console.log('  Answer: ' + (result.answer || '(see evidence)'));
     if (result.decision) console.log('  Decision: ' + result.decision);
@@ -321,13 +338,13 @@ async function runQ1(browser, targetId) {
         await delay(150);
 
         const parsed = ctx.scriptLog.find((s) => s.url === url);
-        const paused = ctx.pauseLog.find((p) => p.url === url);
+        const breakpointPause = findPauseForBreakpoint(ctx.pauseLog, url, bp.breakpointId);
 
         const exVal = await sendInSession(browser, 'Runtime.evaluate',
             { expression: 'globalThis.__q1', returnByValue: true }, ctx.extensionSession);
 
         const visible = !!parsed;
-        const fired = !!paused;
+        const fired = !!breakpointPause;
         const pass = visible && fired;
         record('Q1', {
             pass,
@@ -338,9 +355,10 @@ async function runQ1(browser, targetId) {
                 ? 'replMode is viable as default evaluation path; Story 2.5 may keep replMode:true.'
                 : 'Drop replMode; fall back to async-IIFE for Story 2.5.',
             evidence:
+                `bp.breakpointId=${JSON.stringify(bp.breakpointId)}\n` +
                 `bp.locations=${JSON.stringify(bp.locations)}\n` +
                 `scriptParsed=${JSON.stringify(parsed)}\n` +
-                `paused=${JSON.stringify(paused)}\n` +
+                `breakpointPause=${JSON.stringify(breakpointPause)}\n` +
                 `__q1 after eval=${JSON.stringify(exVal.result?.value)}\n` +
                 `evaluate.exception=${JSON.stringify(result.exceptionDetails || null)}`,
         });
@@ -374,8 +392,8 @@ async function runQ2(browser, targetId) {
         await ctx.evaluate(source, { replMode: true });
         await delay(150);
 
-        const paused = ctx.pauseLog.find((p) => p.url === url);
-        const pass = !!paused;
+        const breakpointPause = findPauseForBreakpoint(ctx.pauseLog, url, bp.breakpointId);
+        const pass = !!breakpointPause;
         return record('Q2', {
             pass,
             answer: pass
@@ -385,8 +403,9 @@ async function runQ2(browser, targetId) {
                 ? 'Lock Debugger Posture = Passive Provider. Mark Story 2.5 AC #1 (call Debugger.enable on per-target session) for REVISION/REMOVAL.'
                 : 'Escalate to Q3 — must coexist with Edge DevTools while we also Debugger.enable.',
             evidence:
+                `bp.breakpointId=${JSON.stringify(bp.breakpointId)}\n` +
                 `bp.locations=${JSON.stringify(bp.locations)}\n` +
-                `paused=${JSON.stringify(paused)}\n` +
+                `breakpointPause=${JSON.stringify(breakpointPause)}\n` +
                 `extensionSessionEnabledDebugger=false`,
         });
     } finally {
@@ -417,19 +436,20 @@ async function runQ3(browser, targetId) {
         await ctx.evaluate(source, { replMode: true });
         await delay(150);
 
-        const pausedCount = ctx.pauseLog.filter((p) => p.url === url).length;
-        const stable = pausedCount >= 2;
+        const breakpointPauseCount = countPausesForBreakpoint(ctx.pauseLog, url, bp.breakpointId);
+        const stable = breakpointPauseCount >= 2 && ctx.breakpointResolutions.length >= 2;
         record('Q3', {
             pass: stable,
             answer: stable
                 ? 'Both sessions remained stable across two evaluations with two Debugger.enable callers.'
-                : `Instability detected: pausedCount=${pausedCount}`,
+                : `Instability detected: breakpointPauseCount=${breakpointPauseCount}`,
             decision: stable
                 ? 'Posture Diagnostic Observer is safe — extension may Debugger.enable for read-only event observation.'
                 : 'Posture must remain Passive Provider; document loss of observability.',
             evidence:
+                `bp.breakpointId=${JSON.stringify(bp.breakpointId)}\n` +
                 `bp.locations=${JSON.stringify(bp.locations)}\n` +
-                `pausedCount=${pausedCount}\n` +
+                `breakpointPauseCount=${breakpointPauseCount}\n` +
                 `breakpointResolutions=${JSON.stringify(ctx.breakpointResolutions)}`,
         });
     } finally {
@@ -457,8 +477,8 @@ async function runQ4(browser, targetId) {
         await ctx.evaluate(source, { replMode: true });
         await delay(150);
 
-        const paused = ctx.pauseLog.find((p) => p.url === url);
-        const pass = !!paused;
+        const breakpointPause = findPauseForBreakpoint(ctx.pauseLog, url, bp.breakpointId);
+        const pass = !!breakpointPause;
         record('Q4', {
             pass,
             answer: pass
@@ -469,8 +489,9 @@ async function runQ4(browser, targetId) {
                 : 'Story 2.5 docs must instruct: run cell once first, then set breakpoint.',
             evidence:
                 `nonce=${nonce}\n` +
+                `bp.breakpointId=${JSON.stringify(bp.breakpointId)}\n` +
                 `bp.locations=${JSON.stringify(bp.locations)}\n` +
-                `paused=${JSON.stringify(paused)}`,
+                `breakpointPause=${JSON.stringify(breakpointPause)}`,
         });
     } finally {
         await ctx.detach();
@@ -555,25 +576,31 @@ async function runQ6(browser, targetId) {
         await delay(200);
 
         const pauses = ctx.pauseLog.filter((p) => p.url === url);
-        const secondPause = pauses[1];
+        const breakpointPause = pauses.find((pause) => isBreakpointHitPause(pause, bp.breakpointId));
         // Pass criterion (a): paused lineNumber reports ORIGINAL user line
         //   (CDP 0-based 2 = user line 3) rather than the wrapper-shifted line 3.
-        // Pass criterion (b): the breakpoint fires (we'll see >= 2 paused events).
+        // Pass criterion (b): the explicit breakpoint fires, not merely the debugger statement.
         const reportsOriginal = !!firstPause && firstPause.lineNumber === 2;
-        const breakpointFired = pauses.length >= 2;
+        const breakpointFired = !!breakpointPause;
         const pass = reportsOriginal && breakpointFired;
+        const answeredNo = !reportsOriginal && breakpointFired;
 
         record('Q6', {
             pass,
+            expectedNegative: answeredNo,
             answer: pass
                 ? 'Yes — V8 honors the inline sourceMappingURL: paused lineNumber reports the original user line and a breakpoint set against the mapped URL+line fires.'
-                : `Partial: reportsOriginal=${reportsOriginal} breakpointFired=${breakpointFired}.`,
+                : answeredNo
+                    ? `No — reportsOriginal=${reportsOriginal} breakpointFired=${breakpointFired}.`
+                    : `Inconclusive: reportsOriginal=${reportsOriginal} breakpointFired=${breakpointFired}.`,
             decision: pass
                 ? 'Pattern B-alt available; recommend Pattern B (same-line) as default if Q5 passes — source maps are a fallback only when user-visible authoring formats other than raw JS appear.'
                 : 'Source-map honoring not reliable for Runtime.evaluate; Pattern B (same-line) locks as Story 2.4’s only wrapper strategy.',
             evidence:
+                `bp.breakpointId=${JSON.stringify(bp.breakpointId)}\n` +
                 `wrapped script=\n${source}\n--\n` +
                 `bp.locations=${JSON.stringify(bp.locations)}\n` +
+                `breakpointPause=${JSON.stringify(breakpointPause)}\n` +
                 `pauses=${JSON.stringify(pauses)}`,
         });
 
@@ -628,9 +655,9 @@ async function runUrlSchemeProbe(browser, targetId) {
     }
     record('URL-scheme', {
         pass: null,
-        answer: 'Comparison across three candidate schemes (visual cleanliness requires INTERACTIVE mode).',
+        answer: 'Comparison across three candidate schemes (all round-trip through CDP, but exact notebook-resource URI shape remains unresolved).',
         decision:
-            'Recommendation: pick the scheme whose Debugger.scriptParsed.url round-trips unchanged AND whose Debugger.setBreakpointByUrl is accepted. Visual rendering must be confirmed interactively against Edge.',
+            'Recommendation: choose the scheme that preserves stable notebook-resource identity and matches the resource URI form used by notebook breakpoints in the debugger. This probe only proves that all three candidate schemes round-trip through CDP and are accepted by Debugger.setBreakpointByUrl.',
         evidence: JSON.stringify(observations, null, 2),
     });
 }
@@ -709,14 +736,20 @@ async function main() {
     let passes = 0;
     let fails = 0;
     let infos = 0;
+    let answeredNos = 0;
     for (const f of findings) {
-        const tag = f.pass === true ? 'PASS' : f.pass === false ? 'FAIL' : 'INFO';
+        const tag = f.pass === true
+            ? 'PASS'
+            : f.pass === false
+                ? (f.expectedNegative ? 'ANSWERED-NO' : 'FAIL')
+                : 'INFO';
         if (tag === 'PASS') passes++;
+        else if (tag === 'ANSWERED-NO') answeredNos++;
         else if (tag === 'FAIL') fails++;
         else infos++;
         console.log(`  [${tag}] ${f.question}: ${f.answer}`);
     }
-    console.log(`  Totals: pass=${passes} fail=${fails} info=${infos}`);
+    console.log(`  Totals: pass=${passes} fail=${fails} answeredNo=${answeredNos} info=${infos}`);
 
     if (KEEP_OPEN) {
         console.log('\nKEEP_OPEN=1 set; leaving browser running. Press Ctrl+C to exit.');

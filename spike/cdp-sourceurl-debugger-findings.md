@@ -11,7 +11,7 @@ All six Critical Documentation Gaps (Q1–Q6) recorded in [docs/archives/technic
 - **Pattern B (same-line wrapper concatenation) is locked as Story 2.4's only wrapper strategy.** Q5 proved CDP-protocol line numbers under Pattern B match user-visible lines exactly. Q6 proved V8 does NOT remap `Debugger.paused.callFrames[].location.lineNumber` through an inline `//# sourceMappingURL=` directive, so Pattern B-alt would silently report wrapped-script line numbers in protocol events even though DevTools UI would still display the mapped source.
 - **First-evaluation breakpoint binding works (Q4).** No "run-then-break" UX caveat is needed.
 - **Multi-client `Debugger.enable` coexists cleanly (Q3).** Posture **Diagnostic Observer** is technically safe if we ever need read-only event observation. We still default to Passive Provider per Q2.
-- **All three URL schemes round-trip cleanly via CDP.** Visual-tree presentation in Edge DevTools must be confirmed interactively before locking the recommendation; the analytical preference remains `notebook-cell:<encoded-uri>/<index>`.
+- **All three URL schemes round-trip cleanly via CDP.** The exact URI shape remains open because we have not yet verified which notebook-resource URI form the debugger uses when notebook breakpoints are created. DevTools tree presentation is secondary evidence, not the deciding criterion.
 
 The transport story validated by [cdp-multiplex-findings.md](cdp-multiplex-findings.md) (browser-level WebSocket + `Target.attachToTarget { flatten: true }` + `client.send(method, params, sessionId)` + `'<Domain>.<event>.<sessionId>'` listeners) was reused without modification, and a third surrogate-session evaluation continued to succeed while two `Debugger.enable` clients were attached (multiplex regression PASS).
 
@@ -157,6 +157,8 @@ The breakpoint we set at `lineNumber: 2` bound to wrapped-script line 2 — that
 
 **Answer.** No. V8 does NOT remap `Debugger.paused.callFrames[].location.lineNumber` through `//# sourceMappingURL=` directives delivered via `Runtime.evaluate`. Source-map honoring is, at best, a DevTools UI feature; it is not part of the runtime/debugger protocol contract.
 
+**Interactive Edge operator note (2026-04-22).** For the `notebook-cell:spike%3A%2F%2Fq6/0` variant, Edge showed both the generated source (`notebook-cell:.../0`) and a separate authored-source entry (`notebook-cell:.../0.user`) containing the original 4-line user code. The generated-source view also showed a banner: `Source map skipped for this file. DevTools can't show authored sources, but you can debug the deployed code.` This reinforces the main conclusion: even when authored-source UI is partially visible, the source-map experience is setting-dependent and must not be treated as a reliable debugger contract.
+
 **Decision locked.** **Pattern B (same-line concatenation) is Story 2.4's ONLY wrapper strategy.** Pattern B-alt (multi-line wrapper + inline source map) is rejected because:
 
 1. It silently mis-reports line numbers in `Debugger.paused` event payloads (off by exactly the wrapper-prefix line count).
@@ -176,13 +178,13 @@ All three candidate schemes round-tripped via CDP without errors:
 | `vscode-notebook-cell://<encoded-uri>/<index>` | `vscode-notebook-cell://spike%3A%2F%2Furl-scheme/0`   | ✅                             | ✅                            |
 | `https://spike.local/<encoded-uri>/cell/<i>`   | `https://spike.local/spike%3A%2F%2Furl-scheme/cell/0` | ✅                             | ✅                            |
 
-**Recommendation (analytical, pending interactive confirmation in Edge):** `notebook-cell:<encoded-uri>/<index>`. Rationale:
+**Conclusion.** This spike does NOT lock the exact per-cell URL format yet. What it does prove is narrower:
 
-- Domain-meaningful (the URL self-documents what it identifies).
-- Cannot collide with real fetched scripts (unlike `https://spike.local/...`).
-- Single-level URI encoding (unlike `vscode-notebook-cell://...` which encodes a URI inside another URI's authority).
+- All three candidate schemes round-trip cleanly via `Debugger.scriptParsed.url`.
+- All three are accepted by `Debugger.setBreakpointByUrl`.
+- The final scheme must be derived from notebook-resource identity, not from DevTools label aesthetics.
 
-**Open item before Story 2.4 can lock the scheme:** run the harness with `INTERACTIVE=1` against Edge with DevTools open and visually confirm which scheme renders cleanest in the Sources tree. This was not performed in this headless run.
+**Open item before Story 2.4 can lock the scheme:** determine what resource URI form the debugger uses for notebook breakpoints, then choose a per-cell `sourceURL` shape that can be matched to that resource identity. A later operator observation confirmed that `notebook-cell:` can appear in Edge and can surface an authored `.user` sibling for Q6, but that does NOT answer how notebook breakpoints identify the source resource.
 
 ---
 
@@ -198,7 +200,7 @@ While two `Debugger.enable` clients were attached (Q3 setup), a third surrogate 
 2. **Debugger-domain posture:** **Passive Provider.** The extension does NOT call `Debugger.enable` on the per-target session. (Q2)
 3. **Wrapper strategy:** **Pattern B — same-line concatenation.** Prefix `(async()=>{` is on the same line as user line 1; suffix `})()` is on the same line as user's last line. (Q5, Q6)
 4. **`//# sourceURL`:** Append `\n//# sourceURL=<url>\n` to the wrapped expression. (Q1)
-5. **URL-scheme recommendation (analytical):** `notebook-cell:<encoded-uri>/<index>`. Pending interactive Edge confirmation before Story 2.4 locks it. (URL-scheme sub-probe)
+5. **URL-scheme status:** unresolved. The final per-cell `sourceURL` shape must derive from notebook-resource identity and match the resource URI form used by notebook breakpoints in the debugger. This spike only proves that multiple candidate schemes round-trip through CDP. (URL-scheme sub-probe)
 6. **First-evaluation breakpoint binding:** Works without UX caveat. (Q4)
 7. **Source-map fallback:** Rejected for production. `source-map` stays a `devDependency`. (Q6)
 
@@ -229,14 +231,14 @@ When Story 2.5 is created, apply these deltas:
 | Q4 (first-eval binding)                         | ✅           | All assertions are CDP-event payload checks.                                                                                                                                                                      |
 | Q5 (Pattern B line fidelity)                    | ✅           | Asserts `Debugger.paused.location.lineNumber`.                                                                                                                                                                    |
 | Q6 (source-map honoring)                        | ✅           | Asserts `Debugger.paused.location.lineNumber` against expected user-line. The "fail" outcome is the lock-in for Pattern B; a future CI run should keep asserting it as a guard against silent V8 behavior change. |
-| URL-scheme visual presentation in DevTools tree | ❌           | Requires operator UI confirmation. Recommend running once in `INTERACTIVE=1` mode against Edge before Story 2.4 commits to the scheme.                                                                            |
+| URL-scheme compatibility with notebook breakpoint resource identity | ❌           | Requires observing how notebook breakpoints are represented in the debugger, then matching the per-cell `sourceURL` scheme to that resource identity. DevTools tree presentation is secondary evidence only. |
 
-**Headless-vs-interactive divergence not yet measured.** All probes in this run were headless Chromium 147. Two probes have known interactive-only sub-checks:
+**Headless-vs-interactive divergence only partially measured.** The original run was headless Chromium 147. A later interactive Edge observation was captured for Q6 on the `notebook-cell:` scheme, but the exact notebook-breakpoint resource URI form is still unknown. Remaining interactive-only sub-checks:
 
-- **Q1 visual sub-check** — does DevTools' Sources tree display the per-cell script under our `notebook-cell:` URL, and does it look reasonable to an operator?
-- **Q6 visual sub-check** — under Pattern B-alt (rejected), does the Sources panel display the original (mapped) source even though the protocol does not honor the map? If yes, this is a "DevTools UI displays one thing, protocol reports another" trap that Story 2.4 must avoid by simply not using Pattern B-alt.
+- **Notebook breakpoint resource-URI check** — when a breakpoint is set from a notebook cell, what resource URI does the debugger use internally for that source, and how should the per-cell `sourceURL` shape align to it?
+- **Q6 visual sub-check** — partially answered. Edge surfaced an authored `.user` sibling for `notebook-cell:` while also showing a "Source map skipped" banner on the generated source. This is exactly the kind of "UI may surface authored code while protocol semantics still target deployed code" trap that Story 2.4 must avoid by simply not using Pattern B-alt.
 
-These are recorded as follow-up tasks for an operator-driven Edge run before Story 2.4 enters dev.
+These are recorded as follow-up tasks before Story 2.4 locks the exact per-cell `sourceURL` format.
 
 ---
 
