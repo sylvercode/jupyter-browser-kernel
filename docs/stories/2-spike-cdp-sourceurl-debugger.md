@@ -2,7 +2,7 @@
 storyId: "spike-2.5"
 storyKey: "2-spike-cdp-sourceurl-debugger"
 title: "Spike: CDP `//# sourceURL`, line preservation, and Debugger-domain coexistence"
-status: "in-progress"
+status: "review"
 created: "2026-04-19"
 epic: "2"
 priority: "p0"
@@ -12,7 +12,7 @@ timebox: "2 days"
 
 # Spike 2.x: CDP `//# sourceURL`, Line Preservation, and Debugger-Domain Coexistence
 
-**Status:** in-progress
+**Status:** review
 
 ## Spike
 
@@ -104,7 +104,7 @@ Resolve all six Critical Documentation Gaps recorded in [docs/archives/technical
 ### 2. Define a Stable Test sourceURL and the Cell Builder Used in the Harness (AC: 1)
 
 - [x] Inside the harness, define a small utility `buildCellSource({ notebookUri, cellIndex, userCode, mode })` where `mode` is one of `"plain"` (no wrapper, replMode-eligible), `"async-iife-sameline"` (Pattern B), `"async-iife-multiline-sourcemap"` (Pattern B-alt for Q6).
-- [x] Use `notebook-cell:<encoded-uri>/<cellIndex>` as the candidate URL scheme. Also implement an alternate-scheme runner that swaps in `vscode-notebook-cell://...` and `https://spike.local/cell/<index>` so Q5/Q6 can compare visual rendering across schemes.
+- [x] Use `notebook-cell:<encoded-uri>/<cellIndex>` as the initial candidate URL scheme. Also implement an alternate-scheme runner that swaps in `vscode-notebook-cell://...` and `https://spike.local/cell/<index>` so Q5/Q6 can compare visual rendering across schemes. Final production identity is now locked to the exact VS Code `vscode-notebook-cell://...#...` cell URI form observed from notebook breakpoints.
 - [x] **Important:** this harness builder is throwaway and lives only in `spike/`. Do NOT extract it into `src/` — that is Story 2.4's job, informed by the locked decisions from this spike.
 
 ### 3. Q1 — `replMode` + Sources visibility + breakpoint binding (AC: 3)
@@ -175,7 +175,7 @@ Resolve all six Critical Documentation Gaps recorded in [docs/archives/technical
   - Does DevTools display the script in the Sources tree under a sensible label? _(deferred — requires interactive Edge run)_
   - Does `Debugger.setBreakpointByUrl` accept the URL string verbatim? _(yes for all three schemes)_
   - Does `Debugger.scriptParsed.url` round-trip the string unchanged? _(yes for all three schemes)_
-- [x] **Decision locked:** all three candidate schemes round-trip cleanly via CDP, but the exact per-cell URI shape is NOT locked by this spike alone. Story 2.4 must choose the scheme that matches notebook-resource identity as exposed by debugger breakpoint resource URIs; DevTools tree presentation is secondary evidence.
+- [x] **Decision locked:** the final per-cell source identity should use the exact VS Code notebook cell document URI string, i.e. the `vscode-notebook-cell://<authority>/<notebook-path>#<opaque-fragment>` resource form used by real notebook breakpoints. In implementation terms, Story 2.4 should use `NotebookCell.document.uri.toString()` as the `//# sourceURL` value. The spike's CDP probe proved the scheme family is acceptable; the observed breakpoint URIs resolved the exact resource-identity question.
 
 ### 10. Write the Findings Document (AC: 3, 4, 5, 7)
 
@@ -186,7 +186,7 @@ Resolve all six Critical Documentation Gaps recorded in [docs/archives/technical
 ### 11. Run the Spike End-to-End in Both Modes (AC: 1, 2, 3, 7)
 
 - [x] **Headless mode:** `node spike/spike-cdp-sourceurl-debugger.js` against headless Chromium. Confirm Q2/Q3/Q4/Q5 and the CDP-introspectable parts of Q1/Q6 produce automated pass/fail.
-- [ ] **Interactive mode on Edge:** start Edge with `--remote-debugging-port=9222` (use [scripts/Start-EdgeDebug.ps1](../../scripts/Start-EdgeDebug.ps1) precedent), open DevTools on `about:blank`, run `INTERACTIVE=1 node spike/spike-cdp-sourceurl-debugger.js`. Operator records the visual sub-checks and the debugger resource URI form used when notebook breakpoints are created. _(partially completed for Q6; exact notebook breakpoint resource URI still needs confirmation)_
+- [ ] **Interactive mode on Edge:** start Edge with `--remote-debugging-port=9222` (use [scripts/Start-EdgeDebug.ps1](../../scripts/Start-EdgeDebug.ps1) precedent), open DevTools on `about:blank`, run `INTERACTIVE=1 node spike/spike-cdp-sourceurl-debugger.js`. Operator records the remaining visual sub-checks. _(Q6 partially completed; breakpoint resource URI form was captured separately from real VS Code notebook breakpoints)_
 - [x] Compare results between modes; record any divergence in the findings doc per AC 7. Pay particular attention to Q1 panel visibility and Q6 mapped-source display since those are the visual-rendering questions. _(documented in findings under "CI Eligibility & Headless-vs-Interactive Divergence" — divergence cannot be measured until interactive run is performed; recorded as follow-up)_
 
 ### 12. Optional: Sanity-Check Against the Existing Multiplex Pattern (AC: 1, 6)
@@ -256,8 +256,8 @@ Three candidate URL schemes for the per-cell `//# sourceURL`:
 
 | Scheme                                | Pros                                                  | Cons                                                       |
 | ------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------- |
-| `notebook-cell:<encoded-uri>/<index>` | Domain-meaningful; matches recommendation in research | Non-`http(s)` — DevTools tree presentation unverified      |
-| `vscode-notebook-cell://...`          | Aligns with VS Code's own URI scheme                  | URI-within-URI encoding is fragile                         |
+| `notebook-cell:<encoded-uri>/<index>` | Domain-meaningful; easy to generate in a spike        | Does NOT match the real VS Code notebook breakpoint resource form |
+| `vscode-notebook-cell://...`          | Matches the actual VS Code notebook breakpoint scheme | Must use the exact runtime cell URI, including opaque fragment |
 | `https://spike.local/cell/<index>`    | Guaranteed clean DevTools tree presentation           | Misleading scheme; could collide with real fetched scripts |
 
 The harness MUST test all three (Task 9) so the findings doc can recommend one. _[Source: research § Data Format and Identity Contract]_
@@ -345,9 +345,9 @@ Claude Opus 4.7 (GitHub Copilot, BMAD dev workflow `bmad-dev-story`).
 - **Q4 PASS** — First-evaluation breakpoint binding works. No "run-then-break" UX caveat needed.
 - **Q5 PASS** — Pattern B (same-line wrapper concatenation) preserves user line numbers exactly in `Debugger.paused.location.lineNumber`. Story 2.4 wrapper builder uses this shape.
 - **Q6 "FAIL" → answer NO.** V8 does not honor inline source maps for protocol-level line reporting. Pattern B-alt is rejected. `source-map` stays in `devDependencies` only because the harness uses it to build the rejection fixture.
-- **URL-scheme sub-probe INFO** — All three schemes round-trip cleanly via CDP, but the exact per-cell URI shape remains unresolved. Story 2.4 must choose the form that matches notebook-resource identity as exposed by debugger breakpoint resource URIs; DevTools rendering is secondary.
+- **URL-scheme sub-probe INFO** — All three schemes round-trip cleanly via CDP. Real VS Code notebook breakpoints later showed that the exact source identity should use the `vscode-notebook-cell://<authority>/<notebook-path>#<opaque-fragment>` cell URI form, reusing the exact runtime cell document URI string rather than a custom scheme. In implementation terms, use `NotebookCell.document.uri.toString()`.
 - **Multiplex regression PASS** — Adding `Debugger.enable` callers does not regress the transport story from `spike/cdp-multiplex-findings.md`.
-- **Partial interactive Edge evidence was later captured.** For Q6 on `notebook-cell:spike%3A%2F%2Fq6/0`, Edge showed the wrapped generated source, surfaced an authored sibling `notebook-cell:.../0.user`, and displayed a `Source map skipped for this file` banner on the generated source. This reinforces the rejection of Pattern B-alt, but the exact notebook breakpoint resource URI still needs confirmation before the per-cell `sourceURL` shape can be locked.
+- **Partial interactive Edge evidence was later captured.** For Q6 on `notebook-cell:spike%3A%2F%2Fq6/0`, Edge showed the wrapped generated source, surfaced an authored sibling `notebook-cell:.../0.user`, and displayed a `Source map skipped for this file` banner on the generated source. Separately, real VS Code notebook breakpoint URIs were captured and showed the `vscode-notebook-cell://<authority>/<notebook-path>#<opaque-fragment>` resource form needed to lock source identity.
 - **No `src/` changes confirmed.** `git status` shows changes only under `spike/`, `docs/stories/`, and `package.json` / `package-lock.json` (the `source-map` devDependency).
 - **Story 2.5 AC adjustments captured.** See `spike/cdp-sourceurl-debugger-findings.md` § "Story 2.5 AC Adjustments" for the full delta to apply when Story 2.5 is created.
 
