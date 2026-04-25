@@ -202,9 +202,12 @@ Per-cell source identity contract:
 
 Debugger lifecycle:
 
-- `Debugger.enable` is invoked on each page session at session attach time, alongside existing `Runtime.enable` setup.
-- The extension does not own a breakpoint UI. Breakpoints are set in the browser's Sources panel against the cell sourceURL identity that the extension provides.
-- The extension does not need `Debugger.setBreakpointByUrl` for MVP; user-set browser breakpoints fire because the sourceURL contract is honored.
+- `Debugger.enable` is invoked on each page session at session attach time, alongside existing `Runtime.enable` setup (Diagnostic Observer posture, validated by the spike Q3).
+- The extension does not own a breakpoint UI. Breakpoint authoring is owned by VS Code (notebook-cell gutter breakpoints) and by the browser's Sources panel. The extension only listens.
+- VS Code-side notebook-cell breakpoints are mirrored into the page via `Debugger.setBreakpointByUrl`, using the cell document URI as the `url` (the same value emitted as `//# sourceURL=`). The mirror is driven by `vscode.debug.breakpoints` and `vscode.debug.onDidChangeBreakpoints`; the extension never invents breakpoints of its own.
+- Browser-side breakpoints set directly in the Sources panel continue to fire without extension involvement, because the sourceURL contract is honored.
+- Any `Debugger.paused` event delivered to the extension's session is auto-resumed on that session, so the extension never holds the JS thread on behalf of another CDP client (Q3 caveat).
+- Pause inspection (paused-line marker, Variables / Call Stack / Watch panels, step controls) happens in the browser's DevTools, not in VS Code. Surfacing pause inspection inside VS Code requires registering a Debug Adapter Protocol (DAP) adapter and is tracked as deferred work, not part of FR38's MVP scope.
 
 Evaluation strategy and `replMode`:
 
