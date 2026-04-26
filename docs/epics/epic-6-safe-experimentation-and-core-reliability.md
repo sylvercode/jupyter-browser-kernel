@@ -29,6 +29,11 @@ So that core runtime behavior remains stable and profile-agnostic.
 **Then** no profile-specific runtime imports are required
 **And** tests remain runnable in isolation from profile implementations.
 
+**Given** the deterministic fixture suite
+**When** a breakpoint-binding fixture runs against a static page
+**Then** the kernel-emitted per-cell `//# sourceURL` is observed on the evaluated script
+**And** the test asserts the Debugger domain is enabled on the session.
+
 **Traceability Note:** Validates NFR12 (deterministic automated validation) and NFR13 (coverage of reconnect and serialization boundaries).
 
 ## Story 6.2: Support Forward and Rollback Cell Patterns

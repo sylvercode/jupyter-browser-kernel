@@ -8,8 +8,8 @@ Users can configure endpoints, connect, reconnect, disconnect, and maintain a st
 
 ## Epic 2: Execute JavaScript Cells (No Intentional Capture)
 
-Users can run and rerun JavaScript notebook cells and validate behavior through explicit success or failure results and visible browser effects.
-**FRs covered:** FR8, FR9, FR11, FR12, FR13, FR14, FR15
+Users can run and rerun JavaScript notebook cells, set source-level breakpoints from the browser's developer tools, and validate behavior through explicit success or failure results and visible browser effects.
+**FRs covered:** FR8, FR9, FR11, FR12, FR13, FR14, FR15, FR38
 **Depends on:** Epic 1
 
 ## Epic 3: Capture Intentional Logs
