@@ -58,7 +58,7 @@ development_status:
   2-1-run-synchronous-javascript-cells: done
   2-2-run-asynchronous-javascript-cells: done
   2-3-normalize-success-and-failure-output-contracts: done
-  2-spike-cdp-sourceurl-debugger: review
+  2-spike-cdp-sourceurl-debugger: done
   2-4-support-fast-rerun-and-iteration-patterns: backlog
   2-5-enable-source-level-breakpoint-debugging: backlog
   epic-2-retrospective: optional
