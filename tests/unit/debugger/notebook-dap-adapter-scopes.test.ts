@@ -120,6 +120,8 @@ test("scopes maps scopeChain entries and appends global scope", async () => {
       }),
       resume: async () => undefined,
       onPaused: () => ({ dispose: () => undefined }),
+      onResumed: () => ({ dispose: () => undefined }),
+      isPaused: () => false,
       onBreakpointResolved: () => ({ dispose: () => undefined }),
     }),
     getBreakpointRegistry: () => undefined,

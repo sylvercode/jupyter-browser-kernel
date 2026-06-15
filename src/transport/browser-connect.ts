@@ -15,31 +15,140 @@ import type { ConnectToTargetResult } from "./connect-types";
 
 const CDP_EVALUATION_TIMEOUT_MS = 30_000;
 
-function raceWithTimeout<T>(
+interface DisposableLike {
+  dispose: () => void;
+}
+
+class SimpleEmitter<T> {
+  private readonly listeners = new Set<(value: T) => void>();
+
+  public readonly event = (listener: (value: T) => void): DisposableLike => {
+    this.listeners.add(listener);
+
+    return {
+      dispose: () => {
+        this.listeners.delete(listener);
+      },
+    };
+  };
+
+  public fire(value: T): void {
+    for (const listener of this.listeners) {
+      listener(value);
+    }
+  }
+}
+
+interface PauseAwareTimeoutSession {
+  isPaused: () => boolean;
+  onPaused: (listener: (event: unknown) => void) => vscode.Disposable;
+  onResumed: (listener: () => void) => vscode.Disposable;
+}
+
+function raceWithPauseAwareTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
+  session: PauseAwareTimeoutSession,
   onTimeout?: () => void,
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => {
+    const timeoutError = new Error("CDP evaluation timed out");
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let remainingMs = timeoutMs;
+    let startedAt = Date.now();
+
+    const cleanup = (): void => {
+      timer = undefined;
+      pausedSubscription.dispose();
+      resumedSubscription.dispose();
+    };
+
+    const settleResolve = (value: T): void => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      if (timer) {
+        clearTimeout(timer);
+      }
+      cleanup();
+      resolve(value);
+    };
+
+    const settleReject = (error: unknown): void => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      if (timer) {
+        clearTimeout(timer);
+      }
+      cleanup();
+      reject(error);
+    };
+
+    const fireTimeout = (): void => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      cleanup();
+
       try {
         onTimeout?.();
       } catch {
         // Non-fatal cleanup error.
       }
-      reject(new Error("CDP evaluation timed out"));
-    }, timeoutMs);
 
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error: unknown) => {
-        clearTimeout(timer);
-        reject(error);
-      },
-    );
+      reject(timeoutError);
+    };
+
+    const scheduleTimeout = (): void => {
+      if (settled || timer || session.isPaused()) {
+        return;
+      }
+
+      startedAt = Date.now();
+      timer = setTimeout(fireTimeout, remainingMs);
+    };
+
+    const pause = (): void => {
+      if (settled || !timer) {
+        return;
+      }
+
+      remainingMs = Math.max(0, remainingMs - (Date.now() - startedAt));
+      clearTimeout(timer);
+      timer = undefined;
+    };
+
+    const resume = (): void => {
+      if (settled || timer || remainingMs <= 0) {
+        if (!settled && remainingMs <= 0) {
+          fireTimeout();
+        }
+        return;
+      }
+
+      scheduleTimeout();
+    };
+
+    const pausedSubscription = session.onPaused(() => {
+      pause();
+    });
+    const resumedSubscription = session.onResumed(() => {
+      resume();
+    });
+
+    if (!session.isPaused()) {
+      scheduleTimeout();
+    }
+
+    promise.then(settleResolve, settleReject);
   });
 }
 
@@ -92,6 +201,8 @@ export interface BrowserDebuggerSession {
   onPaused: (
     listener: (event: DebuggerPausedEvent) => void,
   ) => vscode.Disposable;
+  onResumed: (listener: () => void) => vscode.Disposable;
+  isPaused: () => boolean;
   onBreakpointResolved: (
     listener: (event: DebuggerBreakpointResolvedEvent) => void,
   ) => vscode.Disposable;
@@ -145,7 +256,30 @@ function removeClientListener(
 export function createBrowserDebuggerSession(
   client: CDP.Client,
   sessionId: string,
+  options?: {
+    evaluationTimeoutMs?: number;
+  },
 ): BrowserDebuggerSession {
+  const pausedEmitter = new SimpleEmitter<DebuggerPausedEvent>();
+  const resumedEmitter = new SimpleEmitter<void>();
+  let paused = false;
+
+  const pausedEventName = toSessionScopedEventName("Debugger.paused", sessionId);
+  const resumedEventName = toSessionScopedEventName(
+    "Debugger.resumed",
+    sessionId,
+  );
+
+  client.on(pausedEventName, (event: object) => {
+    paused = true;
+    pausedEmitter.fire(event as DebuggerPausedEvent);
+  });
+
+  client.on(resumedEventName, (_event: object) => {
+    paused = false;
+    resumedEmitter.fire(undefined);
+  });
+
   return {
     enable: async () => {
       await client.send("Debugger.enable", undefined, sessionId);
@@ -181,7 +315,19 @@ export function createBrowserDebuggerSession(
       await client.send("Runtime.releaseObject", params, sessionId);
     },
     evaluate: async (params) =>
-      (await client.send("Runtime.evaluate", params, sessionId)) as BrowserRuntimeEvaluateResult,
+      (await raceWithPauseAwareTimeout(
+        client.send("Runtime.evaluate", params, sessionId) as Promise<BrowserRuntimeEvaluateResult>,
+        options?.evaluationTimeoutMs ?? CDP_EVALUATION_TIMEOUT_MS,
+        {
+          isPaused: () => paused,
+          onPaused: (listener) => pausedEmitter.event(listener),
+          onResumed: (listener) => resumedEmitter.event(listener),
+        },
+        () => {
+          // Best-effort cancellation of the in-flight evaluation.
+          void client.send("Runtime.terminateExecution", undefined, sessionId);
+        },
+      )) as BrowserRuntimeEvaluateResult,
     resume: async () => {
       try {
         await client.send("Debugger.resume", undefined, sessionId);
@@ -190,17 +336,12 @@ export function createBrowserDebuggerSession(
       }
     },
     onPaused: (listener) => {
-      const eventName = toSessionScopedEventName("Debugger.paused", sessionId);
-      const handler = listener as (event: unknown) => void;
-
-      client.on(eventName, handler);
-
-      return {
-        dispose: () => {
-          removeClientListener(client, eventName, handler);
-        },
-      };
+      return pausedEmitter.event(listener);
     },
+    onResumed: (listener) => {
+      return resumedEmitter.event(listener);
+    },
+    isPaused: () => paused,
     onBreakpointResolved: (listener) => {
       const eventName = toSessionScopedEventName(
         "Debugger.breakpointResolved",
@@ -573,6 +714,9 @@ async function connectViaBrowserTargetAttach(
     const debuggerSession = createBrowserDebuggerSession(
       retainedClient,
       retainedSessionId,
+      {
+        evaluationTimeoutMs: CDP_EVALUATION_TIMEOUT_MS,
+      },
     );
 
     const terminateExecution = async (): Promise<void> => {
@@ -593,26 +737,14 @@ async function connectViaBrowserTargetAttach(
       endpoint,
       debugger: debuggerSession,
       evaluate: async (expression: string) =>
-        raceWithTimeout(
-          retainedClient.send(
-            "Runtime.evaluate",
-            {
-              expression,
-              returnByValue: true,
-              awaitPromise: true,
-              // Required for top-level await in notebook cells.
-              replMode: true,
-              timeout: CDP_EVALUATION_TIMEOUT_MS,
-              generatePreview: false,
-            },
-            retainedSessionId,
-          ),
-          CDP_EVALUATION_TIMEOUT_MS,
-          () => {
-            // Best-effort cancellation of the in-flight evaluation.
-            void terminateExecution();
-          },
-        ),
+        debuggerSession.evaluate({
+          expression,
+          returnByValue: true,
+          awaitPromise: true,
+          // Required for top-level await in notebook cells.
+          replMode: true,
+          generatePreview: false,
+        }),
       terminateExecution,
       close: async () => {
         await safeClose(retainedClient);

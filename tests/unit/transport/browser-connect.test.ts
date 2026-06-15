@@ -13,6 +13,33 @@ import {
 import { coreTargetProfile } from "../../../src/profile/core-target-profile.js";
 import { createLocalizeMock } from "../test-utils/localize-mock.js";
 
+interface EventHarnessClient {
+  send: (method: string, params: unknown, sessionId?: string) => Promise<unknown>;
+  on: (eventName: string, listener: (event: unknown) => void) => void;
+  off: (eventName: string, listener: (event: unknown) => void) => void;
+}
+
+function createEventHarness() {
+  const calls: Array<{ action: "on" | "off"; eventName: string }> = [];
+  const listeners = new Map<string, (event: unknown) => void>();
+
+  const client: EventHarnessClient = {
+    send: async () => undefined,
+    on: (eventName: string, listener: (event: unknown) => void) => {
+      calls.push({ action: "on", eventName });
+      listeners.set(eventName, listener);
+    },
+    off: (eventName: string, listener: (event: unknown) => void) => {
+      calls.push({ action: "off", eventName });
+      if (listeners.get(eventName) === listener) {
+        listeners.delete(eventName);
+      }
+    },
+  };
+
+  return { client, calls, listeners };
+}
+
 test("createAttachToTargetParams always enforces flatten mode", () => {
   assert.deepEqual(createAttachToTargetParams("target-1"), {
     targetId: "target-1",
@@ -240,6 +267,84 @@ test("createBrowserDebuggerSession forwards evaluate to the scoped session", asy
   assert.equal(sendCalls[0]?.sessionId, "session-evaluate");
 });
 
+test("createBrowserDebuggerSession evaluate does not timeout while paused", async () => {
+  const { client, listeners } = createEventHarness();
+  const sendCalls: Array<{ method: string }> = [];
+
+  client.send = async (method: string) => {
+    sendCalls.push({ method });
+    if (method !== "Runtime.evaluate") {
+      return undefined;
+    }
+
+    return await new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({
+          result: {
+            type: "number",
+            value: 42,
+          },
+        });
+      }, 35);
+    });
+  };
+
+  const session = createBrowserDebuggerSession(client as never, "session-paused", {
+    evaluationTimeoutMs: 20,
+  });
+
+  const evaluation = session.evaluate({ expression: "1 + 1" });
+
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  listeners.get("Debugger.paused.session-paused")?.({
+    reason: "breakpoint",
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  listeners.get("Debugger.resumed.session-paused")?.({});
+
+  const result = await evaluation;
+
+  assert.equal(sendCalls.filter((call) => call.method === "Runtime.evaluate").length, 1);
+  assert.equal(result.result.value, 42);
+});
+
+test("createBrowserDebuggerSession evaluate still times out when not paused", async () => {
+  const { client } = createEventHarness();
+  const sendCalls: Array<{ method: string }> = [];
+
+  client.send = async (method: string) => {
+    sendCalls.push({ method });
+    if (method !== "Runtime.evaluate") {
+      return undefined;
+    }
+
+    return await new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({
+          result: {
+            type: "number",
+            value: 42,
+          },
+        });
+      }, 35);
+    });
+  };
+
+  const session = createBrowserDebuggerSession(client as never, "session-timeout", {
+    evaluationTimeoutMs: 20,
+  });
+
+  await assert.rejects(
+    async () => {
+      await session.evaluate({ expression: "1 + 1" });
+    },
+    /CDP evaluation timed out/,
+  );
+
+  assert.equal(sendCalls.filter((call) => call.method === "Runtime.evaluate").length, 1);
+});
+
 test("createBrowserDebuggerSession forwards enable to the scoped session", async () => {
   const sendCalls: Array<{
     method: string;
@@ -310,41 +415,45 @@ test("createBrowserDebuggerSession resume swallows CDP errors", async () => {
 });
 
 test("createBrowserDebuggerSession onPaused subscribes and disposes by session-scoped event name", () => {
-  const calls: Array<{ action: "on" | "off"; eventName: string }> = [];
-  let capturedListener: ((event: unknown) => void) | undefined;
+  const { client, calls, listeners } = createEventHarness();
 
-  const session = createBrowserDebuggerSession(
-    {
-      send: async () => undefined,
-      on: (eventName: string, listener: (event: unknown) => void) => {
-        calls.push({ action: "on", eventName });
-        capturedListener = listener;
-      },
-      off: (eventName: string) => {
-        calls.push({ action: "off", eventName });
-      },
-    } as never,
-    "session-4",
-  );
+  const session = createBrowserDebuggerSession(client as never, "session-4");
 
   const events: unknown[] = [];
   const subscription = session.onPaused((event) => {
     events.push(event);
   });
 
-  capturedListener?.({ reason: "other" });
+  listeners.get("Debugger.paused.session-4")?.({ reason: "other" });
   subscription.dispose();
 
+  assert.deepEqual(calls.slice(0, 2), [
+    { action: "on", eventName: "Debugger.paused.session-4" },
+    { action: "on", eventName: "Debugger.resumed.session-4" },
+  ]);
   assert.equal(calls.length, 2);
-  assert.deepEqual(calls[0], {
-    action: "on",
-    eventName: "Debugger.paused.session-4",
-  });
-  assert.deepEqual(calls[1], {
-    action: "off",
-    eventName: "Debugger.paused.session-4",
-  });
   assert.equal(events.length, 1);
+});
+
+test("createBrowserDebuggerSession onResumed notifies listeners and disposes cleanly", () => {
+  const { client, calls, listeners } = createEventHarness();
+
+  const session = createBrowserDebuggerSession(client as never, "session-4b");
+
+  let resumedCount = 0;
+  const subscription = session.onResumed(() => {
+    resumedCount += 1;
+  });
+
+  listeners.get("Debugger.resumed.session-4b")?.({});
+  subscription.dispose();
+
+  assert.deepEqual(calls.slice(0, 2), [
+    { action: "on", eventName: "Debugger.paused.session-4b" },
+    { action: "on", eventName: "Debugger.resumed.session-4b" },
+  ]);
+  assert.equal(calls.length, 2);
+  assert.equal(resumedCount, 1);
 });
 
 test("createBrowserDebuggerSession onBreakpointResolved subscribes and disposes by session-scoped event name", () => {
@@ -373,15 +482,24 @@ test("createBrowserDebuggerSession onBreakpointResolved subscribes and disposes 
   capturedListener?.({ breakpointId: "bp-1" });
   subscription.dispose();
 
-  assert.equal(calls.length, 2);
-  assert.deepEqual(calls[0], {
-    action: "on",
-    eventName: "Debugger.breakpointResolved.session-5",
-  });
-  assert.deepEqual(calls[1], {
-    action: "off",
-    eventName: "Debugger.breakpointResolved.session-5",
-  });
+  assert.deepEqual(calls, [
+    {
+      action: "on",
+      eventName: "Debugger.paused.session-5",
+    },
+    {
+      action: "on",
+      eventName: "Debugger.resumed.session-5",
+    },
+    {
+      action: "on",
+      eventName: "Debugger.breakpointResolved.session-5",
+    },
+    {
+      action: "off",
+      eventName: "Debugger.breakpointResolved.session-5",
+    },
+  ]);
   assert.equal(events.length, 1);
 });
 

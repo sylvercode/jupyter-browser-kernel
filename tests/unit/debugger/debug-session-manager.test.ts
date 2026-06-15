@@ -93,6 +93,16 @@ function createFakeDebuggerSession(
         },
       };
     },
+    onResumed: (listener) => {
+      state.sequence.push("onResumed");
+      return {
+        dispose: () => {
+          state.sequence.push("disposeResumed");
+          void listener;
+        },
+      };
+    },
+    isPaused: () => false,
     onBreakpointResolved: (listener) => {
       state.sequence.push("onBreakpointResolved");
       state.breakpointResolvedListener = listener as (event: {

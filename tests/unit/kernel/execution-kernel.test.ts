@@ -159,6 +159,8 @@ function createFakeConnection(
       evaluate: async () => ({ result: { type: "undefined" } }),
       resume: async () => undefined,
       onPaused: () => ({ dispose: () => undefined }),
+      onResumed: () => ({ dispose: () => undefined }),
+      isPaused: () => false,
       onBreakpointResolved: () => ({ dispose: () => undefined }),
     },
     evaluate,
