@@ -1,8 +1,10 @@
 import type * as vscode from "vscode";
+import type ProtocolMappingApi from "devtools-protocol/types/protocol-mapping";
 
 import type { BrowserDebuggerSession } from "../transport/browser-connect";
 import { onDidChangeConnectionState } from "../transport/connection-state";
 import type { Localize } from "../config/endpoint-config";
+import { createVariableStore, type VariableStore } from "./variable-store";
 import {
   createBreakpointRegistry,
   type BreakpointRegistry,
@@ -20,12 +22,20 @@ export interface DebugBreakpointResolvedEvent {
 
 export interface DebugSessionManager {
   launch: () => Promise<void>;
+  resume: () => Promise<void>;
   disconnect: () => Promise<void>;
   terminate: () => Promise<void>;
+  getDebuggerSession: () => BrowserDebuggerSession | undefined;
   getBreakpointRegistry: () => BreakpointRegistry | undefined;
+  getVariableStore: () => VariableStore | undefined;
+  getPausedEvent: () => DebuggerPausedEvent | undefined;
+  getPauseVersion: () => number;
   recordSetBreakpoints: (url: string, desired: DesiredBreakpoint[]) => void;
   onDidTerminate: (
     listener: (reason: DebugSessionTerminationReason) => void,
+  ) => vscode.Disposable;
+  onDidPaused: (
+    listener: (event: DebuggerPausedEvent) => void,
   ) => vscode.Disposable;
   onDidBreakpointResolved: (
     listener: (event: DebugBreakpointResolvedEvent) => void,
@@ -38,6 +48,8 @@ export interface DebugSessionManagerOptions {
   logger: (message: string, error?: unknown) => void;
   localize?: Localize;
 }
+
+type DebuggerPausedEvent = ProtocolMappingApi.Events["Debugger.paused"][0];
 
 interface DisposableLike {
   dispose: () => void;
@@ -97,6 +109,7 @@ export function createDebugSessionManager({
   localize = defaultLocalize,
 }: DebugSessionManagerOptions): DebugSessionManager {
   const terminateEmitter = new SimpleEmitter<DebugSessionTerminationReason>();
+  const pausedEmitter = new SimpleEmitter<DebuggerPausedEvent>();
   const breakpointResolvedEmitter =
     new SimpleEmitter<DebugBreakpointResolvedEvent>();
 
@@ -104,6 +117,9 @@ export function createDebugSessionManager({
   let breakpointResolvedDisposable: vscode.Disposable | undefined;
   let runningSession: BrowserDebuggerSession | undefined;
   let breakpointRegistry: BreakpointRegistry | undefined;
+  let variableStore: VariableStore | undefined;
+  let pausedEvent: DebuggerPausedEvent | undefined;
+  let pauseVersion = 0;
   let running = false;
   let emittedConnectionLost = false;
   const cachedBreakpointsByUrl = new Map<string, DesiredBreakpoint[]>();
@@ -121,9 +137,13 @@ export function createDebugSessionManager({
   const stopRunningSession = async (): Promise<void> => {
     const sessionToStop = runningSession;
     const registryToClear = breakpointRegistry;
+    const variableStoreToDispose = variableStore;
     running = false;
     runningSession = undefined;
     breakpointRegistry = undefined;
+    variableStore = undefined;
+    pausedEvent = undefined;
+    pauseVersion = 0;
     clearPausedSubscription();
     clearBreakpointResolvedSubscription();
 
@@ -133,6 +153,10 @@ export function createDebugSessionManager({
 
     if (registryToClear) {
       await registryToClear.clearAll();
+    }
+
+    if (variableStoreToDispose) {
+      await variableStoreToDispose.dispose();
     }
 
     try {
@@ -210,9 +234,17 @@ export function createDebugSessionManager({
       }
 
       clearPausedSubscription();
-      pausedDisposable = session.onPaused(() => {
-        // Pause handling is implemented in Story 10.2.
+      pausedDisposable = session.onPaused((event) => {
+        pausedEvent = event;
+        pauseVersion += 1;
+        pausedEmitter.fire(event);
       });
+
+      const nextVariableStore = createVariableStore({
+        debuggerSession: session,
+        logger,
+      });
+      variableStore = nextVariableStore;
 
       const nextRegistry = createBreakpointRegistry({
         debuggerSession: session,
@@ -247,17 +279,33 @@ export function createDebugSessionManager({
       runningSession = session;
       running = true;
     },
+    resume: async () => {
+      const session = runningSession;
+      if (!session) {
+        return;
+      }
+
+      await session.resume();
+
+      pausedEvent = undefined;
+      pauseVersion += 1;
+    },
     disconnect: async () => {
       await stopRunningSession();
     },
     terminate: async () => {
       await stopRunningSession();
     },
+    getDebuggerSession: () => runningSession,
     getBreakpointRegistry: () => breakpointRegistry,
+    getVariableStore: () => variableStore,
+    getPausedEvent: () => pausedEvent,
+    getPauseVersion: () => pauseVersion,
     recordSetBreakpoints: (url, desired) => {
       cachedBreakpointsByUrl.set(url, [...desired]);
     },
     onDidTerminate: (listener) => terminateEmitter.event(listener),
+    onDidPaused: (listener) => pausedEmitter.event(listener),
     onDidBreakpointResolved: (listener) =>
       breakpointResolvedEmitter.event(listener),
     dispose: () => {
@@ -265,11 +313,19 @@ export function createDebugSessionManager({
       clearPausedSubscription();
       clearBreakpointResolvedSubscription();
       terminateEmitter.dispose();
+      pausedEmitter.dispose();
       breakpointResolvedEmitter.dispose();
+      const variableStoreToDispose = variableStore;
       running = false;
       runningSession = undefined;
       breakpointRegistry = undefined;
+      variableStore = undefined;
+      pausedEvent = undefined;
+      pauseVersion = 0;
       emittedConnectionLost = false;
+      if (variableStoreToDispose) {
+        void variableStoreToDispose.dispose();
+      }
     },
   };
 }

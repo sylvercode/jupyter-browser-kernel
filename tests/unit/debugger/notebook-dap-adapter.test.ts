@@ -6,6 +6,7 @@ import type { DebugProtocol } from "@vscode/debugprotocol";
 import { NotebookDebugAdapter } from "../../../src/debugger/notebook-dap-adapter.js";
 import type { DebugSessionManager } from "../../../src/debugger/debug-session-manager.js";
 import type { DesiredBreakpoint } from "../../../src/debugger/breakpoint-registry.js";
+import type { VariableStore } from "../../../src/debugger/variable-store.js";
 
 interface Harness {
   adapter: NotebookDebugAdapter;
@@ -72,17 +73,34 @@ function createHarness(sessionManager: DebugSessionManager): Harness {
 function createSessionManager(
   overrides: Partial<DebugSessionManager>,
 ): DebugSessionManager {
+  const variableStore: VariableStore = {
+    reserve: () => 0,
+    resolve: () => undefined,
+    clearForPause: async () => undefined,
+    dispose: async () => undefined,
+  };
+
   return {
-    launch: async () => undefined,
-    disconnect: async () => undefined,
-    terminate: async () => undefined,
-    getBreakpointRegistry: () => undefined,
-    recordSetBreakpoints: (_url: string, _desired: DesiredBreakpoint[]) =>
-      undefined,
-    onDidTerminate: () => ({ dispose: () => undefined }),
-    onDidBreakpointResolved: () => ({ dispose: () => undefined }),
-    dispose: () => undefined,
-    ...overrides,
+    launch: overrides.launch ?? (async () => undefined),
+    resume: overrides.resume ?? (async () => undefined),
+    disconnect: overrides.disconnect ?? (async () => undefined),
+    terminate: overrides.terminate ?? (async () => undefined),
+    getDebuggerSession: overrides.getDebuggerSession ?? (() => undefined),
+    getBreakpointRegistry: overrides.getBreakpointRegistry ?? (() => undefined),
+    getVariableStore: overrides.getVariableStore ?? (() => variableStore),
+    getPausedEvent: overrides.getPausedEvent ?? (() => undefined),
+    getPauseVersion: overrides.getPauseVersion ?? (() => 0),
+    recordSetBreakpoints:
+      overrides.recordSetBreakpoints ??
+      ((_url: string, _desired: DesiredBreakpoint[]) => undefined),
+    onDidTerminate:
+      overrides.onDidTerminate ?? (() => ({ dispose: () => undefined })),
+    onDidPaused:
+      overrides.onDidPaused ?? (() => ({ dispose: () => undefined })),
+    onDidBreakpointResolved:
+      overrides.onDidBreakpointResolved ??
+      (() => ({ dispose: () => undefined })),
+    dispose: overrides.dispose ?? (() => undefined),
   };
 }
 
@@ -196,6 +214,67 @@ test("connection-lost followed by terminate emits terminated event exactly once"
   );
 
   assert.equal(terminatedEvents.length, 1);
+
+  harness.adapter.dispose();
+});
+
+test("manager paused notification emits stopped event", () => {
+  let pausedListener:
+    | ((event: { reason: string; hitBreakpoints?: string[] }) => void)
+    | undefined;
+
+  const harness = createHarness(
+    createSessionManager({
+      onDidPaused: (listener) => {
+        pausedListener = listener as (event: {
+          reason: string;
+          hitBreakpoints?: string[];
+        }) => void;
+        return { dispose: () => undefined };
+      },
+    }),
+  );
+
+  pausedListener?.({ reason: "other", hitBreakpoints: ["bp-1"] });
+
+  const stoppedEvents = harness.sentMessages.filter(
+    (message) =>
+      message.type === "event" &&
+      (message as DebugProtocol.Event).event === "stopped",
+  ) as DebugProtocol.StoppedEvent[];
+
+  assert.equal(stoppedEvents.length, 1);
+  assert.equal(stoppedEvents[0]?.body.reason, "breakpoint");
+  assert.equal(stoppedEvents[0]?.body.threadId, 1);
+
+  harness.adapter.dispose();
+});
+
+test("continue request resumes manager and emits continued event", async () => {
+  let resumeCalls = 0;
+
+  const harness = createHarness(
+    createSessionManager({
+      resume: async () => {
+        resumeCalls += 1;
+      },
+    }),
+  );
+
+  const response = await harness.sendRequest("continue", { threadId: 1 });
+
+  assert.equal(response.success, true);
+  assert.equal(resumeCalls, 1);
+
+  const continuedEvents = harness.sentMessages.filter(
+    (message) =>
+      message.type === "event" &&
+      (message as DebugProtocol.Event).event === "continued",
+  ) as DebugProtocol.ContinuedEvent[];
+
+  assert.equal(continuedEvents.length, 1);
+  assert.equal(continuedEvents[0]?.body.threadId, 1);
+  assert.equal(continuedEvents[0]?.body.allThreadsContinued, true);
 
   harness.adapter.dispose();
 });

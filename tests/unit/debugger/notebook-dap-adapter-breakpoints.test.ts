@@ -10,6 +10,7 @@ import type {
   BoundBreakpoint,
   DesiredBreakpoint,
 } from "../../../src/debugger/breakpoint-registry.js";
+import type { VariableStore } from "../../../src/debugger/variable-store.js";
 
 interface Harness {
   adapter: NotebookDebugAdapter;
@@ -81,15 +82,28 @@ function createSessionManager(
   state: ManagerState,
   registry: BreakpointRegistry | undefined,
 ): DebugSessionManager {
+  const variableStore: VariableStore = {
+    reserve: () => 0,
+    resolve: () => undefined,
+    clearForPause: async () => undefined,
+    dispose: async () => undefined,
+  };
+
   return {
     launch: async () => undefined,
+    resume: async () => undefined,
     disconnect: async () => undefined,
     terminate: async () => undefined,
+    getDebuggerSession: () => undefined,
     getBreakpointRegistry: () => registry,
+    getVariableStore: () => variableStore,
+    getPausedEvent: () => undefined,
+    getPauseVersion: () => 0,
     recordSetBreakpoints: (url, desired) => {
       state.recorded.push({ url, desired });
     },
     onDidTerminate: () => ({ dispose: () => undefined }),
+    onDidPaused: () => ({ dispose: () => undefined }),
     onDidBreakpointResolved: () => ({ dispose: () => undefined }),
     dispose: () => undefined,
   };
@@ -103,6 +117,7 @@ function createRegistry(
 ): BreakpointRegistry {
   return {
     replace: onReplace,
+    getUrlForBreakpointId: () => undefined,
     resolveRuntimeBreakpoint: () => undefined,
     clear: async () => undefined,
     clearAll: async () => undefined,
