@@ -13,7 +13,7 @@ const defaultLocalize = ((
 
   let rendered = template;
   for (const [index, value] of args.entries()) {
-    rendered = rendered.replace(`{${index}}`, String(value));
+    rendered = rendered.split(`{${index}}`).join(String(value));
   }
 
   return rendered;

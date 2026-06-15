@@ -31,6 +31,7 @@
   "Cannot start debug session: connect to a browser target first.": "Cannot start debug session: connect to a browser target first.",
   "Browser connection lost; debug session terminated.": "Browser connection lost; debug session terminated.",
   "Notebook cells": "Notebook cells",
+  "<anonymous>": "<anonymous>",
   "Local": "Local",
   "Closure": "Closure",
   "Block": "Block",

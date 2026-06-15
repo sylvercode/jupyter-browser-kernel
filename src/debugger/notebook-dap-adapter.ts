@@ -39,7 +39,7 @@ const defaultLocalize = ((
 
   let rendered = template;
   for (const [index, value] of args.entries()) {
-    rendered = rendered.replace(`{${index}}`, String(value));
+    rendered = rendered.split(`{${index}}`).join(String(value));
   }
 
   return rendered;
@@ -254,60 +254,67 @@ export class NotebookDebugAdapter
     response: DebugProtocol.ScopesResponse,
     args: DebugProtocol.ScopesArguments,
   ): Promise<void> {
-    const paused = await this.ensurePausedFrames();
-    const frame = paused ? this.stackFramesById.get(args.frameId) : undefined;
-    const variableStore = this.sessionManager.getVariableStore();
-    const debuggerSession = this.sessionManager.getDebuggerSession();
+    try {
+      const paused = await this.ensurePausedFrames();
+      const frame = paused ? this.stackFramesById.get(args.frameId) : undefined;
+      const variableStore = this.sessionManager.getVariableStore();
+      const debuggerSession = this.sessionManager.getDebuggerSession();
 
-    if (!frame || !variableStore || !debuggerSession) {
+      if (!frame || !variableStore || !debuggerSession) {
+        response.success = true;
+        response.body = { scopes: [] };
+        this.sendResponse(response);
+        return;
+      }
+
+      const scopes: DebugProtocol.Scope[] = [];
+
+      for (const scope of frame.callFrame.scopeChain) {
+        if (!scopeKinds.has(scope.type)) {
+          continue;
+        }
+
+        const objectId = scope.object.objectId;
+        const variablesReference = objectId
+          ? variableStore.reserve({
+              objectId,
+              kind: toReferenceKind(scope.object),
+            })
+          : 0;
+
+        scopes.push({
+          name: this.localizeScopeName(scope.type),
+          presentationHint: scope.type,
+          expensive: false,
+          variablesReference,
+        });
+      }
+
+      const globalObjectId = await this.resolveGlobalObjectId(debuggerSession);
+      const globalReference =
+        globalObjectId !== undefined
+          ? variableStore.reserve({
+              objectId: globalObjectId,
+              kind: "object",
+            })
+          : 0;
+
+      scopes.push({
+        name: this.localize("Global"),
+        presentationHint: "globals",
+        expensive: true,
+        variablesReference: globalReference,
+      });
+
+      response.success = true;
+      response.body = { scopes };
+      this.sendResponse(response);
+    } catch (error) {
+      this.logger("[debug] scopesRequest failed.", error);
       response.success = true;
       response.body = { scopes: [] };
       this.sendResponse(response);
-      return;
     }
-
-    const scopes: DebugProtocol.Scope[] = [];
-
-    for (const scope of frame.callFrame.scopeChain) {
-      if (!scopeKinds.has(scope.type)) {
-        continue;
-      }
-
-      const objectId = scope.object.objectId;
-      const variablesReference = objectId
-        ? variableStore.reserve({
-            objectId,
-            kind: toReferenceKind(scope.object),
-          })
-        : 0;
-
-      scopes.push({
-        name: this.localizeScopeName(scope.type),
-        presentationHint: scope.type,
-        expensive: false,
-        variablesReference,
-      });
-    }
-
-    const globalObjectId = await this.resolveGlobalObjectId(debuggerSession);
-    const globalReference =
-      globalObjectId !== undefined
-        ? variableStore.reserve({
-            objectId: globalObjectId,
-            kind: "object",
-          })
-        : 0;
-
-    scopes.push({
-      name: this.localize("Global"),
-      presentationHint: "globals",
-      expensive: true,
-      variablesReference: globalReference,
-    });
-
-    response.success = true;
-    response.body = { scopes };
-    this.sendResponse(response);
   }
 
   protected override async variablesRequest(
@@ -332,54 +339,61 @@ export class NotebookDebugAdapter
       return;
     }
 
-    const result = await debuggerSession.getProperties({
-      objectId: reference.objectId,
-      ownProperties: true,
-      accessorPropertiesOnly: false,
-      generatePreview: true,
-    });
-
-    const descriptors = result.result.filter(
-      (descriptor) => descriptor.value !== undefined,
-    );
-    const start = Math.max(0, args.start ?? 0);
-    const requestedCount = Math.max(0, args.count ?? descriptors.length);
-    const pageSize = Math.min(requestedCount, MAX_VARIABLE_PAGE_SIZE);
-    const selected = descriptors.slice(start, start + pageSize);
-
-    const variables: DebugProtocol.Variable[] = selected.map((descriptor) => {
-      const value = descriptor.value as Protocol.Runtime.RemoteObject;
-      const nextReference = shouldCreateChildHandle(value)
-        ? variableStore.reserve({
-            objectId: value.objectId,
-            kind: toReferenceKind(value),
-          })
-        : 0;
-
-      return {
-        name: descriptor.name,
-        value: formatRemoteObject(value, 10240, this.localize),
-        type: formatRemoteType(value),
-        variablesReference: nextReference,
-      };
-    });
-
-    const remaining = Math.max(
-      0,
-      descriptors.length - (start + selected.length),
-    );
-    if (requestedCount > MAX_VARIABLE_PAGE_SIZE && remaining > 0) {
-      variables.push({
-        name: this.localize("… ({0} more)", remaining),
-        value: "",
-        type: "info",
-        variablesReference: 0,
+    try {
+      const result = await debuggerSession.getProperties({
+        objectId: reference.objectId,
+        ownProperties: true,
+        accessorPropertiesOnly: false,
+        generatePreview: true,
       });
-    }
 
-    response.success = true;
-    response.body = { variables };
-    this.sendResponse(response);
+      const descriptors = result.result.filter(
+        (descriptor) => descriptor.value !== undefined,
+      );
+      const start = Math.max(0, args.start ?? 0);
+      const requestedCount = Math.max(0, args.count ?? descriptors.length);
+      const pageSize = Math.min(requestedCount, MAX_VARIABLE_PAGE_SIZE);
+      const selected = descriptors.slice(start, start + pageSize);
+
+      const variables: DebugProtocol.Variable[] = selected.map((descriptor) => {
+        const value = descriptor.value as Protocol.Runtime.RemoteObject;
+        const nextReference = shouldCreateChildHandle(value)
+          ? variableStore.reserve({
+              objectId: value.objectId,
+              kind: toReferenceKind(value),
+            })
+          : 0;
+
+        return {
+          name: descriptor.name,
+          value: formatRemoteObject(value, 10240, this.localize),
+          type: formatRemoteType(value),
+          variablesReference: nextReference,
+        };
+      });
+
+      const remaining = Math.max(
+        0,
+        descriptors.length - (start + selected.length),
+      );
+      if (requestedCount > MAX_VARIABLE_PAGE_SIZE && remaining > 0) {
+        variables.push({
+          name: this.localize("… ({0} more)", remaining),
+          value: "",
+          type: "info",
+          variablesReference: 0,
+        });
+      }
+
+      response.success = true;
+      response.body = { variables };
+      this.sendResponse(response);
+    } catch (error) {
+      this.logger("[debug] variablesRequest failed.", error);
+      response.success = true;
+      response.body = { variables: [] };
+      this.sendResponse(response);
+    }
   }
 
   protected override async evaluateRequest(
@@ -410,50 +424,64 @@ export class NotebookDebugAdapter
     const variableStore = this.sessionManager.getVariableStore();
     const expression = args.expression;
 
-    const evaluation = selectedFrame
-      ? await debuggerSession.evaluateOnCallFrame({
-          callFrameId: selectedFrame.callFrame.callFrameId,
-          expression,
-          returnByValue: false,
-          generatePreview: true,
-          throwOnSideEffect: args.context === "hover",
-        })
-      : await debuggerSession.evaluate({
-          expression,
-          returnByValue: false,
-          generatePreview: true,
-        });
+    try {
+      const evaluation = selectedFrame
+        ? await debuggerSession.evaluateOnCallFrame({
+            callFrameId: selectedFrame.callFrame.callFrameId,
+            expression,
+            returnByValue: false,
+            generatePreview: true,
+            throwOnSideEffect: args.context === "hover",
+          })
+        : await debuggerSession.evaluate({
+            expression,
+            returnByValue: false,
+            generatePreview: true,
+          });
 
-    if (evaluation.exceptionDetails) {
+      if (evaluation.exceptionDetails) {
+        response.success = true;
+        response.body = {
+          result: this.localize(
+            "Evaluation failed: {0}",
+            describeException(evaluation.exceptionDetails),
+          ),
+          presentationHint: { kind: "error" },
+          variablesReference: 0,
+        };
+        this.sendResponse(response);
+        return;
+      }
+
+      const remoteResult = evaluation.result;
+      const variablesReference =
+        variableStore && shouldCreateChildHandle(remoteResult)
+          ? variableStore.reserve({
+              objectId: remoteResult.objectId,
+              kind: toReferenceKind(remoteResult),
+            })
+          : 0;
+
+      response.success = true;
+      response.body = {
+        result: formatRemoteObject(remoteResult, 10240, this.localize),
+        type: formatRemoteType(remoteResult),
+        variablesReference,
+      };
+      this.sendResponse(response);
+    } catch (error) {
+      this.logger("[debug] evaluateRequest failed.", error);
       response.success = true;
       response.body = {
         result: this.localize(
           "Evaluation failed: {0}",
-          describeException(evaluation.exceptionDetails),
+          error instanceof Error ? error.message : String(error),
         ),
         presentationHint: { kind: "error" },
         variablesReference: 0,
       };
       this.sendResponse(response);
-      return;
     }
-
-    const remoteResult = evaluation.result;
-    const variablesReference =
-      variableStore && shouldCreateChildHandle(remoteResult)
-        ? variableStore.reserve({
-            objectId: remoteResult.objectId,
-            kind: toReferenceKind(remoteResult),
-          })
-        : 0;
-
-    response.success = true;
-    response.body = {
-      result: formatRemoteObject(remoteResult, 10240, this.localize),
-      type: formatRemoteType(remoteResult),
-      variablesReference,
-    };
-    this.sendResponse(response);
   }
 
   protected override async setBreakPointsRequest(
@@ -577,7 +605,18 @@ export class NotebookDebugAdapter
     response: DebugProtocol.ContinueResponse,
     _args: DebugProtocol.ContinueArguments,
   ): Promise<void> {
-    await this.sessionManager.resume();
+    try {
+      await this.sessionManager.resume();
+    } catch (error) {
+      this.logger("[debug] continueRequest failed.", error);
+      this.sendErrorResponse(
+        response,
+        0,
+        error instanceof Error ? error.message : String(error),
+      );
+      return;
+    }
+
     response.success = true;
     response.body = {
       allThreadsContinued: true,

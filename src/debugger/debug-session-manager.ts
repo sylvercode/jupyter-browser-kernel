@@ -34,7 +34,9 @@ export interface DebugSessionManager {
   onDidTerminate: (
     listener: (reason: DebugSessionTerminationReason) => void,
   ) => vscode.Disposable;
-  onDidPaused: (listener: (event: DebuggerPausedEvent) => void) => vscode.Disposable;
+  onDidPaused: (
+    listener: (event: DebuggerPausedEvent) => void,
+  ) => vscode.Disposable;
   onDidBreakpointResolved: (
     listener: (event: DebugBreakpointResolvedEvent) => void,
   ) => vscode.Disposable;
@@ -313,6 +315,7 @@ export function createDebugSessionManager({
       terminateEmitter.dispose();
       pausedEmitter.dispose();
       breakpointResolvedEmitter.dispose();
+      const variableStoreToDispose = variableStore;
       running = false;
       runningSession = undefined;
       breakpointRegistry = undefined;
@@ -320,6 +323,9 @@ export function createDebugSessionManager({
       pausedEvent = undefined;
       pauseVersion = 0;
       emittedConnectionLost = false;
+      if (variableStoreToDispose) {
+        void variableStoreToDispose.dispose();
+      }
     },
   };
 }
