@@ -173,6 +173,10 @@ type RuntimeReleaseObjectParams =
   ProtocolMappingApi.Commands["Runtime.releaseObject"]["paramsType"][0];
 type RuntimeEvaluateParams =
   ProtocolMappingApi.Commands["Runtime.evaluate"]["paramsType"][0];
+type DebuggerStepOverParams =
+  ProtocolMappingApi.Commands["Debugger.stepOver"]["paramsType"][0];
+type DebuggerStepIntoParams =
+  ProtocolMappingApi.Commands["Debugger.stepInto"]["paramsType"][0];
 type DebuggerPausedEvent = ProtocolMappingApi.Events["Debugger.paused"][0];
 type DebuggerBreakpointResolvedEvent =
   ProtocolMappingApi.Events["Debugger.breakpointResolved"][0];
@@ -198,6 +202,10 @@ export interface BrowserDebuggerSession {
   releaseObject: (params: RuntimeReleaseObjectParams) => Promise<void>;
   evaluate: (params: RuntimeEvaluateParams) => Promise<BrowserRuntimeEvaluateResult>;
   resume: () => Promise<void>;
+  stepOver: (params?: DebuggerStepOverParams) => Promise<void>;
+  stepInto: (params?: DebuggerStepIntoParams) => Promise<void>;
+  stepOut: () => Promise<void>;
+  pause: () => Promise<void>;
   onPaused: (
     listener: (event: DebuggerPausedEvent) => void,
   ) => vscode.Disposable;
@@ -334,6 +342,18 @@ export function createBrowserDebuggerSession(
       } catch {
         // Best-effort resume.
       }
+    },
+    stepOver: async (params?) => {
+      await client.send("Debugger.stepOver", params ?? {}, sessionId);
+    },
+    stepInto: async (params?) => {
+      await client.send("Debugger.stepInto", params ?? {}, sessionId);
+    },
+    stepOut: async () => {
+      await client.send("Debugger.stepOut", undefined, sessionId);
+    },
+    pause: async () => {
+      await client.send("Debugger.pause", undefined, sessionId);
     },
     onPaused: (listener) => {
       return pausedEmitter.event(listener);

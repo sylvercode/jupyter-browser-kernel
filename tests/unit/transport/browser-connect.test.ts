@@ -14,7 +14,11 @@ import { coreTargetProfile } from "../../../src/profile/core-target-profile.js";
 import { createLocalizeMock } from "../test-utils/localize-mock.js";
 
 interface EventHarnessClient {
-  send: (method: string, params: unknown, sessionId?: string) => Promise<unknown>;
+  send: (
+    method: string,
+    params: unknown,
+    sessionId?: string,
+  ) => Promise<unknown>;
   on: (eventName: string, listener: (event: unknown) => void) => void;
   off: (eventName: string, listener: (event: unknown) => void) => void;
 }
@@ -289,9 +293,13 @@ test("createBrowserDebuggerSession evaluate does not timeout while paused", asyn
     });
   };
 
-  const session = createBrowserDebuggerSession(client as never, "session-paused", {
-    evaluationTimeoutMs: 20,
-  });
+  const session = createBrowserDebuggerSession(
+    client as never,
+    "session-paused",
+    {
+      evaluationTimeoutMs: 20,
+    },
+  );
 
   const evaluation = session.evaluate({ expression: "1 + 1" });
 
@@ -305,7 +313,10 @@ test("createBrowserDebuggerSession evaluate does not timeout while paused", asyn
 
   const result = await evaluation;
 
-  assert.equal(sendCalls.filter((call) => call.method === "Runtime.evaluate").length, 1);
+  assert.equal(
+    sendCalls.filter((call) => call.method === "Runtime.evaluate").length,
+    1,
+  );
   assert.equal(result.result.value, 42);
 });
 
@@ -331,18 +342,22 @@ test("createBrowserDebuggerSession evaluate still times out when not paused", as
     });
   };
 
-  const session = createBrowserDebuggerSession(client as never, "session-timeout", {
-    evaluationTimeoutMs: 20,
-  });
-
-  await assert.rejects(
-    async () => {
-      await session.evaluate({ expression: "1 + 1" });
+  const session = createBrowserDebuggerSession(
+    client as never,
+    "session-timeout",
+    {
+      evaluationTimeoutMs: 20,
     },
-    /CDP evaluation timed out/,
   );
 
-  assert.equal(sendCalls.filter((call) => call.method === "Runtime.evaluate").length, 1);
+  await assert.rejects(async () => {
+    await session.evaluate({ expression: "1 + 1" });
+  }, /CDP evaluation timed out/);
+
+  assert.equal(
+    sendCalls.filter((call) => call.method === "Runtime.evaluate").length,
+    1,
+  );
 });
 
 test("createBrowserDebuggerSession forwards enable to the scoped session", async () => {
@@ -572,4 +587,108 @@ test("connectToBrowserTarget does not call Debugger.enable during attach", async
   );
 
   await disconnectActiveBrowserConnection();
+});
+
+test("createBrowserDebuggerSession stepOver forwards to the scoped session", async () => {
+  const sendCalls: Array<{
+    method: string;
+    params: unknown;
+    sessionId?: string;
+  }> = [];
+
+  const session = createBrowserDebuggerSession(
+    {
+      send: async (method: string, params: unknown, sessionId?: string) => {
+        sendCalls.push({ method, params, sessionId });
+        return undefined;
+      },
+      on: () => undefined,
+      off: () => undefined,
+    } as never,
+    "session-stepover",
+  );
+
+  await session.stepOver();
+
+  assert.equal(sendCalls.length, 1);
+  assert.equal(sendCalls[0]?.method, "Debugger.stepOver");
+  assert.equal(sendCalls[0]?.sessionId, "session-stepover");
+});
+
+test("createBrowserDebuggerSession stepInto forwards to the scoped session", async () => {
+  const sendCalls: Array<{
+    method: string;
+    params: unknown;
+    sessionId?: string;
+  }> = [];
+
+  const session = createBrowserDebuggerSession(
+    {
+      send: async (method: string, params: unknown, sessionId?: string) => {
+        sendCalls.push({ method, params, sessionId });
+        return undefined;
+      },
+      on: () => undefined,
+      off: () => undefined,
+    } as never,
+    "session-stepinto",
+  );
+
+  await session.stepInto();
+
+  assert.equal(sendCalls.length, 1);
+  assert.equal(sendCalls[0]?.method, "Debugger.stepInto");
+  assert.equal(sendCalls[0]?.sessionId, "session-stepinto");
+});
+
+test("createBrowserDebuggerSession stepOut forwards to the scoped session", async () => {
+  const sendCalls: Array<{
+    method: string;
+    params: unknown;
+    sessionId?: string;
+  }> = [];
+
+  const session = createBrowserDebuggerSession(
+    {
+      send: async (method: string, params: unknown, sessionId?: string) => {
+        sendCalls.push({ method, params, sessionId });
+        return undefined;
+      },
+      on: () => undefined,
+      off: () => undefined,
+    } as never,
+    "session-stepout",
+  );
+
+  await session.stepOut();
+
+  assert.equal(sendCalls.length, 1);
+  assert.equal(sendCalls[0]?.method, "Debugger.stepOut");
+  assert.equal(sendCalls[0]?.sessionId, "session-stepout");
+});
+
+test("createBrowserDebuggerSession pause forwards to the scoped session", async () => {
+  const sendCalls: Array<{
+    method: string;
+    params: unknown;
+    sessionId?: string;
+  }> = [];
+
+  const session = createBrowserDebuggerSession(
+    {
+      send: async (method: string, params: unknown, sessionId?: string) => {
+        sendCalls.push({ method, params, sessionId });
+        return undefined;
+      },
+      on: () => undefined,
+      off: () => undefined,
+    } as never,
+    "session-pause",
+  );
+
+  await session.pause();
+
+  assert.equal(sendCalls.length, 1);
+  assert.equal(sendCalls[0]?.method, "Debugger.pause");
+  assert.equal(sendCalls[0]?.sessionId, "session-pause");
 });

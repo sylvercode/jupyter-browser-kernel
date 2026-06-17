@@ -23,6 +23,10 @@ export interface DebugBreakpointResolvedEvent {
 export interface DebugSessionManager {
   launch: () => Promise<void>;
   resume: () => Promise<void>;
+  stepOver: () => Promise<void>;
+  stepInto: () => Promise<void>;
+  stepOut: () => Promise<void>;
+  pause: () => Promise<void>;
   disconnect: () => Promise<void>;
   terminate: () => Promise<void>;
   getDebuggerSession: () => BrowserDebuggerSession | undefined;
@@ -289,6 +293,38 @@ export function createDebugSessionManager({
 
       pausedEvent = undefined;
       pauseVersion += 1;
+    },
+    stepOver: async () => {
+      const session = runningSession;
+      if (!session) {
+        return;
+      }
+
+      await session.stepOver();
+    },
+    stepInto: async () => {
+      const session = runningSession;
+      if (!session) {
+        return;
+      }
+
+      await session.stepInto();
+    },
+    stepOut: async () => {
+      const session = runningSession;
+      if (!session) {
+        return;
+      }
+
+      await session.stepOut();
+    },
+    pause: async () => {
+      const session = runningSession;
+      if (!session) {
+        return;
+      }
+
+      await session.pause();
     },
     disconnect: async () => {
       await stopRunningSession();

@@ -101,6 +101,10 @@ test("scopes maps scopeChain entries and appends global scope", async () => {
   const manager: DebugSessionManager = {
     launch: async () => undefined,
     resume: async () => undefined,
+    stepOver: async () => undefined,
+    stepInto: async () => undefined,
+    stepOut: async () => undefined,
+    pause: async () => undefined,
     disconnect: async () => undefined,
     terminate: async () => undefined,
     getDebuggerSession: () => ({
@@ -119,6 +123,10 @@ test("scopes maps scopeChain entries and appends global scope", async () => {
         },
       }),
       resume: async () => undefined,
+      stepOver: async () => undefined,
+      stepInto: async () => undefined,
+      stepOut: async () => undefined,
+      pause: async () => undefined,
       onPaused: () => ({ dispose: () => undefined }),
       onResumed: () => ({ dispose: () => undefined }),
       isPaused: () => false,

@@ -625,6 +625,89 @@ export class NotebookDebugAdapter
     this.sendEvent(new ContinuedEvent(1, true));
   }
 
+  protected override async nextRequest(
+    response: DebugProtocol.NextResponse,
+    _args: DebugProtocol.NextArguments,
+  ): Promise<void> {
+    try {
+      await this.sessionManager.stepOver();
+    } catch (error) {
+      this.logger("[debug] nextRequest failed.", error);
+      this.sendErrorResponse(
+        response,
+        0,
+        error instanceof Error ? error.message : String(error),
+      );
+      return;
+    }
+
+    response.success = true;
+    this.sendResponse(response);
+    this.sendEvent(new ContinuedEvent(1, true));
+  }
+
+  protected override async stepInRequest(
+    response: DebugProtocol.StepInResponse,
+    _args: DebugProtocol.StepInArguments,
+  ): Promise<void> {
+    try {
+      await this.sessionManager.stepInto();
+    } catch (error) {
+      this.logger("[debug] stepInRequest failed.", error);
+      this.sendErrorResponse(
+        response,
+        0,
+        error instanceof Error ? error.message : String(error),
+      );
+      return;
+    }
+
+    response.success = true;
+    this.sendResponse(response);
+    this.sendEvent(new ContinuedEvent(1, true));
+  }
+
+  protected override async stepOutRequest(
+    response: DebugProtocol.StepOutResponse,
+    _args: DebugProtocol.StepOutArguments,
+  ): Promise<void> {
+    try {
+      await this.sessionManager.stepOut();
+    } catch (error) {
+      this.logger("[debug] stepOutRequest failed.", error);
+      this.sendErrorResponse(
+        response,
+        0,
+        error instanceof Error ? error.message : String(error),
+      );
+      return;
+    }
+
+    response.success = true;
+    this.sendResponse(response);
+    this.sendEvent(new ContinuedEvent(1, true));
+  }
+
+  protected override async pauseRequest(
+    response: DebugProtocol.PauseResponse,
+    _args: DebugProtocol.PauseArguments,
+  ): Promise<void> {
+    try {
+      await this.sessionManager.pause();
+    } catch (error) {
+      this.logger("[debug] pauseRequest failed.", error);
+      this.sendErrorResponse(
+        response,
+        0,
+        error instanceof Error ? error.message : String(error),
+      );
+      return;
+    }
+
+    response.success = true;
+    this.sendResponse(response);
+  }
+
   protected override async terminateRequest(
     response: DebugProtocol.TerminateResponse,
     _args: DebugProtocol.TerminateArguments,

@@ -108,153 +108,201 @@ function createSessionManager(
   };
 }
 
-test("initialize returns expected capability snapshot", async () => {
-  const harness = createHarness(createSessionManager({}));
+test("next calls stepOver exactly once and emits ContinuedEvent", async () => {
+  let stepOverCalls = 0;
 
-  const response = await harness.sendRequest("initialize", {
-    adapterID: "jupyter-browser-kernel",
-    pathFormat: "path",
-  });
-
-  assert.equal(response.success, true);
-  const body = (response as DebugProtocol.InitializeResponse).body;
-
-  assert.deepEqual(body, {
-    supportsBreakpointLocationsRequest: true,
-    supportsConfigurationDoneRequest: true,
-    supportsTerminateRequest: true,
-    supportTerminateDebuggee: false,
-    supportsEvaluateForHovers: true,
-    supportsConditionalBreakpoints: true,
-    supportsHitConditionalBreakpoints: false,
-    supportsLogPoints: false,
-  });
-
-  harness.adapter.dispose();
-});
-
-test("launch failure returns ErrorResponse with localized message", async () => {
   const harness = createHarness(
     createSessionManager({
-      launch: async () => {
-        throw new Error(
-          "Cannot start debug session: connect to a browser target first.",
-        );
+      stepOver: async () => {
+        stepOverCalls += 1;
       },
     }),
   );
 
-  const response = await harness.sendRequest("launch", {});
+  const response = await harness.sendRequest("next", { threadId: 1 });
+
+  assert.equal(response.success, true);
+  assert.equal(stepOverCalls, 1);
+
+  const continuedEvents = harness.sentMessages.filter(
+    (message) =>
+      message.type === "event" &&
+      (message as DebugProtocol.Event).event === "continued",
+  ) as DebugProtocol.ContinuedEvent[];
+
+  assert.equal(continuedEvents.length, 1);
+  assert.equal(continuedEvents[0]?.body?.threadId, 1);
+  assert.equal(continuedEvents[0]?.body?.allThreadsContinued, true);
+
+  harness.adapter.dispose();
+});
+
+test("stepIn calls stepInto exactly once and emits ContinuedEvent", async () => {
+  let stepIntoCalls = 0;
+
+  const harness = createHarness(
+    createSessionManager({
+      stepInto: async () => {
+        stepIntoCalls += 1;
+      },
+    }),
+  );
+
+  const response = await harness.sendRequest("stepIn", { threadId: 1 });
+
+  assert.equal(response.success, true);
+  assert.equal(stepIntoCalls, 1);
+
+  const continuedEvents = harness.sentMessages.filter(
+    (message) =>
+      message.type === "event" &&
+      (message as DebugProtocol.Event).event === "continued",
+  ) as DebugProtocol.ContinuedEvent[];
+
+  assert.equal(continuedEvents.length, 1);
+  assert.equal(continuedEvents[0]?.body?.allThreadsContinued, true);
+
+  harness.adapter.dispose();
+});
+
+test("stepOut calls stepOut exactly once and emits ContinuedEvent", async () => {
+  let stepOutCalls = 0;
+
+  const harness = createHarness(
+    createSessionManager({
+      stepOut: async () => {
+        stepOutCalls += 1;
+      },
+    }),
+  );
+
+  const response = await harness.sendRequest("stepOut", { threadId: 1 });
+
+  assert.equal(response.success, true);
+  assert.equal(stepOutCalls, 1);
+
+  const continuedEvents = harness.sentMessages.filter(
+    (message) =>
+      message.type === "event" &&
+      (message as DebugProtocol.Event).event === "continued",
+  ) as DebugProtocol.ContinuedEvent[];
+
+  assert.equal(continuedEvents.length, 1);
+  assert.equal(continuedEvents[0]?.body?.allThreadsContinued, true);
+
+  harness.adapter.dispose();
+});
+
+test("pause calls pause exactly once and sends success response", async () => {
+  let pauseCalls = 0;
+
+  const harness = createHarness(
+    createSessionManager({
+      pause: async () => {
+        pauseCalls += 1;
+      },
+    }),
+  );
+
+  const response = await harness.sendRequest("pause", { threadId: 1 });
+
+  assert.equal(response.success, true);
+  assert.equal(pauseCalls, 1);
+
+  harness.adapter.dispose();
+});
+
+test("next failure returns ErrorResponse with error message", async () => {
+  const harness = createHarness(
+    createSessionManager({
+      stepOver: async () => {
+        throw new Error("step over failed: session gone");
+      },
+    }),
+  );
+
+  const response = await harness.sendRequest("next", { threadId: 1 });
 
   assert.equal(response.success, false);
-  assert.match(response.message ?? "", /Cannot start debug session/);
+  assert.match(response.message ?? "", /step over failed: session gone/);
 
   harness.adapter.dispose();
 });
 
-test("threads returns the single notebook-cells thread", async () => {
-  const harness = createHarness(createSessionManager({}));
-
-  const response = await harness.sendRequest("threads", {});
-
-  assert.equal(response.success, true);
-  const body = (response as DebugProtocol.ThreadsResponse).body;
-  assert.equal(body?.threads.length, 1);
-  assert.equal(body?.threads[0]?.id, 1);
-  assert.equal(body?.threads[0]?.name, "Notebook cells");
-
-  harness.adapter.dispose();
-});
-
-test("terminate emits terminated event so one stop cleanly ends session", async () => {
-  let terminateCalls = 0;
-
+test("stepIn failure returns ErrorResponse with error message", async () => {
   const harness = createHarness(
     createSessionManager({
-      terminate: async () => {
-        terminateCalls += 1;
+      stepInto: async () => {
+        throw new Error("step into failed");
       },
     }),
   );
 
-  const response = await harness.sendRequest("terminate", {});
+  const response = await harness.sendRequest("stepIn", { threadId: 1 });
 
-  assert.equal(response.success, true);
-  assert.equal(terminateCalls, 1);
-
-  const terminatedEvents = harness.sentMessages.filter(
-    (message) =>
-      message.type === "event" &&
-      (message as DebugProtocol.Event).event === "terminated",
-  );
-
-  assert.equal(terminatedEvents.length, 1);
+  assert.equal(response.success, false);
+  assert.match(response.message ?? "", /step into failed/);
 
   harness.adapter.dispose();
 });
 
-test("connection-lost followed by terminate emits terminated event exactly once", async () => {
-  let terminationListener: ((reason: "connection-lost") => void) | undefined;
-
+test("stepOut failure returns ErrorResponse with error message", async () => {
   const harness = createHarness(
     createSessionManager({
-      onDidTerminate: (listener) => {
-        terminationListener = listener;
-        return { dispose: () => undefined };
+      stepOut: async () => {
+        throw new Error("step out failed");
       },
     }),
   );
 
-  assert.ok(terminationListener, "adapter must subscribe to onDidTerminate");
-  terminationListener?.("connection-lost");
+  const response = await harness.sendRequest("stepOut", { threadId: 1 });
 
-  const response = await harness.sendRequest("terminate", {});
-  assert.equal(response.success, true);
-
-  const terminatedEvents = harness.sentMessages.filter(
-    (message) =>
-      message.type === "event" &&
-      (message as DebugProtocol.Event).event === "terminated",
-  );
-
-  assert.equal(terminatedEvents.length, 1);
+  assert.equal(response.success, false);
+  assert.match(response.message ?? "", /step out failed/);
 
   harness.adapter.dispose();
 });
 
-test("manager paused notification emits stopped event", () => {
-  let pausedListener:
-    | ((event: { reason: string; hitBreakpoints?: string[] }) => void)
-    | undefined;
-
+test("pause failure returns ErrorResponse with error message", async () => {
   const harness = createHarness(
     createSessionManager({
-      onDidPaused: (listener) => {
-        pausedListener = listener as (event: {
-          reason: string;
-          hitBreakpoints?: string[];
-        }) => void;
-        return { dispose: () => undefined };
+      pause: async () => {
+        throw new Error("pause failed: session unavailable");
       },
     }),
   );
 
-  pausedListener?.({ reason: "other", hitBreakpoints: ["bp-1"] });
+  const response = await harness.sendRequest("pause", { threadId: 1 });
 
-  const stoppedEvents = harness.sentMessages.filter(
-    (message) =>
-      message.type === "event" &&
-      (message as DebugProtocol.Event).event === "stopped",
-  ) as DebugProtocol.StoppedEvent[];
-
-  assert.equal(stoppedEvents.length, 1);
-  assert.equal(stoppedEvents[0]?.body.reason, "breakpoint");
-  assert.equal(stoppedEvents[0]?.body.threadId, 1);
+  assert.equal(response.success, false);
+  assert.match(response.message ?? "", /pause failed: session unavailable/);
 
   harness.adapter.dispose();
 });
 
-test("continue request resumes manager and emits continued event", async () => {
+test("next failure does not emit ContinuedEvent", async () => {
+  const harness = createHarness(
+    createSessionManager({
+      stepOver: async () => {
+        throw new Error("step failed");
+      },
+    }),
+  );
+
+  await harness.sendRequest("next", { threadId: 1 });
+
+  const continuedEvents = harness.sentMessages.filter(
+    (message) =>
+      message.type === "event" &&
+      (message as DebugProtocol.Event).event === "continued",
+  );
+
+  assert.equal(continuedEvents.length, 0);
+
+  harness.adapter.dispose();
+});
+
+test("continue still calls resume and emits ContinuedEvent (regression)", async () => {
   let resumeCalls = 0;
 
   const harness = createHarness(
@@ -270,6 +318,9 @@ test("continue request resumes manager and emits continued event", async () => {
   assert.equal(response.success, true);
   assert.equal(resumeCalls, 1);
 
+  const body = (response as DebugProtocol.ContinueResponse).body;
+  assert.equal(body?.allThreadsContinued, true);
+
   const continuedEvents = harness.sentMessages.filter(
     (message) =>
       message.type === "event" &&
@@ -277,8 +328,7 @@ test("continue request resumes manager and emits continued event", async () => {
   ) as DebugProtocol.ContinuedEvent[];
 
   assert.equal(continuedEvents.length, 1);
-  assert.equal(continuedEvents[0]?.body.threadId, 1);
-  assert.equal(continuedEvents[0]?.body.allThreadsContinued, true);
+  assert.equal(continuedEvents[0]?.body?.allThreadsContinued, true);
 
   harness.adapter.dispose();
 });

@@ -66,6 +66,10 @@ function createSessionManager(
   return {
     launch: async () => undefined,
     resume: async () => undefined,
+    stepOver: async () => undefined,
+    stepInto: async () => undefined,
+    stepOut: async () => undefined,
+    pause: async () => undefined,
     disconnect: async () => undefined,
     terminate: async () => undefined,
     getDebuggerSession: () => undefined,

@@ -87,6 +87,10 @@ test("variables resolves properties and allocates child handles", async () => {
   const manager: DebugSessionManager = {
     launch: async () => undefined,
     resume: async () => undefined,
+    stepOver: async () => undefined,
+    stepInto: async () => undefined,
+    stepOut: async () => undefined,
+    pause: async () => undefined,
     disconnect: async () => undefined,
     terminate: async () => undefined,
     getDebuggerSession: () => ({
@@ -117,6 +121,10 @@ test("variables resolves properties and allocates child handles", async () => {
       releaseObject: async () => undefined,
       evaluate: async () => ({ result: { type: "undefined" } }),
       resume: async () => undefined,
+      stepOver: async () => undefined,
+      stepInto: async () => undefined,
+      stepOut: async () => undefined,
+      pause: async () => undefined,
       onPaused: () => ({ dispose: () => undefined }),
       onResumed: () => ({ dispose: () => undefined }),
       isPaused: () => false,
@@ -170,6 +178,10 @@ test("variables truncates oversized page requests with marker", async () => {
   const manager: DebugSessionManager = {
     launch: async () => undefined,
     resume: async () => undefined,
+    stepOver: async () => undefined,
+    stepInto: async () => undefined,
+    stepOut: async () => undefined,
+    pause: async () => undefined,
     disconnect: async () => undefined,
     terminate: async () => undefined,
     getDebuggerSession: () => ({
@@ -182,6 +194,10 @@ test("variables truncates oversized page requests with marker", async () => {
       releaseObject: async () => undefined,
       evaluate: async () => ({ result: { type: "undefined" } }),
       resume: async () => undefined,
+      stepOver: async () => undefined,
+      stepInto: async () => undefined,
+      stepOut: async () => undefined,
+      pause: async () => undefined,
       onPaused: () => ({ dispose: () => undefined }),
       onResumed: () => ({ dispose: () => undefined }),
       isPaused: () => false,

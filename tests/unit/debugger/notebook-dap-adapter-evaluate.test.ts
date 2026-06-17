@@ -88,6 +88,10 @@ test("evaluate success path uses evaluateOnCallFrame", async () => {
   const manager: DebugSessionManager = {
     launch: async () => undefined,
     resume: async () => undefined,
+    stepOver: async () => undefined,
+    stepInto: async () => undefined,
+    stepOut: async () => undefined,
+    pause: async () => undefined,
     disconnect: async () => undefined,
     terminate: async () => undefined,
     getDebuggerSession: () => ({
@@ -107,6 +111,10 @@ test("evaluate success path uses evaluateOnCallFrame", async () => {
       releaseObject: async () => undefined,
       evaluate: async () => ({ result: { type: "undefined" } }),
       resume: async () => undefined,
+      stepOver: async () => undefined,
+      stepInto: async () => undefined,
+      stepOut: async () => undefined,
+      pause: async () => undefined,
       onPaused: () => ({ dispose: () => undefined }),
       onResumed: () => ({ dispose: () => undefined }),
       isPaused: () => false,
@@ -150,6 +158,10 @@ test("evaluate returns localized error when exceptionDetails exist", async () =>
   const manager: DebugSessionManager = {
     launch: async () => undefined,
     resume: async () => undefined,
+    stepOver: async () => undefined,
+    stepInto: async () => undefined,
+    stepOut: async () => undefined,
+    pause: async () => undefined,
     disconnect: async () => undefined,
     terminate: async () => undefined,
     getDebuggerSession: () => ({
@@ -170,6 +182,10 @@ test("evaluate returns localized error when exceptionDetails exist", async () =>
       releaseObject: async () => undefined,
       evaluate: async () => ({ result: { type: "undefined" } }),
       resume: async () => undefined,
+      stepOver: async () => undefined,
+      stepInto: async () => undefined,
+      stepOut: async () => undefined,
+      pause: async () => undefined,
       onPaused: () => ({ dispose: () => undefined }),
       onResumed: () => ({ dispose: () => undefined }),
       isPaused: () => false,
