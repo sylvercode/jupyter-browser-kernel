@@ -79,24 +79,22 @@ So that execution control stays fully in the editor.
 
 ## Tasks / Subtasks
 
-### 1. Implement `continue` DAP Request Handler (AC: 1)
+> **Implementation note (already in place from Stories 10.1 / 10.3):** `continueRequest`, the session-manager pause subscription (`DebugSessionManager.onDidPaused`), the adapter's `emitStopped` → `StoppedEvent` path, and the CDP-reason → DAP-reason mapping (`resolveStoppedReason`) already exist and are tested. The genuinely new work in this story is the three step commands on the transport and the three step request handlers on the adapter. Tasks below labeled **(verify existing)** must be confirmed and reused — do NOT re-implement or duplicate them.
 
-- [ ] In `src/debugger/notebook-dap-adapter.ts`, add `continueRequest(response, args)`.
-- [ ] Validate `args.threadId === 1` (notebook execution is single-threaded for MVP).
-- [ ] Call `BrowserDebuggerSession.resume()` (already exists from Story 2.5; reused, never bypassed).
-- [ ] Mark the session as running, clear cached pause state via the variable store's `clearForPause()` (Story 10.3).
-- [ ] Send `ContinuedEvent({ threadId: 1, allThreadsContinued: true })` and resolve the request immediately. The next pause arrives asynchronously through the `Debugger.paused` subscription owned by the session manager (Story 10.1).
-- [ ] If `resume()` rejects, return a localized DAP error response and leave the session in its prior state.
+### 1. Verify `continue` DAP Request Handler (AC: 1) — (verify existing)
+
+- [ ] `continueRequest(response, _args)` already exists in [src/debugger/notebook-dap-adapter.ts](../../src/debugger/notebook-dap-adapter.ts). Confirm it: calls `sessionManager.resume()`, sets `response.body.allThreadsContinued = true`, sends the response, then emits `new ContinuedEvent(1, true)`, and returns a localized error response if `resume()` rejects.
+- [ ] Do NOT call `BrowserDebuggerSession.resume()` directly from the adapter and do NOT call `clearForPause()` inline. Resume is routed through `DebugSessionManager.resume()`, which already clears `pausedEvent` and increments `pauseVersion`; the variable store's `clearForPause()` is already invoked from `ensurePausedFrames()` on the next pause.
+- [ ] No changes are expected here unless a defect is found — add a regression test only if missing.
 
 ### 2. Implement `next` / `stepIn` / `stepOut` DAP Request Handlers (AC: 2, 3, 4)
 
-- [ ] Add `nextRequest`, `stepInRequest`, `stepOutRequest`. Each handler:
-  - Validates `args.threadId === 1`.
-  - Calls the matching method on `BrowserDebuggerSession` (Task 5): `stepOver`, `stepInto`, or `stepOut`.
-  - Clears cached pause state via `clearForPause()`.
-  - Sends `ContinuedEvent` and resolves the request immediately.
-  - Sets an internal `awaitingStepCompletion = true` flag (consumed by Task 8 to suppress duplicate `stopped` events).
-- [ ] CDP does not have a `Debugger.resumed` event. The adapter relies entirely on the next `Debugger.paused` event (or session termination) as the signal that the step is complete.
+- [ ] Add `nextRequest`, `stepInRequest`, `stepOutRequest` to the adapter, mirroring the existing `continueRequest` shape. Each handler:
+  - Calls the matching method on `DebugSessionManager` (Task 6): `stepOver`, `stepInto`, or `stepOut`, which routes to `BrowserDebuggerSession` (Task 5).
+  - Sets `response.body.allThreadsContinued = true` (where the response type supports it), sends the response, then emits `new ContinuedEvent(1, true)`.
+  - Returns a localized DAP error response if the step command rejects, leaving the session in its prior state.
+- [ ] Do NOT call `clearForPause()` inline — the existing `ensurePausedFrames()` path already clears stale variable handles when the next pause arrives (`pauseVersion` changes).
+- [ ] No `awaitingStepCompletion` flag is required. CDP reports `Debugger.paused.reason === "step"` after a step, and the existing `resolveStoppedReason` already maps that to the DAP `"step"` reason. The next pause is delivered through the existing `onDidPaused` subscription.
 
 ### 5. Extend `BrowserDebuggerSession` for Stepping (AC: 1–4)
 
@@ -105,28 +103,26 @@ So that execution control stays fully in the editor.
   - `stepInto(params?: ProtocolMappingApi.Commands["Debugger.stepInto"]["paramsType"][0]): Promise<void>` — wraps `Debugger.stepInto`.
   - `stepOut(): Promise<void>` — wraps `Debugger.stepOut`.
 - [ ] Each method sends the command on the per-target session and resolves on the CDP ack (no waiting for `Debugger.paused`).
+- [ ] Add matching `stepOver` / `stepInto` / `stepOut` (and optional `pause`) methods to `DebugSessionManager` ([src/debugger/debug-session-manager.ts](../../src/debugger/debug-session-manager.ts)) that forward to `runningSession` and no-op when no session is running, mirroring the existing `resume()` method. The adapter calls the manager, never `BrowserDebuggerSession` directly.
 - [ ] Update [tests/unit/transport/browser-connect.test.ts](../../tests/unit/transport/browser-connect.test.ts) with forwarding tests for each method.
 
-### 6. Consume `Debugger.paused` From the Session Manager (AC: 5, 6)
+### 6. Consume `Debugger.paused` From the Session Manager (AC: 5, 6) — (verify existing)
 
-- [ ] The session manager (Story 10.1) is the sole subscriber to `BrowserDebuggerSession.onPaused`. Story 10.4 adds a typed `onPaused(handler)` registration on the session manager that the adapter uses to receive parsed pause events.
-- [ ] Adapter `handlePaused(payload)`:
-  1. Cache `payload.callFrames` for Story 10.3.
-  2. Map `payload.reason` (`"other"`, `"step"`, `"breakpoint"`, `"exception"`, `"OOM"`, etc.) to the DAP `stopped` reason vocabulary (`"step"`, `"breakpoint"`, `"exception"`, `"pause"`, `"entry"`).
-  3. If `awaitingStepCompletion` is true, override the reason to `"step"` regardless of CDP's value, then clear the flag.
-  4. Emit `StoppedEvent({ reason, threadId: 1, allThreadsStopped: true, hitBreakpointIds: payload.hitBreakpoints })`.
-- [ ] There is no `Debugger.resumed` event to subscribe to — CDP does not emit one. Resume is observable only via the next `Debugger.paused` or session termination.
+- [ ] The session manager already owns the sole subscription to `BrowserDebuggerSession.onPaused` and re-broadcasts via `DebugSessionManager.onDidPaused` ([src/debugger/debug-session-manager.ts](../../src/debugger/debug-session-manager.ts)). The adapter already subscribes (`this.pausedSubscription`) and runs `emitStopped`. Confirm this wiring; do NOT add a second subscription.
+- [ ] The existing `emitStopped` already:
+  1. Relies on `ensurePausedFrames()` to cache `pausedEvent.callFrames` (Story 10.3).
+  2. Maps the CDP reason via `resolveStoppedReason` to the DAP vocabulary (`"step"`, `"breakpoint"`, `"exception"`, `"pause"`). CDP natively reports `"step"` after a step, so no manual override is needed.
+  3. Emits `new StoppedEvent(reason, 1, exceptionText)`.
+- [ ] **`Debugger.resumed` exists and is already wired.** The transport subscribes to it and exposes `onResumed` (used by the pause-aware evaluation timeout). The adapter does not need it for stepping: `ContinuedEvent` is emitted immediately by the step/continue handlers, and the next state change arrives via the existing `onDidPaused` subscription or session termination.
 
-### 7. Pause Subscription Lifecycle (AC: 5, 6)
+### 7. Pause Subscription Lifecycle (AC: 5, 6) — (verify existing)
 
-- [ ] Subscription is owned by the session manager (Story 10.1) for the lifetime of the DAP session and disposed on `terminate`/`disconnect`. Story 10.4 only registers the adapter's handler with the manager, never with `BrowserDebuggerSession.onPaused` directly.
+- [ ] The pause subscription is already owned by the session manager for the lifetime of the session and disposed on `terminate`/`disconnect`/`dispose` (`clearPausedSubscription`). The adapter disposes its own `pausedSubscription` in `dispose()`. Confirm only; no new lifecycle code is expected.
 
-### 8. Pause Event Serialization (AC: 5)
+### 8. Pause Event Ordering (AC: 5) — (verify existing, extend only if a gap is proven)
 
-- [ ] Create `src/debugger/pause-event-serializer.ts` exporting `createPauseEventSerializer({ adapter })`.
-- [ ] Internally guard with a single in-flight Promise: each incoming `Debugger.paused` payload is appended to a queue; the serializer awaits the previous handler before invoking the next so `StoppedEvent`s are emitted in CDP arrival order.
-- [ ] Drop duplicate consecutive payloads with identical `(reason, hitBreakpoints, top callFrame.location)` to defend against CDP retries.
-- [ ] Step commands (Task 2) are queued through the same serializer so the adapter never has two outstanding step requests against V8.
+- [ ] For the single-threaded notebook runtime, pause ordering is already deterministic: the session manager is the single synchronous subscriber, increments a monotonic `pauseVersion`, and stores the latest `pausedEvent`. VS Code issues one step/continue at a time and waits for the resulting `stopped` event.
+- [ ] Do NOT add a new `pause-event-serializer.ts` unless a concrete ordering or duplicate-delivery defect is reproduced against this single-thread model. If a defect is found, document the reproduction in the Dev Agent Record before adding serialization, and prefer extending the existing session-manager path over a new module.
 
 ### 9. Step Completion Without a Pause (AC: 2–5, 6)
 
@@ -135,16 +131,16 @@ So that execution control stays fully in the editor.
   - Without termination and without pause, the session legitimately stays in the running state — VS Code's UI handles this correctly.
 - [ ] Do NOT introduce a synthetic timeout that emits `terminated`; that would race with normal long-running scripts.
 
-### 10. Pause Capability Hardening (AC: 6)
+### 10. Optional Explicit Pause (AC: 6)
 
-- [ ] Update Story 10.1's `initialize` capability set to enable `supportsRestartFrame: false`, `supportsStepBack: false`, `supportsTerminateThreadsRequest: false`. Stepping is implicitly supported — no DAP capability flag is required for `next`/`stepIn`/`stepOut`/`continue`.
-- [ ] Optional explicit `pause` request (DAP `pauseRequest`) calls `client.send("Debugger.pause", ..., sessionId)` via a new `BrowserDebuggerSession.pause()` method (add alongside step methods in Task 5). On success, the next `Debugger.paused` becomes the user-initiated pause.
+- [ ] The existing `initializeRequest` capability set already omits `supportsRestartFrame`, `supportsStepBack`, and `supportsTerminateThreadsRequest` (default `false`), so no capability change is required for stepping — it is implicitly supported. Only touch the capability set if you add `pauseRequest`.
+- [ ] (Optional) Add a DAP `pauseRequest` handler that calls `DebugSessionManager.pause()` → `BrowserDebuggerSession.pause()` (`Debugger.pause` on the per-target session, added in Task 5). On success, the next `Debugger.paused` becomes the user-initiated pause and flows through the existing `onDidPaused` path.
 
 ### 11. Add Unit Tests (AC: 1–6)
 
-- [ ] `tests/unit/debugger/notebook-dap-adapter-stepping.test.ts`: each of `continue`/`next`/`stepIn`/`stepOut` calls the matching `BrowserDebuggerSession` method exactly once, emits `ContinuedEvent`, and resolves immediately; failure paths return localized DAP errors.
-- [ ] `tests/unit/debugger/pause-event-serializer.test.ts`: rapid pause arrivals are emitted in order; duplicate consecutive payloads collapse; step + pause interleaving never overlaps two handlers.
-- [ ] `tests/unit/debugger/notebook-dap-adapter-paused.test.ts`: `awaitingStepCompletion` flag overrides CDP reason to `"step"`; CDP `"breakpoint"` reason maps verbatim with `hitBreakpointIds` populated; `"exception"` maps to `"exception"`.
+- [ ] `tests/unit/debugger/notebook-dap-adapter-stepping.test.ts`: each of `next`/`stepIn`/`stepOut` calls the matching `DebugSessionManager` step method exactly once, emits `ContinuedEvent(1, true)`, and resolves immediately; failure paths return localized DAP errors. Include a regression assertion that `continue` still behaves identically.
+- [ ] `tests/unit/debugger/debug-session-manager.test.ts` (update): `stepOver`/`stepInto`/`stepOut`/`pause` forward to `runningSession` and no-op when no session is running.
+- [ ] `tests/unit/debugger/notebook-dap-adapter-paused.test.ts`: confirm CDP `"step"` reason maps to DAP `"step"`; CDP `"breakpoint"` with populated `hitBreakpoints` maps to `"breakpoint"`; `"exception"` maps to `"exception"` (these exercise the existing `resolveStoppedReason`).
 - [ ] `tests/unit/transport/browser-connect.test.ts` (update): forwarding tests for `stepOver`/`stepInto`/`stepOut`/`pause`.
 
 ### 12. Run Full Validation Suite (AC: 1–6)
@@ -172,11 +168,12 @@ This is the **fourth story in Epic 10** and focuses on execution control (steppi
 
 ### Architecture Guardrails (Must Follow)
 
-- **No `Debugger.resumed`.** The CDP `Debugger` domain does not emit a `resumed` event. The DAP `ContinuedEvent` is sent by the adapter immediately after issuing the resume/step command. The next observable runtime event is either `Debugger.paused` or session termination.
-- **Asynchronous stepping.** Stepping requests resolve immediately; the next `StoppedEvent` arrives asynchronously through the session manager's `Debugger.paused` subscription.
-- **Single transport surface.** All stepping commands go through `BrowserDebuggerSession` (extended in Task 5). No `src/transport/debugger-interface.ts`. No direct `client.send("Debugger.*", ...)` outside `src/transport/`.
+- **`Debugger.resumed` exists — don't re-derive it.** The CDP `Debugger` domain DOES emit `Debugger.resumed`, and the transport already subscribes to it and exposes `onResumed` (consumed by the pause-aware evaluation timeout). Stepping does not need it: the DAP `ContinuedEvent` is emitted by the adapter immediately after issuing the step/continue command, and the next observable state arrives via the existing `onDidPaused` subscription or session termination.
+- **Asynchronous stepping.** Step/continue requests resolve immediately; the next `StoppedEvent` arrives asynchronously through the session manager's existing `onDidPaused` re-broadcast of `Debugger.paused`.
+- **Route through the session manager.** The adapter calls `DebugSessionManager` methods (`resume`, and the new `stepOver`/`stepInto`/`stepOut`/`pause`), never `BrowserDebuggerSession` directly. The manager owns the running session, pause state, and `pauseVersion`.
+- **Single transport surface.** Raw debugger-domain CDP commands live only in `BrowserDebuggerSession` (extended in Task 5). No `src/transport/debugger-interface.ts`. No direct `client.send("Debugger.*", ...)` outside `src/transport/`.
+- **Reuse existing pause handling.** Pause subscription, `pauseVersion`, `ensurePausedFrames()` cache invalidation, `clearForPause()`, and `resolveStoppedReason` already exist — reuse them; do not add a parallel pause path or call `clearForPause()` from the step handlers.
 - **Folder is `src/debugger/`.** Created by Story 2.5, owned by Epic 10.
-- **Event ordering.** Pause events and step requests are funneled through `pause-event-serializer.ts` so the adapter never has two outstanding handlers.
 - **No client-side step timeout.** A step that completes without pausing simply leaves the session running until the program ends or a breakpoint is hit; termination is signaled by transport, not by a synthetic timer.
 - **Localization.** All error messages via `vscode.l10n.t()` keyed in `l10n/bundle.l10n.json`.
 
@@ -198,7 +195,7 @@ export interface BrowserDebuggerSession {
 }
 ```
 
-`resume()` is already exposed by Story 2.5; the adapter reuses it for `continueRequest`.
+`resume()` is already exposed by Story 2.5 and re-exposed as `DebugSessionManager.resume()`. The existing `continueRequest` calls the session manager, not `BrowserDebuggerSession` directly; the new step request handlers follow the same pattern via the manager's new step methods (Task 5).
 
 ### Known Unknowns & Future Decisions
 
