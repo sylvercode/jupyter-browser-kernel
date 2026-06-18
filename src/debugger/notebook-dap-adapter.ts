@@ -228,7 +228,9 @@ export class NotebookDebugAdapter
       .slice(startFrame, startFrame + levels)
       .map((entry) => {
         const callFrame = entry.callFrame;
-        const sourceIdentifier = this.resolveStackFrameSource(callFrame);
+        const sourceUrl = this.resolveStackFrameSource(callFrame);
+        const source: DebugProtocol.Source | undefined =
+          sourceUrl !== undefined ? createSource(sourceUrl) : undefined;
 
         return {
           id: entry.frameId,
@@ -236,7 +238,7 @@ export class NotebookDebugAdapter
             callFrame.functionName.length > 0
               ? callFrame.functionName
               : this.localize("<anonymous>"),
-          source: createSource(sourceIdentifier),
+          source,
           line: callFrame.location.lineNumber + 1,
           column: (callFrame.location.columnNumber ?? 0) + 1,
         };
@@ -778,23 +780,12 @@ export class NotebookDebugAdapter
 
   private resolveStackFrameSource(
     callFrame: Protocol.Debugger.CallFrame,
-  ): string {
+  ): string | undefined {
     if (callFrame.url.length > 0) {
       return callFrame.url;
     }
 
-    const pausedEvent = this.sessionManager.getPausedEvent();
-    const hitBreakpointId = pausedEvent?.hitBreakpoints?.[0];
-    if (hitBreakpointId) {
-      const urlFromBreakpoint = this.sessionManager
-        .getBreakpointRegistry()
-        ?.getUrlForBreakpointId(hitBreakpointId);
-      if (urlFromBreakpoint && urlFromBreakpoint.length > 0) {
-        return urlFromBreakpoint;
-      }
-    }
-
-    return this.localize("<anonymous>");
+    return this.sessionManager.getScriptUrl(callFrame.location.scriptId);
   }
 
   private async ensurePausedFrames(): Promise<StackFrameEntry[] | undefined> {

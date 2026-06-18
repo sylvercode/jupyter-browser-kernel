@@ -80,6 +80,7 @@ function createSession(state: SessionState): BrowserDebuggerSession {
     onResumed: () => ({ dispose: () => undefined }),
     isPaused: () => false,
     onBreakpointResolved: () => ({ dispose: () => undefined }),
+    onScriptParsed: () => ({ dispose: () => undefined }),
   };
 }
 

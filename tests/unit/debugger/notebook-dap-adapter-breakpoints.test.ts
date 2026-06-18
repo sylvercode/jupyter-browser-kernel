@@ -103,6 +103,7 @@ function createSessionManager(
     getVariableStore: () => variableStore,
     getPausedEvent: () => undefined,
     getPauseVersion: () => 0,
+    getScriptUrl: () => undefined,
     recordSetBreakpoints: (url, desired) => {
       state.recorded.push({ url, desired });
     },

@@ -94,6 +94,7 @@ function createSessionManager(
     getVariableStore: overrides.getVariableStore ?? (() => variableStore),
     getPausedEvent: overrides.getPausedEvent ?? (() => undefined),
     getPauseVersion: overrides.getPauseVersion ?? (() => 0),
+    getScriptUrl: () => undefined,
     recordSetBreakpoints:
       overrides.recordSetBreakpoints ??
       ((_url: string, _desired: DesiredBreakpoint[]) => undefined),

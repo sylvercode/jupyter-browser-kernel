@@ -124,6 +124,7 @@ function createFakeDebuggerSession(
         },
       };
     },
+    onScriptParsed: () => ({ dispose: () => undefined }),
   };
 }
 

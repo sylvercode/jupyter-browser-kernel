@@ -40,6 +40,7 @@ function createHarness(): Harness {
     getVariableStore: () => variableStore,
     getPausedEvent: () => undefined,
     getPauseVersion: () => 0,
+    getScriptUrl: () => undefined,
     recordSetBreakpoints: (_url: string, _desired: DesiredBreakpoint[]) =>
       undefined,
     onDidTerminate: () => ({ dispose: () => undefined }),

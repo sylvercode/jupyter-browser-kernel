@@ -34,6 +34,7 @@ export interface DebugSessionManager {
   getVariableStore: () => VariableStore | undefined;
   getPausedEvent: () => DebuggerPausedEvent | undefined;
   getPauseVersion: () => number;
+  getScriptUrl: (scriptId: string) => string | undefined;
   recordSetBreakpoints: (url: string, desired: DesiredBreakpoint[]) => void;
   onDidTerminate: (
     listener: (reason: DebugSessionTerminationReason) => void,
@@ -119,6 +120,7 @@ export function createDebugSessionManager({
 
   let pausedDisposable: vscode.Disposable | undefined;
   let breakpointResolvedDisposable: vscode.Disposable | undefined;
+  let scriptParsedDisposable: vscode.Disposable | undefined;
   let runningSession: BrowserDebuggerSession | undefined;
   let breakpointRegistry: BreakpointRegistry | undefined;
   let variableStore: VariableStore | undefined;
@@ -127,6 +129,7 @@ export function createDebugSessionManager({
   let running = false;
   let emittedConnectionLost = false;
   const cachedBreakpointsByUrl = new Map<string, DesiredBreakpoint[]>();
+  const scriptUrlMap = new Map<string, string>();
 
   const clearPausedSubscription = (): void => {
     pausedDisposable?.dispose();
@@ -136,6 +139,11 @@ export function createDebugSessionManager({
   const clearBreakpointResolvedSubscription = (): void => {
     breakpointResolvedDisposable?.dispose();
     breakpointResolvedDisposable = undefined;
+  };
+
+  const clearScriptParsedSubscription = (): void => {
+    scriptParsedDisposable?.dispose();
+    scriptParsedDisposable = undefined;
   };
 
   const stopRunningSession = async (): Promise<void> => {
@@ -150,6 +158,8 @@ export function createDebugSessionManager({
     pauseVersion = 0;
     clearPausedSubscription();
     clearBreakpointResolvedSubscription();
+    clearScriptParsedSubscription();
+    scriptUrlMap.clear();
 
     if (!sessionToStop) {
       return;
@@ -276,6 +286,13 @@ export function createDebugSessionManager({
         breakpointResolvedEmitter.fire(resolved);
       });
 
+      clearScriptParsedSubscription();
+      scriptParsedDisposable = session.onScriptParsed((event) => {
+        if (event.url.length > 0) {
+          scriptUrlMap.set(event.scriptId, event.url);
+        }
+      });
+
       for (const [url, desired] of cachedBreakpointsByUrl.entries()) {
         await nextRegistry.replace(url, desired);
       }
@@ -337,6 +354,7 @@ export function createDebugSessionManager({
     getVariableStore: () => variableStore,
     getPausedEvent: () => pausedEvent,
     getPauseVersion: () => pauseVersion,
+    getScriptUrl: (scriptId) => scriptUrlMap.get(scriptId),
     recordSetBreakpoints: (url, desired) => {
       cachedBreakpointsByUrl.set(url, [...desired]);
     },
@@ -348,6 +366,7 @@ export function createDebugSessionManager({
       disconnectFromStateChanges.dispose();
       clearPausedSubscription();
       clearBreakpointResolvedSubscription();
+      clearScriptParsedSubscription();
       terminateEmitter.dispose();
       pausedEmitter.dispose();
       breakpointResolvedEmitter.dispose();

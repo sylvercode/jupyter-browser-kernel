@@ -180,6 +180,8 @@ type DebuggerStepIntoParams =
 type DebuggerPausedEvent = ProtocolMappingApi.Events["Debugger.paused"][0];
 type DebuggerBreakpointResolvedEvent =
   ProtocolMappingApi.Events["Debugger.breakpointResolved"][0];
+type DebuggerScriptParsedEvent =
+  ProtocolMappingApi.Events["Debugger.scriptParsed"][0];
 
 export interface BrowserDebuggerSession {
   enable: () => Promise<void>;
@@ -200,7 +202,9 @@ export interface BrowserDebuggerSession {
     params: DebuggerEvaluateOnCallFrameParams,
   ) => Promise<DebuggerEvaluateOnCallFrameResult>;
   releaseObject: (params: RuntimeReleaseObjectParams) => Promise<void>;
-  evaluate: (params: RuntimeEvaluateParams) => Promise<BrowserRuntimeEvaluateResult>;
+  evaluate: (
+    params: RuntimeEvaluateParams,
+  ) => Promise<BrowserRuntimeEvaluateResult>;
   resume: () => Promise<void>;
   stepOver: (params?: DebuggerStepOverParams) => Promise<void>;
   stepInto: (params?: DebuggerStepIntoParams) => Promise<void>;
@@ -213,6 +217,11 @@ export interface BrowserDebuggerSession {
   isPaused: () => boolean;
   onBreakpointResolved: (
     listener: (event: DebuggerBreakpointResolvedEvent) => void,
+  ) => vscode.Disposable;
+  onScriptParsed: (
+    listener: (
+      event: Pick<DebuggerScriptParsedEvent, "scriptId" | "url">,
+    ) => void,
   ) => vscode.Disposable;
 }
 
@@ -272,7 +281,10 @@ export function createBrowserDebuggerSession(
   const resumedEmitter = new SimpleEmitter<void>();
   let paused = false;
 
-  const pausedEventName = toSessionScopedEventName("Debugger.paused", sessionId);
+  const pausedEventName = toSessionScopedEventName(
+    "Debugger.paused",
+    sessionId,
+  );
   const resumedEventName = toSessionScopedEventName(
     "Debugger.resumed",
     sessionId,
@@ -324,7 +336,11 @@ export function createBrowserDebuggerSession(
     },
     evaluate: async (params) =>
       (await raceWithPauseAwareTimeout(
-        client.send("Runtime.evaluate", params, sessionId) as Promise<BrowserRuntimeEvaluateResult>,
+        client.send(
+          "Runtime.evaluate",
+          params,
+          sessionId,
+        ) as Promise<BrowserRuntimeEvaluateResult>,
         options?.evaluationTimeoutMs ?? CDP_EVALUATION_TIMEOUT_MS,
         {
           isPaused: () => paused,
@@ -368,6 +384,24 @@ export function createBrowserDebuggerSession(
         sessionId,
       );
       const handler = listener as (event: unknown) => void;
+
+      client.on(eventName, handler);
+
+      return {
+        dispose: () => {
+          removeClientListener(client, eventName, handler);
+        },
+      };
+    },
+    onScriptParsed: (listener) => {
+      const eventName = toSessionScopedEventName(
+        "Debugger.scriptParsed",
+        sessionId,
+      );
+      const handler = (event: unknown): void => {
+        const parsed = event as DebuggerScriptParsedEvent;
+        listener({ scriptId: parsed.scriptId, url: parsed.url });
+      };
 
       client.on(eventName, handler);
 

@@ -166,6 +166,7 @@ function createFakeConnection(
       onResumed: () => ({ dispose: () => undefined }),
       isPaused: () => false,
       onBreakpointResolved: () => ({ dispose: () => undefined }),
+      onScriptParsed: () => ({ dispose: () => undefined }),
     },
     evaluate,
     terminateExecution: async () => undefined,

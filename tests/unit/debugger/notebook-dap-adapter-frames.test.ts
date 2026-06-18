@@ -5,7 +5,6 @@ import type { DebugProtocol } from "@vscode/debugprotocol";
 
 import { NotebookDebugAdapter } from "../../../src/debugger/notebook-dap-adapter.js";
 import type { DebugSessionManager } from "../../../src/debugger/debug-session-manager.js";
-import type { BreakpointRegistry } from "../../../src/debugger/breakpoint-registry.js";
 import type { DesiredBreakpoint } from "../../../src/debugger/breakpoint-registry.js";
 
 interface Harness {
@@ -61,7 +60,6 @@ function createHarness(sessionManager: DebugSessionManager): Harness {
 
 function createSessionManager(
   pausedEvent: unknown,
-  registry?: BreakpointRegistry,
 ): DebugSessionManager {
   return {
     launch: async () => undefined,
@@ -73,7 +71,7 @@ function createSessionManager(
     disconnect: async () => undefined,
     terminate: async () => undefined,
     getDebuggerSession: () => undefined,
-    getBreakpointRegistry: () => registry,
+    getBreakpointRegistry: () => undefined,
     getVariableStore: () => ({
       reserve: () => 0,
       resolve: () => undefined,
@@ -82,6 +80,7 @@ function createSessionManager(
     }),
     getPausedEvent: () => pausedEvent as never,
     getPauseVersion: () => 1,
+    getScriptUrl: () => undefined,
     recordSetBreakpoints: (_url: string, _desired: DesiredBreakpoint[]) =>
       undefined,
     onDidTerminate: () => ({ dispose: () => undefined }),
@@ -145,7 +144,7 @@ test("stackTrace returns empty payload when no pause is cached", async () => {
   harness.adapter.dispose();
 });
 
-test("stackTrace resolves source from bound breakpoint when callFrame URL is empty", async () => {
+test("stackTrace resolves source from scriptId map when callFrame URL is empty on breakpoint pause", async () => {
   const pausedEvent = {
     callFrames: [
       {
@@ -160,18 +159,13 @@ test("stackTrace resolves source from bound breakpoint when callFrame URL is emp
     hitBreakpoints: ["bp-1"],
   };
 
-  const registry: BreakpointRegistry = {
-    replace: async () => [],
-    getUrlForBreakpointId: (breakpointId) =>
-      breakpointId === "bp-1"
-        ? "vscode-notebook-cell://test/cell-fallback.js"
-        : undefined,
-    resolveRuntimeBreakpoint: () => undefined,
-    clear: async () => undefined,
-    clearAll: async () => undefined,
-  };
+  const manager = createSessionManager(pausedEvent);
+  manager.getScriptUrl = (scriptId) =>
+    scriptId === "1"
+      ? "vscode-notebook-cell://test/cell-fallback.js"
+      : undefined;
 
-  const harness = createHarness(createSessionManager(pausedEvent, registry));
+  const harness = createHarness(manager);
   const response = await harness.sendRequest("stackTrace", {
     threadId: 1,
     startFrame: 0,
@@ -183,6 +177,73 @@ test("stackTrace resolves source from bound breakpoint when callFrame URL is emp
   assert.equal(
     body?.stackFrames[0]?.source?.path,
     "vscode-notebook-cell://test/cell-fallback.js",
+  );
+
+  harness.adapter.dispose();
+});
+
+test("stackTrace emits name-only source with no path when callFrame URL is empty and no breakpoint is bound", async () => {
+  const pausedEvent = {
+    callFrames: [
+      {
+        callFrameId: "cf-1",
+        functionName: "",
+        location: { scriptId: "1", lineNumber: 2, columnNumber: 0 },
+        scopeChain: [],
+        this: { type: "undefined" },
+        url: "",
+      },
+    ],
+    hitBreakpoints: [],
+  };
+
+  const harness = createHarness(createSessionManager(pausedEvent));
+  const response = await harness.sendRequest("stackTrace", {
+    threadId: 1,
+    startFrame: 0,
+    levels: 1,
+  });
+
+  assert.equal(response.success, true);
+  const body = (response as DebugProtocol.StackTraceResponse).body;
+  assert.equal(body?.stackFrames[0]?.source, undefined);
+
+  harness.adapter.dispose();
+});
+
+test("stackTrace resolves source from scriptId map when callFrame URL is empty and no breakpoint is bound", async () => {
+  const pausedEvent = {
+    callFrames: [
+      {
+        callFrameId: "cf-1",
+        functionName: "addOne",
+        location: { scriptId: "40", lineNumber: 2, columnNumber: 18 },
+        scopeChain: [],
+        this: { type: "undefined" },
+        url: "",
+      },
+    ],
+    hitBreakpoints: [],
+  };
+
+  const manager = createSessionManager(pausedEvent);
+  manager.getScriptUrl = (scriptId) =>
+    scriptId === "40"
+      ? "vscode-notebook-cell://test/test2.ipynb#W0"
+      : undefined;
+
+  const harness = createHarness(manager);
+  const response = await harness.sendRequest("stackTrace", {
+    threadId: 1,
+    startFrame: 0,
+    levels: 1,
+  });
+
+  assert.equal(response.success, true);
+  const body = (response as DebugProtocol.StackTraceResponse).body;
+  assert.equal(
+    body?.stackFrames[0]?.source?.path,
+    "vscode-notebook-cell://test/test2.ipynb#W0",
   );
 
   harness.adapter.dispose();
