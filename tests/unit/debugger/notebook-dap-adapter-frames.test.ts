@@ -3,91 +3,15 @@ import assert from "node:assert/strict";
 
 import type { DebugProtocol } from "@vscode/debugprotocol";
 
-import { NotebookDebugAdapter } from "../../../src/debugger/notebook-dap-adapter.js";
 import type { DebugSessionManager } from "../../../src/debugger/debug-session-manager.js";
-import type { DesiredBreakpoint } from "../../../src/debugger/breakpoint-registry.js";
+import { createFakeSessionManager } from "../test-utils/debug-session-manager-mock.js";
+import { createAdapterHarness } from "../test-utils/notebook-dap-harness.js";
 
-interface Harness {
-  adapter: NotebookDebugAdapter;
-  sendRequest: (
-    command: string,
-    args?: unknown,
-  ) => Promise<DebugProtocol.Response>;
-}
-
-function createHarness(sessionManager: DebugSessionManager): Harness {
-  const adapter = new NotebookDebugAdapter({ sessionManager });
-  const sentMessages: DebugProtocol.ProtocolMessage[] = [];
-  adapter.onDidSendMessage((message) => {
-    sentMessages.push(message as DebugProtocol.ProtocolMessage);
-  });
-
-  let sequence = 0;
-  const sendRequest = async (
-    command: string,
-    args?: unknown,
-  ): Promise<DebugProtocol.Response> => {
-    sequence += 1;
-    const request: DebugProtocol.Request = {
-      seq: sequence,
-      type: "request",
-      command,
-      arguments: args as Record<string, unknown> | undefined,
-    };
-    adapter.handleMessage(request);
-
-    for (let index = 0; index < 30; index += 1) {
-      const response = sentMessages.find((message) => {
-        if (message.type !== "response") {
-          return false;
-        }
-
-        return (message as DebugProtocol.Response).request_seq === sequence;
-      }) as DebugProtocol.Response | undefined;
-
-      if (response) {
-        return response;
-      }
-
-      await Promise.resolve();
-    }
-
-    throw new Error(`No response captured for ${command}`);
-  };
-
-  return { adapter, sendRequest };
-}
-
-function createSessionManager(
-  pausedEvent: unknown,
-): DebugSessionManager {
-  return {
-    launch: async () => undefined,
-    resume: async () => undefined,
-    stepOver: async () => undefined,
-    stepInto: async () => undefined,
-    stepOut: async () => undefined,
-    pause: async () => undefined,
-    disconnect: async () => undefined,
-    terminate: async () => undefined,
-    getDebuggerSession: () => undefined,
-    getBreakpointRegistry: () => undefined,
-    getVariableStore: () => ({
-      reserve: () => 0,
-      resolve: () => undefined,
-      clearForPause: async () => undefined,
-      dispose: async () => undefined,
-    }),
+function createSessionManager(pausedEvent: unknown): DebugSessionManager {
+  return createFakeSessionManager({
     getPausedEvent: () => pausedEvent as never,
     getPauseVersion: () => 1,
-    getScriptUrl: () => undefined,
-    recordSetBreakpoints: (_url: string, _desired: DesiredBreakpoint[]) =>
-      undefined,
-    onDidTerminate: () => ({ dispose: () => undefined }),
-    onDidPaused: () => ({ dispose: () => undefined }),
-    onDidBreakpointResolved: () => ({ dispose: () => undefined }),
-    dispose: () => undefined,
-  };
+  });
 }
 
 test("stackTrace paginates cached paused callFrames", async () => {
@@ -112,7 +36,9 @@ test("stackTrace paginates cached paused callFrames", async () => {
     ],
   };
 
-  const harness = createHarness(createSessionManager(pausedEvent));
+  const harness = createAdapterHarness(createSessionManager(pausedEvent), {
+    maxPolls: 30,
+  });
   const response = await harness.sendRequest("stackTrace", {
     threadId: 1,
     startFrame: 1,
@@ -134,7 +60,7 @@ test("stackTrace returns empty payload when no pause is cached", async () => {
   manager.getPausedEvent = () => undefined;
   manager.getPauseVersion = () => 0;
 
-  const harness = createHarness(manager);
+  const harness = createAdapterHarness(manager, { maxPolls: 30 });
   const response = await harness.sendRequest("stackTrace", { threadId: 1 });
 
   assert.equal(response.success, true);
@@ -165,7 +91,7 @@ test("stackTrace resolves source from scriptId map when callFrame URL is empty o
       ? "vscode-notebook-cell://test/cell-fallback.js"
       : undefined;
 
-  const harness = createHarness(manager);
+  const harness = createAdapterHarness(manager, { maxPolls: 30 });
   const response = await harness.sendRequest("stackTrace", {
     threadId: 1,
     startFrame: 0,
@@ -197,7 +123,9 @@ test("stackTrace emits name-only source with no path when callFrame URL is empty
     hitBreakpoints: [],
   };
 
-  const harness = createHarness(createSessionManager(pausedEvent));
+  const harness = createAdapterHarness(createSessionManager(pausedEvent), {
+    maxPolls: 30,
+  });
   const response = await harness.sendRequest("stackTrace", {
     threadId: 1,
     startFrame: 0,
@@ -232,7 +160,7 @@ test("stackTrace resolves source from scriptId map when callFrame URL is empty a
       ? "vscode-notebook-cell://test/test2.ipynb#W0"
       : undefined;
 
-  const harness = createHarness(manager);
+  const harness = createAdapterHarness(manager, { maxPolls: 30 });
   const response = await harness.sendRequest("stackTrace", {
     threadId: 1,
     startFrame: 0,

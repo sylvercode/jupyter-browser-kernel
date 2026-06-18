@@ -3,114 +3,13 @@ import assert from "node:assert/strict";
 
 import type { DebugProtocol } from "@vscode/debugprotocol";
 
-import { NotebookDebugAdapter } from "../../../src/debugger/notebook-dap-adapter.js";
-import type { DebugSessionManager } from "../../../src/debugger/debug-session-manager.js";
-import type { DesiredBreakpoint } from "../../../src/debugger/breakpoint-registry.js";
-import type { VariableStore } from "../../../src/debugger/variable-store.js";
-
-interface Harness {
-  adapter: NotebookDebugAdapter;
-  sendRequest: (
-    command: string,
-    args?: unknown,
-  ) => Promise<DebugProtocol.Response>;
-  sentMessages: DebugProtocol.ProtocolMessage[];
-}
-
-function createHarness(sessionManager: DebugSessionManager): Harness {
-  const adapter = new NotebookDebugAdapter({ sessionManager });
-  const sentMessages: DebugProtocol.ProtocolMessage[] = [];
-
-  adapter.onDidSendMessage((message) => {
-    sentMessages.push(message as DebugProtocol.ProtocolMessage);
-  });
-
-  let sequence = 0;
-
-  const sendRequest = async (
-    command: string,
-    args?: unknown,
-  ): Promise<DebugProtocol.Response> => {
-    const requestSeq = sequence + 1;
-    sequence = requestSeq;
-
-    const request: DebugProtocol.Request = {
-      seq: requestSeq,
-      type: "request",
-      command,
-      arguments: args as Record<string, unknown> | undefined,
-    };
-
-    adapter.handleMessage(request);
-
-    for (let step = 0; step < 20; step += 1) {
-      const response = sentMessages.find((message) => {
-        if (message.type !== "response") {
-          return false;
-        }
-
-        const typedResponse = message as DebugProtocol.Response;
-        return typedResponse.request_seq === requestSeq;
-      }) as DebugProtocol.Response | undefined;
-
-      if (response) {
-        return response;
-      }
-
-      await Promise.resolve();
-    }
-
-    throw new Error(`No response captured for ${command}`);
-  };
-
-  return {
-    adapter,
-    sendRequest,
-    sentMessages,
-  };
-}
-
-function createSessionManager(
-  overrides: Partial<DebugSessionManager>,
-): DebugSessionManager {
-  const variableStore: VariableStore = {
-    reserve: () => 0,
-    resolve: () => undefined,
-    clearForPause: async () => undefined,
-    dispose: async () => undefined,
-  };
-
-  return {
-    launch: overrides.launch ?? (async () => undefined),
-    resume: overrides.resume ?? (async () => undefined),
-    stepOver: overrides.stepOver ?? (async () => undefined),
-    stepInto: overrides.stepInto ?? (async () => undefined),
-    stepOut: overrides.stepOut ?? (async () => undefined),
-    pause: overrides.pause ?? (async () => undefined),
-    disconnect: overrides.disconnect ?? (async () => undefined),
-    terminate: overrides.terminate ?? (async () => undefined),
-    getDebuggerSession: overrides.getDebuggerSession ?? (() => undefined),
-    getBreakpointRegistry: overrides.getBreakpointRegistry ?? (() => undefined),
-    getVariableStore: overrides.getVariableStore ?? (() => variableStore),
-    getPausedEvent: overrides.getPausedEvent ?? (() => undefined),
-    getPauseVersion: overrides.getPauseVersion ?? (() => 0),
-    getScriptUrl: () => undefined,
-    recordSetBreakpoints:
-      overrides.recordSetBreakpoints ??
-      ((_url: string, _desired: DesiredBreakpoint[]) => undefined),
-    onDidTerminate:
-      overrides.onDidTerminate ?? (() => ({ dispose: () => undefined })),
-    onDidPaused:
-      overrides.onDidPaused ?? (() => ({ dispose: () => undefined })),
-    onDidBreakpointResolved:
-      overrides.onDidBreakpointResolved ??
-      (() => ({ dispose: () => undefined })),
-    dispose: overrides.dispose ?? (() => undefined),
-  };
-}
+import { createFakeSessionManager } from "../test-utils/debug-session-manager-mock.js";
+import { createAdapterHarness } from "../test-utils/notebook-dap-harness.js";
 
 test("initialize returns expected capability snapshot", async () => {
-  const harness = createHarness(createSessionManager({}));
+  const harness = createAdapterHarness(createFakeSessionManager(), {
+    maxPolls: 20,
+  });
 
   const response = await harness.sendRequest("initialize", {
     adapterID: "jupyter-browser-kernel",
@@ -135,14 +34,15 @@ test("initialize returns expected capability snapshot", async () => {
 });
 
 test("launch failure returns ErrorResponse with localized message", async () => {
-  const harness = createHarness(
-    createSessionManager({
+  const harness = createAdapterHarness(
+    createFakeSessionManager({
       launch: async () => {
         throw new Error(
           "Cannot start debug session: connect to a browser target first.",
         );
       },
     }),
+    { maxPolls: 20 },
   );
 
   const response = await harness.sendRequest("launch", {});
@@ -154,7 +54,9 @@ test("launch failure returns ErrorResponse with localized message", async () => 
 });
 
 test("threads returns the single notebook-cells thread", async () => {
-  const harness = createHarness(createSessionManager({}));
+  const harness = createAdapterHarness(createFakeSessionManager(), {
+    maxPolls: 20,
+  });
 
   const response = await harness.sendRequest("threads", {});
 
@@ -170,12 +72,13 @@ test("threads returns the single notebook-cells thread", async () => {
 test("terminate emits terminated event so one stop cleanly ends session", async () => {
   let terminateCalls = 0;
 
-  const harness = createHarness(
-    createSessionManager({
+  const harness = createAdapterHarness(
+    createFakeSessionManager({
       terminate: async () => {
         terminateCalls += 1;
       },
     }),
+    { maxPolls: 20 },
   );
 
   const response = await harness.sendRequest("terminate", {});
@@ -197,13 +100,14 @@ test("terminate emits terminated event so one stop cleanly ends session", async 
 test("connection-lost followed by terminate emits terminated event exactly once", async () => {
   let terminationListener: ((reason: "connection-lost") => void) | undefined;
 
-  const harness = createHarness(
-    createSessionManager({
+  const harness = createAdapterHarness(
+    createFakeSessionManager({
       onDidTerminate: (listener) => {
         terminationListener = listener;
         return { dispose: () => undefined };
       },
     }),
+    { maxPolls: 20 },
   );
 
   assert.ok(terminationListener, "adapter must subscribe to onDidTerminate");
@@ -228,8 +132,8 @@ test("manager paused notification emits stopped event", () => {
     | ((event: { reason: string; hitBreakpoints?: string[] }) => void)
     | undefined;
 
-  const harness = createHarness(
-    createSessionManager({
+  const harness = createAdapterHarness(
+    createFakeSessionManager({
       onDidPaused: (listener) => {
         pausedListener = listener as (event: {
           reason: string;
@@ -238,6 +142,7 @@ test("manager paused notification emits stopped event", () => {
         return { dispose: () => undefined };
       },
     }),
+    { maxPolls: 20 },
   );
 
   pausedListener?.({ reason: "other", hitBreakpoints: ["bp-1"] });
@@ -258,12 +163,13 @@ test("manager paused notification emits stopped event", () => {
 test("continue request resumes manager and emits continued event", async () => {
   let resumeCalls = 0;
 
-  const harness = createHarness(
-    createSessionManager({
+  const harness = createAdapterHarness(
+    createFakeSessionManager({
       resume: async () => {
         resumeCalls += 1;
       },
     }),
+    { maxPolls: 20 },
   );
 
   const response = await harness.sendRequest("continue", { threadId: 1 });

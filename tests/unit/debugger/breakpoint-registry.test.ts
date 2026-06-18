@@ -6,6 +6,8 @@ import {
   type DesiredBreakpoint,
 } from "../../../src/debugger/breakpoint-registry.js";
 import type { BrowserDebuggerSession } from "../../../src/transport/browser-connect.js";
+import { createFakeDebuggerSession } from "../test-utils/browser-debugger-session-mock.js";
+import { createLocalizeMock } from "../test-utils/localize-mock.js";
 
 interface SessionState {
   setCalls: Array<{
@@ -32,9 +34,7 @@ function createState(overrides?: Partial<SessionState>): SessionState {
 }
 
 function createSession(state: SessionState): BrowserDebuggerSession {
-  return {
-    enable: async () => undefined,
-    disable: async () => undefined,
+  return createFakeDebuggerSession({
     setBreakpointByUrl: async (params) => {
       state.setCalls.push({
         url: params.url,
@@ -67,30 +67,10 @@ function createSession(state: SessionState): BrowserDebuggerSession {
         throw new Error("remove failed");
       }
     },
-    getProperties: async () => ({ result: [] }),
-    evaluateOnCallFrame: async () => ({ result: { type: "undefined" } }),
-    releaseObject: async () => undefined,
-    evaluate: async () => ({ result: { type: "undefined" } }),
-    resume: async () => undefined,
-    stepOver: async () => undefined,
-    stepInto: async () => undefined,
-    stepOut: async () => undefined,
-    pause: async () => undefined,
-    onPaused: () => ({ dispose: () => undefined }),
-    onResumed: () => ({ dispose: () => undefined }),
-    isPaused: () => false,
-    onBreakpointResolved: () => ({ dispose: () => undefined }),
-    onScriptParsed: () => ({ dispose: () => undefined }),
-  };
+  });
 }
 
-const localize = ((message: string, ...args: unknown[]): string => {
-  let rendered = message;
-  for (const [index, value] of args.entries()) {
-    rendered = rendered.replace(`{${index}}`, String(value));
-  }
-  return rendered;
-}) as (typeof import("vscode"))["l10n"]["t"];
+const localize = createLocalizeMock() as (typeof import("vscode"))["l10n"]["t"];
 
 test("replace with empty current and three desired adds all breakpoints", async () => {
   const state = createState();

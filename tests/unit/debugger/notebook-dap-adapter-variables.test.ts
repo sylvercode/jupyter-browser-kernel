@@ -3,62 +3,10 @@ import assert from "node:assert/strict";
 
 import type { DebugProtocol } from "@vscode/debugprotocol";
 
-import { NotebookDebugAdapter } from "../../../src/debugger/notebook-dap-adapter.js";
-import type { DebugSessionManager } from "../../../src/debugger/debug-session-manager.js";
-import type { DesiredBreakpoint } from "../../../src/debugger/breakpoint-registry.js";
 import type { VariableStore } from "../../../src/debugger/variable-store.js";
-
-function createHarness(sessionManager: DebugSessionManager): {
-  adapter: NotebookDebugAdapter;
-  sendRequest: (
-    command: string,
-    args?: unknown,
-  ) => Promise<DebugProtocol.Response>;
-} {
-  const adapter = new NotebookDebugAdapter({ sessionManager });
-  const sentMessages: DebugProtocol.ProtocolMessage[] = [];
-  adapter.onDidSendMessage((message) => {
-    sentMessages.push(message as DebugProtocol.ProtocolMessage);
-  });
-
-  let sequence = 0;
-
-  const sendRequest = async (
-    command: string,
-    args?: unknown,
-  ): Promise<DebugProtocol.Response> => {
-    sequence += 1;
-
-    const request: DebugProtocol.Request = {
-      seq: sequence,
-      type: "request",
-      command,
-      arguments: args as Record<string, unknown> | undefined,
-    };
-
-    adapter.handleMessage(request);
-
-    for (let index = 0; index < 40; index += 1) {
-      const response = sentMessages.find((message) => {
-        if (message.type !== "response") {
-          return false;
-        }
-
-        return (message as DebugProtocol.Response).request_seq === sequence;
-      }) as DebugProtocol.Response | undefined;
-
-      if (response) {
-        return response;
-      }
-
-      await Promise.resolve();
-    }
-
-    throw new Error(`No response captured for ${command}`);
-  };
-
-  return { adapter, sendRequest };
-}
+import { createFakeDebuggerSession } from "../test-utils/browser-debugger-session-mock.js";
+import { createFakeSessionManager } from "../test-utils/debug-session-manager-mock.js";
+import { createAdapterHarness } from "../test-utils/notebook-dap-harness.js";
 
 test("variables resolves properties and allocates child handles", async () => {
   const getPropertiesCalls: Array<{ objectId: string }> = [];
@@ -84,67 +32,33 @@ test("variables resolves properties and allocates child handles", async () => {
     dispose: async () => undefined,
   };
 
-  const manager: DebugSessionManager = {
-    launch: async () => undefined,
-    resume: async () => undefined,
-    stepOver: async () => undefined,
-    stepInto: async () => undefined,
-    stepOut: async () => undefined,
-    pause: async () => undefined,
-    disconnect: async () => undefined,
-    terminate: async () => undefined,
-    getDebuggerSession: () => ({
-      enable: async () => undefined,
-      disable: async () => undefined,
-      setBreakpointByUrl: async () => ({ breakpointId: "bp", locations: [] }),
-      removeBreakpoint: async () => undefined,
-      getProperties: async ({ objectId }) => {
-        getPropertiesCalls.push({ objectId });
-        return {
-          result: [
-            {
-              name: "x",
-              value: { type: "number", value: 2 },
-            },
-            {
-              name: "obj",
-              value: {
-                type: "object",
-                objectId: "child-obj",
-                description: "Object",
+  const manager = createFakeSessionManager({
+    getDebuggerSession: () =>
+      createFakeDebuggerSession({
+        getProperties: async ({ objectId }) => {
+          getPropertiesCalls.push({ objectId });
+          return {
+            result: [
+              {
+                name: "x",
+                value: { type: "number", value: 2 },
               },
-            },
-          ],
-        } as never;
-      },
-      evaluateOnCallFrame: async () => ({ result: { type: "undefined" } }),
-      releaseObject: async () => undefined,
-      evaluate: async () => ({ result: { type: "undefined" } }),
-      resume: async () => undefined,
-      stepOver: async () => undefined,
-      stepInto: async () => undefined,
-      stepOut: async () => undefined,
-      pause: async () => undefined,
-      onPaused: () => ({ dispose: () => undefined }),
-      onResumed: () => ({ dispose: () => undefined }),
-      isPaused: () => false,
-      onBreakpointResolved: () => ({ dispose: () => undefined }),
-      onScriptParsed: () => ({ dispose: () => undefined }),
-    }),
-    getBreakpointRegistry: () => undefined,
+              {
+                name: "obj",
+                value: {
+                  type: "object",
+                  objectId: "child-obj",
+                  description: "Object",
+                },
+              },
+            ],
+          } as never;
+        },
+      }),
     getVariableStore: () => variableStore,
-    getPausedEvent: () => undefined,
-    getPauseVersion: () => 0,
-    getScriptUrl: () => undefined,
-    recordSetBreakpoints: (_url: string, _desired: DesiredBreakpoint[]) =>
-      undefined,
-    onDidTerminate: () => ({ dispose: () => undefined }),
-    onDidPaused: () => ({ dispose: () => undefined }),
-    onDidBreakpointResolved: () => ({ dispose: () => undefined }),
-    dispose: () => undefined,
-  };
+  });
 
-  const harness = createHarness(manager);
+  const harness = createAdapterHarness(manager, { maxPolls: 40 });
 
   const response = await harness.sendRequest("variables", {
     variablesReference: 1000,
@@ -177,49 +91,15 @@ test("variables truncates oversized page requests with marker", async () => {
     dispose: async () => undefined,
   };
 
-  const manager: DebugSessionManager = {
-    launch: async () => undefined,
-    resume: async () => undefined,
-    stepOver: async () => undefined,
-    stepInto: async () => undefined,
-    stepOut: async () => undefined,
-    pause: async () => undefined,
-    disconnect: async () => undefined,
-    terminate: async () => undefined,
-    getDebuggerSession: () => ({
-      enable: async () => undefined,
-      disable: async () => undefined,
-      setBreakpointByUrl: async () => ({ breakpointId: "bp", locations: [] }),
-      removeBreakpoint: async () => undefined,
-      getProperties: async () => ({ result: descriptors as never[] }),
-      evaluateOnCallFrame: async () => ({ result: { type: "undefined" } }),
-      releaseObject: async () => undefined,
-      evaluate: async () => ({ result: { type: "undefined" } }),
-      resume: async () => undefined,
-      stepOver: async () => undefined,
-      stepInto: async () => undefined,
-      stepOut: async () => undefined,
-      pause: async () => undefined,
-      onPaused: () => ({ dispose: () => undefined }),
-      onResumed: () => ({ dispose: () => undefined }),
-      isPaused: () => false,
-      onBreakpointResolved: () => ({ dispose: () => undefined }),
-      onScriptParsed: () => ({ dispose: () => undefined }),
-    }),
-    getBreakpointRegistry: () => undefined,
+  const manager = createFakeSessionManager({
+    getDebuggerSession: () =>
+      createFakeDebuggerSession({
+        getProperties: async () => ({ result: descriptors as never[] }),
+      }),
     getVariableStore: () => variableStore,
-    getPausedEvent: () => undefined,
-    getPauseVersion: () => 0,
-    getScriptUrl: () => undefined,
-    recordSetBreakpoints: (_url: string, _desired: DesiredBreakpoint[]) =>
-      undefined,
-    onDidTerminate: () => ({ dispose: () => undefined }),
-    onDidPaused: () => ({ dispose: () => undefined }),
-    onDidBreakpointResolved: () => ({ dispose: () => undefined }),
-    dispose: () => undefined,
-  };
+  });
 
-  const harness = createHarness(manager);
+  const harness = createAdapterHarness(manager, { maxPolls: 40 });
 
   const response = await harness.sendRequest("variables", {
     variablesReference: 1000,

@@ -5,6 +5,7 @@ import { createDebugSessionManager } from "../../../src/debugger/debug-session-m
 import type { DesiredBreakpoint } from "../../../src/debugger/breakpoint-registry.js";
 import { createConnectionStateStore } from "../../../src/transport/connection-state.js";
 import type { BrowserDebuggerSession } from "../../../src/transport/browser-connect.js";
+import { createFakeDebuggerSession } from "../test-utils/browser-debugger-session-mock.js";
 
 interface FakeSessionState {
   sequence: string[];
@@ -33,10 +34,10 @@ function createState(overrides?: Partial<FakeSessionState>): FakeSessionState {
   };
 }
 
-function createFakeDebuggerSession(
+function createStateTrackingSession(
   state: FakeSessionState,
 ): BrowserDebuggerSession {
-  return {
+  return createFakeDebuggerSession({
     enable: async () => {
       state.sequence.push("enable");
       if (state.failEnable) {
@@ -70,23 +71,6 @@ function createFakeDebuggerSession(
       state.sequence.push("removeBreakpoint");
       state.removeBreakpointCalls.push(breakpointId);
     },
-    getProperties: async () => ({ result: [] }),
-    evaluateOnCallFrame: async () => ({
-      result: {
-        type: "undefined",
-      },
-    }),
-    releaseObject: async () => undefined,
-    evaluate: async () => ({
-      result: {
-        type: "undefined",
-      },
-    }),
-    resume: async () => undefined,
-    stepOver: async () => undefined,
-    stepInto: async () => undefined,
-    stepOut: async () => undefined,
-    pause: async () => undefined,
     onPaused: (listener) => {
       state.sequence.push("onPaused");
       state.pauseListener = listener as (event: unknown) => void;
@@ -106,7 +90,6 @@ function createFakeDebuggerSession(
         },
       };
     },
-    isPaused: () => false,
     onBreakpointResolved: (listener) => {
       state.sequence.push("onBreakpointResolved");
       state.breakpointResolvedListener = listener as (event: {
@@ -124,8 +107,7 @@ function createFakeDebuggerSession(
         },
       };
     },
-    onScriptParsed: () => ({ dispose: () => undefined }),
-  };
+  });
 }
 
 test("launch enables debugger and subscribes paused listener", async () => {
@@ -134,7 +116,7 @@ test("launch enables debugger and subscribes paused listener", async () => {
   const state = createState();
 
   const manager = createDebugSessionManager({
-    getDebuggerSession: () => createFakeDebuggerSession(state),
+    getDebuggerSession: () => createStateTrackingSession(state),
     logger: () => undefined,
   });
 
@@ -155,7 +137,7 @@ test("terminate clears registry before disabling debugger", async () => {
   const state = createState();
 
   const manager = createDebugSessionManager({
-    getDebuggerSession: () => createFakeDebuggerSession(state),
+    getDebuggerSession: () => createStateTrackingSession(state),
     logger: () => undefined,
   });
 
@@ -196,7 +178,7 @@ test("enable failure is logged and re-thrown for DAP launch path", async () => {
   const logEntries: string[] = [];
 
   const manager = createDebugSessionManager({
-    getDebuggerSession: () => createFakeDebuggerSession(state),
+    getDebuggerSession: () => createStateTrackingSession(state),
     logger: (message, error) => {
       logEntries.push(`${message} :: ${String(error)}`);
     },
@@ -218,7 +200,7 @@ test("connection-state disconnected transition emits terminated exactly once", a
   const state = createState();
 
   const manager = createDebugSessionManager({
-    getDebuggerSession: () => createFakeDebuggerSession(state),
+    getDebuggerSession: () => createStateTrackingSession(state),
     logger: () => undefined,
   });
 
@@ -250,7 +232,7 @@ test("connection lost during enable rejects launch and disables session without 
 
   const state = createState();
 
-  const baseSession = createFakeDebuggerSession(state);
+  const baseSession = createStateTrackingSession(state);
   let resolveEnable: (() => void) | undefined;
   const session = {
     ...baseSession,
@@ -303,7 +285,7 @@ test("launch creates registry and replays each cached payload once", async () =>
   const state = createState();
 
   const manager = createDebugSessionManager({
-    getDebuggerSession: () => createFakeDebuggerSession(state),
+    getDebuggerSession: () => createStateTrackingSession(state),
     logger: () => undefined,
   });
 
@@ -334,7 +316,7 @@ test("terminate survives removeBreakpoint failures and still disables", async ()
 
   const state = createState();
 
-  const base = createFakeDebuggerSession(state);
+  const base = createStateTrackingSession(state);
   const session: BrowserDebuggerSession = {
     ...base,
     removeBreakpoint: async ({ breakpointId }) => {
@@ -367,7 +349,7 @@ test("runtime breakpointResolved is propagated through manager event", async () 
 
   const state = createState();
   const manager = createDebugSessionManager({
-    getDebuggerSession: () => createFakeDebuggerSession(state),
+    getDebuggerSession: () => createStateTrackingSession(state),
     logger: () => undefined,
   });
 
@@ -401,7 +383,7 @@ test("stepOver forwards to runningSession and resolves", async () => {
   const state = createState();
   const stepCalls: string[] = [];
 
-  const base = createFakeDebuggerSession(state);
+  const base = createStateTrackingSession(state);
   const session = {
     ...base,
     stepOver: async () => {
@@ -428,7 +410,7 @@ test("stepInto forwards to runningSession and resolves", async () => {
   const state = createState();
   const stepCalls: string[] = [];
 
-  const base = createFakeDebuggerSession(state);
+  const base = createStateTrackingSession(state);
   const session = {
     ...base,
     stepInto: async () => {
@@ -455,7 +437,7 @@ test("stepOut forwards to runningSession and resolves", async () => {
   const state = createState();
   const stepCalls: string[] = [];
 
-  const base = createFakeDebuggerSession(state);
+  const base = createStateTrackingSession(state);
   const session = {
     ...base,
     stepOut: async () => {
@@ -482,7 +464,7 @@ test("pause forwards to runningSession and resolves", async () => {
   const state = createState();
   const pauseCalls: string[] = [];
 
-  const base = createFakeDebuggerSession(state);
+  const base = createStateTrackingSession(state);
   const session = {
     ...base,
     pause: async () => {

@@ -3,61 +3,27 @@ import assert from "node:assert/strict";
 
 import type { DebugProtocol } from "@vscode/debugprotocol";
 
-import { NotebookDebugAdapter } from "../../../src/debugger/notebook-dap-adapter.js";
-import type { DebugSessionManager } from "../../../src/debugger/debug-session-manager.js";
-import type { DesiredBreakpoint } from "../../../src/debugger/breakpoint-registry.js";
-import type { VariableStore } from "../../../src/debugger/variable-store.js";
+import { createFakeSessionManager } from "../test-utils/debug-session-manager-mock.js";
+import { createAdapterHarness } from "../test-utils/notebook-dap-harness.js";
 
 type PausedListener = (event: unknown) => void;
 
 interface Harness {
-  adapter: NotebookDebugAdapter;
+  adapter: ReturnType<typeof createAdapterHarness>["adapter"];
   firePaused: (event: unknown) => void;
   sentMessages: DebugProtocol.ProtocolMessage[];
 }
 
 function createHarness(): Harness {
   let pausedListener: PausedListener | undefined;
-
-  const variableStore: VariableStore = {
-    reserve: () => 0,
-    resolve: () => undefined,
-    clearForPause: async () => undefined,
-    dispose: async () => undefined,
-  };
-
-  const sessionManager: DebugSessionManager = {
-    launch: async () => undefined,
-    resume: async () => undefined,
-    stepOver: async () => undefined,
-    stepInto: async () => undefined,
-    stepOut: async () => undefined,
-    pause: async () => undefined,
-    disconnect: async () => undefined,
-    terminate: async () => undefined,
-    getDebuggerSession: () => undefined,
-    getBreakpointRegistry: () => undefined,
-    getVariableStore: () => variableStore,
-    getPausedEvent: () => undefined,
-    getPauseVersion: () => 0,
-    getScriptUrl: () => undefined,
-    recordSetBreakpoints: (_url: string, _desired: DesiredBreakpoint[]) =>
-      undefined,
-    onDidTerminate: () => ({ dispose: () => undefined }),
-    onDidPaused: (listener) => {
-      pausedListener = listener as PausedListener;
-      return { dispose: () => undefined };
-    },
-    onDidBreakpointResolved: () => ({ dispose: () => undefined }),
-    dispose: () => undefined,
-  };
-
-  const adapter = new NotebookDebugAdapter({ sessionManager });
-  const sentMessages: DebugProtocol.ProtocolMessage[] = [];
-
-  adapter.onDidSendMessage((message) => {
-    sentMessages.push(message as DebugProtocol.ProtocolMessage);
-  });
+  const { adapter, sentMessages } = createAdapterHarness(
+    createFakeSessionManager({
+      onDidPaused: (listener) => {
+        pausedListener = listener as PausedListener;
+        return { dispose: () => undefined };
+      },
+    }),
+  );
 
   return {
     adapter,

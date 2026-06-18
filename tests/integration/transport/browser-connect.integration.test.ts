@@ -1,6 +1,5 @@
 import test, { after, afterEach, before } from "node:test";
 import assert from "node:assert/strict";
-import http from "node:http";
 import CDP from "chrome-remote-interface";
 
 import {
@@ -11,64 +10,30 @@ import {
   toSessionScopedEventName,
 } from "../../../src/transport/browser-connect.js";
 import { coreTargetProfile } from "../../../src/profile/core-target-profile.js";
-import { startHeadlessChromium } from "../helpers/headless-chromium.js";
+import {
+  startFoundryIntegrationLifecycle,
+  type FoundryIntegrationLifecycle,
+} from "../helpers/integration-app-server.js";
 
 const runIntegration = process.env.RUN_CDP_INTEGRATION === "1";
 const host = process.env.CDP_HOST ?? "127.0.0.1";
 const cdpPort = Number(process.env.CDP_PORT ?? "9222");
 const appPort = Number(process.env.CDP_APP_PORT ?? "9322");
 
-let chromiumStop: (() => Promise<void>) | undefined;
-let appServer: http.Server | undefined;
+let lifecycle: FoundryIntegrationLifecycle | undefined;
 
 before(async () => {
   if (!runIntegration) {
     return;
   }
 
-  const chromium = await startHeadlessChromium(host, cdpPort);
-  chromiumStop = chromium.stop;
-
-  appServer = http.createServer((request, response) => {
-    if (request.url === "/game") {
-      response.writeHead(200, { "content-type": "text/html" });
-      response.end("<html><body>foundry-target</body></html>");
-      return;
-    }
-
-    response.writeHead(200, { "content-type": "text/html" });
-    response.end("<html><body>generic-target</body></html>");
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    appServer?.once("error", reject);
-    appServer?.listen(appPort, host, () => {
-      resolve();
-    });
-  });
-
-  const browser = await CDP({ host, port: cdpPort });
-  await browser.Target.createTarget({ url: `http://${host}:${appPort}/game` });
-  await browser.close();
+  lifecycle = await startFoundryIntegrationLifecycle(host, cdpPort, appPort);
 });
 
 after(async () => {
   await disconnectActiveBrowserConnection();
 
-  if (chromiumStop) {
-    await chromiumStop();
-  }
-
-  await new Promise<void>((resolve) => {
-    if (!appServer) {
-      resolve();
-      return;
-    }
-
-    appServer.close(() => {
-      resolve();
-    });
-  });
+  await lifecycle?.stop();
 });
 
 afterEach(async () => {
