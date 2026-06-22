@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-02
-last_updated: 2026-06-14
+last_updated: 2026-06-22
 project: jupyter-browser-kernel
 project_key: NOKEY
 tracking_system: file-system
@@ -120,6 +120,6 @@ development_status:
   10-1-register-and-bootstrap-notebook-cell-dap-session: done
   10-2-verify-and-bind-notebook-cell-breakpoints-in-vs-code-ui: done
   10-3-surface-stack-frames-scopes-and-variables-in-vs-code: done
-  10-4-implement-stepping-controls-and-pause-lifecycle-synchronization: ready-for-dev
+  10-4-implement-stepping-controls-and-pause-lifecycle-synchronization: done
   10-5-validate-dual-client-coexistence-and-reliability: ready-for-dev
   epic-10-retrospective: optional

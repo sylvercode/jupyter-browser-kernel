@@ -6,35 +6,16 @@ import {
   executeCell,
 } from "../../../src/kernel/execution-kernel.js";
 import type { ActiveBrowserConnection } from "../../../src/transport/browser-connect.js";
+import { createFakeDebuggerSession } from "../test-utils/browser-debugger-session-mock.js";
+import {
+  createCancellationHarness,
+  type CancellationTokenLike,
+} from "../test-utils/cancellation-harness.js";
+import {
+  FakeNotebookCellOutput,
+  FakeNotebookCellOutputItem,
+} from "../test-utils/fake-notebook-output.js";
 import { createLocalizeMock } from "../test-utils/localize-mock.js";
-
-class FakeNotebookCellOutputItem {
-  public readonly kind: "text" | "error";
-  public readonly value: string | Error;
-  public readonly mime?: string;
-
-  private constructor(
-    kind: "text" | "error",
-    value: string | Error,
-    mime?: string,
-  ) {
-    this.kind = kind;
-    this.value = value;
-    this.mime = mime;
-  }
-
-  static text(value: string, mime: string): FakeNotebookCellOutputItem {
-    return new FakeNotebookCellOutputItem("text", value, mime);
-  }
-
-  static error(error: Error): FakeNotebookCellOutputItem {
-    return new FakeNotebookCellOutputItem("error", error);
-  }
-}
-
-class FakeNotebookCellOutput {
-  constructor(public readonly items: FakeNotebookCellOutputItem[]) {}
-}
 
 interface RecordedExecution {
   startedAt?: number;
@@ -49,10 +30,7 @@ interface RecordedNotebookExecution {
   end: (success: boolean, endTime: number) => void;
   replaceOutput: (outputs: FakeNotebookCellOutput[]) => Promise<void>;
   executionOrder?: number;
-  token: {
-    readonly isCancellationRequested: boolean;
-    onCancellationRequested: (listener: () => void) => { dispose: () => void };
-  };
+  token: CancellationTokenLike;
 }
 
 interface ExecutionRecorder {
@@ -71,23 +49,13 @@ function createExecutionRecorder(options?: {
     outputs: [],
   };
 
-  let isCancellationRequested = options?.isCancellationRequested ?? false;
-  const cancellationListeners = new Set<() => void>();
-
-  const token = {
-    get isCancellationRequested(): boolean {
-      return isCancellationRequested;
-    },
-    onCancellationRequested: (listener: () => void) => {
-      cancellationListeners.add(listener);
-
-      return {
-        dispose: () => {
-          cancellationListeners.delete(listener);
-        },
-      };
-    },
-  };
+  const cancellation = options?.isCancellationRequested
+    ? (() => {
+        const harness = createCancellationHarness();
+        harness.cancel();
+        return harness;
+      })()
+    : createCancellationHarness();
 
   const notebookExecution: RecordedNotebookExecution = {
     start: (startTime: number) => {
@@ -101,18 +69,13 @@ function createExecutionRecorder(options?: {
       execution.outputs = outputs;
     },
     executionOrder: undefined as number | undefined,
-    token,
+    token: cancellation.token,
   };
 
   return {
     execution,
     notebookExecution,
-    cancel: () => {
-      isCancellationRequested = true;
-      for (const listener of cancellationListeners) {
-        listener();
-      }
-    },
+    cancel: cancellation.cancel,
   };
 }
 
@@ -145,24 +108,7 @@ function createFakeConnection(
     targetId: "target-1",
     sessionId: "session-1",
     endpoint: { host: "localhost", port: 9222 },
-    debugger: {
-      enable: async () => undefined,
-      disable: async () => undefined,
-      setBreakpointByUrl: async () => ({
-        breakpointId: "bp-1",
-        locations: [],
-      }),
-      removeBreakpoint: async () => undefined,
-      getProperties: async () => ({ result: [] }),
-      evaluateOnCallFrame: async () => ({ result: { type: "undefined" } }),
-      releaseObject: async () => undefined,
-      evaluate: async () => ({ result: { type: "undefined" } }),
-      resume: async () => undefined,
-      onPaused: () => ({ dispose: () => undefined }),
-      onResumed: () => ({ dispose: () => undefined }),
-      isPaused: () => false,
-      onBreakpointResolved: () => ({ dispose: () => undefined }),
-    },
+    debugger: createFakeDebuggerSession(),
     evaluate,
     terminateExecution: async () => undefined,
     close: async () => undefined,

@@ -3,76 +3,14 @@ import assert from "node:assert/strict";
 
 import type { DebugProtocol } from "@vscode/debugprotocol";
 
-import { NotebookDebugAdapter } from "../../../src/debugger/notebook-dap-adapter.js";
 import type { DebugSessionManager } from "../../../src/debugger/debug-session-manager.js";
 import type {
   BreakpointRegistry,
   BoundBreakpoint,
   DesiredBreakpoint,
 } from "../../../src/debugger/breakpoint-registry.js";
-import type { VariableStore } from "../../../src/debugger/variable-store.js";
-
-interface Harness {
-  adapter: NotebookDebugAdapter;
-  sentMessages: DebugProtocol.ProtocolMessage[];
-  sendRequest: (
-    command: string,
-    args?: unknown,
-  ) => Promise<DebugProtocol.Response>;
-}
-
-function createHarness(sessionManager: DebugSessionManager): Harness {
-  const adapter = new NotebookDebugAdapter({ sessionManager });
-  const sentMessages: DebugProtocol.ProtocolMessage[] = [];
-
-  adapter.onDidSendMessage((message) => {
-    sentMessages.push(message as DebugProtocol.ProtocolMessage);
-  });
-
-  let sequence = 0;
-
-  const sendRequest = async (
-    command: string,
-    args?: unknown,
-  ): Promise<DebugProtocol.Response> => {
-    const requestSeq = sequence + 1;
-    sequence = requestSeq;
-
-    const request: DebugProtocol.Request = {
-      seq: requestSeq,
-      type: "request",
-      command,
-      arguments: args as Record<string, unknown> | undefined,
-    };
-
-    adapter.handleMessage(request);
-
-    for (let step = 0; step < 30; step += 1) {
-      const response = sentMessages.find((message) => {
-        if (message.type !== "response") {
-          return false;
-        }
-
-        const typedResponse = message as DebugProtocol.Response;
-        return typedResponse.request_seq === requestSeq;
-      }) as DebugProtocol.Response | undefined;
-
-      if (response) {
-        return response;
-      }
-
-      await Promise.resolve();
-    }
-
-    throw new Error(`No response captured for ${command}`);
-  };
-
-  return {
-    adapter,
-    sentMessages,
-    sendRequest,
-  };
-}
+import { createFakeSessionManager } from "../test-utils/debug-session-manager-mock.js";
+import { createAdapterHarness } from "../test-utils/notebook-dap-harness.js";
 
 interface ManagerState {
   recorded: Array<{ url: string; desired: DesiredBreakpoint[] }>;
@@ -82,31 +20,12 @@ function createSessionManager(
   state: ManagerState,
   registry: BreakpointRegistry | undefined,
 ): DebugSessionManager {
-  const variableStore: VariableStore = {
-    reserve: () => 0,
-    resolve: () => undefined,
-    clearForPause: async () => undefined,
-    dispose: async () => undefined,
-  };
-
-  return {
-    launch: async () => undefined,
-    resume: async () => undefined,
-    disconnect: async () => undefined,
-    terminate: async () => undefined,
-    getDebuggerSession: () => undefined,
+  return createFakeSessionManager({
     getBreakpointRegistry: () => registry,
-    getVariableStore: () => variableStore,
-    getPausedEvent: () => undefined,
-    getPauseVersion: () => 0,
     recordSetBreakpoints: (url, desired) => {
       state.recorded.push({ url, desired });
     },
-    onDidTerminate: () => ({ dispose: () => undefined }),
-    onDidPaused: () => ({ dispose: () => undefined }),
-    onDidBreakpointResolved: () => ({ dispose: () => undefined }),
-    dispose: () => undefined,
-  };
+  });
 }
 
 function createRegistry(
@@ -142,7 +61,9 @@ test("setBreakpoints resolves notebook URI from source.path", async () => {
     }));
   });
 
-  const harness = createHarness(createSessionManager(state, registry));
+  const harness = createAdapterHarness(createSessionManager(state, registry), {
+    maxPolls: 30,
+  });
 
   const response = await harness.sendRequest("setBreakpoints", {
     source: {
@@ -161,7 +82,9 @@ test("setBreakpoints resolves notebook URI from source.path", async () => {
 
 test("setBreakpoints returns unverified entries when debug session is not active", async () => {
   const state: ManagerState = { recorded: [] };
-  const harness = createHarness(createSessionManager(state, undefined));
+  const harness = createAdapterHarness(createSessionManager(state, undefined), {
+    maxPolls: 30,
+  });
 
   const response = await harness.sendRequest("setBreakpoints", {
     source: {
@@ -209,7 +132,9 @@ test("setBreakpoints forwards conditional expressions to registry", async () => 
     }));
   });
 
-  const harness = createHarness(createSessionManager(state, registry));
+  const harness = createAdapterHarness(createSessionManager(state, registry), {
+    maxPolls: 30,
+  });
 
   const response = await harness.sendRequest("setBreakpoints", {
     source: {
@@ -242,7 +167,9 @@ test("logpoint entries report deferred-support info message", async () => {
     }));
   });
 
-  const harness = createHarness(createSessionManager(state, registry));
+  const harness = createAdapterHarness(createSessionManager(state, registry), {
+    maxPolls: 30,
+  });
 
   const response = await harness.sendRequest("setBreakpoints", {
     source: {
@@ -264,7 +191,9 @@ test("logpoint entries report deferred-support info message", async () => {
 
 test("initialize capability snapshot includes breakpoint flags", async () => {
   const state: ManagerState = { recorded: [] };
-  const harness = createHarness(createSessionManager(state, undefined));
+  const harness = createAdapterHarness(createSessionManager(state, undefined), {
+    maxPolls: 30,
+  });
 
   const response = await harness.sendRequest("initialize", {
     adapterID: "jupyter-browser-kernel",
@@ -305,7 +234,7 @@ test("adapter emits breakpoint changed event when manager reports runtime resolu
     return { dispose: () => undefined };
   };
 
-  const harness = createHarness(manager);
+  const harness = createAdapterHarness(manager, { maxPolls: 30 });
 
   breakpointResolvedListener?.({
     url: "vscode-notebook-cell://test/cell-5.js",

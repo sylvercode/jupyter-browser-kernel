@@ -5,6 +5,7 @@ import { createDebugSessionManager } from "../../../src/debugger/debug-session-m
 import type { DesiredBreakpoint } from "../../../src/debugger/breakpoint-registry.js";
 import { createConnectionStateStore } from "../../../src/transport/connection-state.js";
 import type { BrowserDebuggerSession } from "../../../src/transport/browser-connect.js";
+import { createFakeDebuggerSession } from "../test-utils/browser-debugger-session-mock.js";
 
 interface FakeSessionState {
   sequence: string[];
@@ -33,10 +34,10 @@ function createState(overrides?: Partial<FakeSessionState>): FakeSessionState {
   };
 }
 
-function createFakeDebuggerSession(
+function createStateTrackingSession(
   state: FakeSessionState,
 ): BrowserDebuggerSession {
-  return {
+  return createFakeDebuggerSession({
     enable: async () => {
       state.sequence.push("enable");
       if (state.failEnable) {
@@ -70,19 +71,6 @@ function createFakeDebuggerSession(
       state.sequence.push("removeBreakpoint");
       state.removeBreakpointCalls.push(breakpointId);
     },
-    getProperties: async () => ({ result: [] }),
-    evaluateOnCallFrame: async () => ({
-      result: {
-        type: "undefined",
-      },
-    }),
-    releaseObject: async () => undefined,
-    evaluate: async () => ({
-      result: {
-        type: "undefined",
-      },
-    }),
-    resume: async () => undefined,
     onPaused: (listener) => {
       state.sequence.push("onPaused");
       state.pauseListener = listener as (event: unknown) => void;
@@ -102,7 +90,6 @@ function createFakeDebuggerSession(
         },
       };
     },
-    isPaused: () => false,
     onBreakpointResolved: (listener) => {
       state.sequence.push("onBreakpointResolved");
       state.breakpointResolvedListener = listener as (event: {
@@ -120,7 +107,7 @@ function createFakeDebuggerSession(
         },
       };
     },
-  };
+  });
 }
 
 test("launch enables debugger and subscribes paused listener", async () => {
@@ -129,7 +116,7 @@ test("launch enables debugger and subscribes paused listener", async () => {
   const state = createState();
 
   const manager = createDebugSessionManager({
-    getDebuggerSession: () => createFakeDebuggerSession(state),
+    getDebuggerSession: () => createStateTrackingSession(state),
     logger: () => undefined,
   });
 
@@ -150,7 +137,7 @@ test("terminate clears registry before disabling debugger", async () => {
   const state = createState();
 
   const manager = createDebugSessionManager({
-    getDebuggerSession: () => createFakeDebuggerSession(state),
+    getDebuggerSession: () => createStateTrackingSession(state),
     logger: () => undefined,
   });
 
@@ -191,7 +178,7 @@ test("enable failure is logged and re-thrown for DAP launch path", async () => {
   const logEntries: string[] = [];
 
   const manager = createDebugSessionManager({
-    getDebuggerSession: () => createFakeDebuggerSession(state),
+    getDebuggerSession: () => createStateTrackingSession(state),
     logger: (message, error) => {
       logEntries.push(`${message} :: ${String(error)}`);
     },
@@ -213,7 +200,7 @@ test("connection-state disconnected transition emits terminated exactly once", a
   const state = createState();
 
   const manager = createDebugSessionManager({
-    getDebuggerSession: () => createFakeDebuggerSession(state),
+    getDebuggerSession: () => createStateTrackingSession(state),
     logger: () => undefined,
   });
 
@@ -245,7 +232,7 @@ test("connection lost during enable rejects launch and disables session without 
 
   const state = createState();
 
-  const baseSession = createFakeDebuggerSession(state);
+  const baseSession = createStateTrackingSession(state);
   let resolveEnable: (() => void) | undefined;
   const session = {
     ...baseSession,
@@ -298,7 +285,7 @@ test("launch creates registry and replays each cached payload once", async () =>
   const state = createState();
 
   const manager = createDebugSessionManager({
-    getDebuggerSession: () => createFakeDebuggerSession(state),
+    getDebuggerSession: () => createStateTrackingSession(state),
     logger: () => undefined,
   });
 
@@ -329,7 +316,7 @@ test("terminate survives removeBreakpoint failures and still disables", async ()
 
   const state = createState();
 
-  const base = createFakeDebuggerSession(state);
+  const base = createStateTrackingSession(state);
   const session: BrowserDebuggerSession = {
     ...base,
     removeBreakpoint: async ({ breakpointId }) => {
@@ -362,7 +349,7 @@ test("runtime breakpointResolved is propagated through manager event", async () 
 
   const state = createState();
   const manager = createDebugSessionManager({
-    getDebuggerSession: () => createFakeDebuggerSession(state),
+    getDebuggerSession: () => createStateTrackingSession(state),
     logger: () => undefined,
   });
 
@@ -387,5 +374,173 @@ test("runtime breakpointResolved is propagated through manager event", async () 
   ]);
 
   subscription.dispose();
+  manager.dispose();
+});
+
+test("stepOver forwards to runningSession and resolves", async () => {
+  createConnectionStateStore();
+
+  const state = createState();
+  const stepCalls: string[] = [];
+
+  const base = createStateTrackingSession(state);
+  const session = {
+    ...base,
+    stepOver: async () => {
+      stepCalls.push("stepOver");
+    },
+  };
+
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () => session,
+    logger: () => undefined,
+  });
+
+  await manager.launch();
+  await manager.stepOver();
+
+  assert.deepEqual(stepCalls, ["stepOver"]);
+
+  manager.dispose();
+});
+
+test("stepInto forwards to runningSession and resolves", async () => {
+  createConnectionStateStore();
+
+  const state = createState();
+  const stepCalls: string[] = [];
+
+  const base = createStateTrackingSession(state);
+  const session = {
+    ...base,
+    stepInto: async () => {
+      stepCalls.push("stepInto");
+    },
+  };
+
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () => session,
+    logger: () => undefined,
+  });
+
+  await manager.launch();
+  await manager.stepInto();
+
+  assert.deepEqual(stepCalls, ["stepInto"]);
+
+  manager.dispose();
+});
+
+test("stepOut forwards to runningSession and resolves", async () => {
+  createConnectionStateStore();
+
+  const state = createState();
+  const stepCalls: string[] = [];
+
+  const base = createStateTrackingSession(state);
+  const session = {
+    ...base,
+    stepOut: async () => {
+      stepCalls.push("stepOut");
+    },
+  };
+
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () => session,
+    logger: () => undefined,
+  });
+
+  await manager.launch();
+  await manager.stepOut();
+
+  assert.deepEqual(stepCalls, ["stepOut"]);
+
+  manager.dispose();
+});
+
+test("pause forwards to runningSession and resolves", async () => {
+  createConnectionStateStore();
+
+  const state = createState();
+  const pauseCalls: string[] = [];
+
+  const base = createStateTrackingSession(state);
+  const session = {
+    ...base,
+    pause: async () => {
+      pauseCalls.push("pause");
+    },
+  };
+
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () => session,
+    logger: () => undefined,
+  });
+
+  await manager.launch();
+  await manager.pause();
+
+  assert.deepEqual(pauseCalls, ["pause"]);
+
+  manager.dispose();
+});
+
+test("stepOver no-ops when no session is running", async () => {
+  createConnectionStateStore();
+
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () => undefined,
+    logger: () => undefined,
+  });
+
+  await assert.doesNotReject(async () => {
+    await manager.stepOver();
+  });
+
+  manager.dispose();
+});
+
+test("stepInto no-ops when no session is running", async () => {
+  createConnectionStateStore();
+
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () => undefined,
+    logger: () => undefined,
+  });
+
+  await assert.doesNotReject(async () => {
+    await manager.stepInto();
+  });
+
+  manager.dispose();
+});
+
+test("stepOut no-ops when no session is running", async () => {
+  createConnectionStateStore();
+
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () => undefined,
+    logger: () => undefined,
+  });
+
+  await assert.doesNotReject(async () => {
+    await manager.stepOut();
+  });
+
+  manager.dispose();
+});
+
+test("pause no-ops when no session is running", async () => {
+  createConnectionStateStore();
+
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () => undefined,
+    logger: () => undefined,
+  });
+
+  await assert.doesNotReject(async () => {
+    await manager.pause();
+  });
+
   manager.dispose();
 });

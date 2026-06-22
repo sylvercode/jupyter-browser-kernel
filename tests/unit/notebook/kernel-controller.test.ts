@@ -5,45 +5,18 @@ import {
   registerKernelController,
   resetExecutionOrderForTests,
 } from "../../../src/notebook/kernel-controller.js";
+import { createCancellationToken } from "../test-utils/cancellation-harness.js";
+import {
+  FakeNotebookCellOutput,
+  FakeNotebookCellOutputItem,
+} from "../test-utils/fake-notebook-output.js";
 import { createLocalizeMock } from "../test-utils/localize-mock.js";
-
-class FakeNotebookCellOutputItem {
-  private constructor(
-    public readonly kind: "text" | "error",
-    public readonly value: string | Error,
-    public readonly mime?: string,
-  ) {}
-
-  static text(value: string, mime: string): FakeNotebookCellOutputItem {
-    return new FakeNotebookCellOutputItem("text", value, mime);
-  }
-
-  static error(error: Error): FakeNotebookCellOutputItem {
-    return new FakeNotebookCellOutputItem("error", error);
-  }
-}
-
-class FakeNotebookCellOutput {
-  constructor(public readonly items: FakeNotebookCellOutputItem[]) {}
-}
 
 type FakeNotebookCell = { document: { getText: () => string } };
 
 type FakeNotebookExecutionController = {
   createNotebookCellExecution: (cell: unknown) => unknown;
 };
-
-function createToken(isCancellationRequested = false): {
-  readonly isCancellationRequested: boolean;
-  onCancellationRequested: (listener: () => void) => { dispose: () => void };
-} {
-  return {
-    isCancellationRequested,
-    onCancellationRequested: () => ({
-      dispose: () => undefined,
-    }),
-  };
-}
 
 type FakeExecuteHandler = (
   cells: FakeNotebookCell[],
@@ -132,7 +105,7 @@ test("executeHandler dispatches each cell to kernel execution", async () => {
       start: () => undefined,
       end: () => undefined,
       replaceOutput: async () => undefined,
-      token: createToken(),
+      token: createCancellationToken(),
       set executionOrder(order: number) {
         executionOrders.push(order);
       },
@@ -185,7 +158,7 @@ test("executeHandler stops dispatching remaining cells after cancellation", asyn
         start: () => undefined,
         end: () => undefined,
         replaceOutput: async () => undefined,
-        token: createToken(true),
+        token: createCancellationToken(true),
         set executionOrder(order: number) {
           executionOrders.push(order);
         },

@@ -2,20 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { formatConnectFailureMessage } from "../../../src/transport/connect-diagnostics";
-import type { Localize } from "../../../src/config/endpoint-config";
+import { createLocalizeMock } from "../test-utils/localize-mock.js";
 
-const passthroughLocalize = ((
-  input: string | { message: string; args?: unknown[] },
-): string => {
-  if (typeof input === "string") {
-    return input;
-  }
-
-  const args = input.args ?? [];
-  return args.reduce<string>((message, value, index) => {
-    return message.replace(`{${index}}`, String(value));
-  }, input.message);
-}) as Localize;
+const passthroughLocalize = createLocalizeMock();
 
 test("formatConnectFailureMessage includes failure category and endpoint summary", () => {
   const message = formatConnectFailureMessage(

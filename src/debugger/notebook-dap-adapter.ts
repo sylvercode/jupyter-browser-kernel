@@ -228,7 +228,9 @@ export class NotebookDebugAdapter
       .slice(startFrame, startFrame + levels)
       .map((entry) => {
         const callFrame = entry.callFrame;
-        const sourceIdentifier = this.resolveStackFrameSource(callFrame);
+        const sourceUrl = this.resolveStackFrameSource(callFrame);
+        const source: DebugProtocol.Source | undefined =
+          sourceUrl !== undefined ? createSource(sourceUrl) : undefined;
 
         return {
           id: entry.frameId,
@@ -236,7 +238,7 @@ export class NotebookDebugAdapter
             callFrame.functionName.length > 0
               ? callFrame.functionName
               : this.localize("<anonymous>"),
-          source: createSource(sourceIdentifier),
+          source,
           line: callFrame.location.lineNumber + 1,
           column: (callFrame.location.columnNumber ?? 0) + 1,
         };
@@ -625,6 +627,89 @@ export class NotebookDebugAdapter
     this.sendEvent(new ContinuedEvent(1, true));
   }
 
+  protected override async nextRequest(
+    response: DebugProtocol.NextResponse,
+    _args: DebugProtocol.NextArguments,
+  ): Promise<void> {
+    try {
+      await this.sessionManager.stepOver();
+    } catch (error) {
+      this.logger("[debug] nextRequest failed.", error);
+      this.sendErrorResponse(
+        response,
+        0,
+        error instanceof Error ? error.message : String(error),
+      );
+      return;
+    }
+
+    response.success = true;
+    this.sendResponse(response);
+    this.sendEvent(new ContinuedEvent(1, true));
+  }
+
+  protected override async stepInRequest(
+    response: DebugProtocol.StepInResponse,
+    _args: DebugProtocol.StepInArguments,
+  ): Promise<void> {
+    try {
+      await this.sessionManager.stepInto();
+    } catch (error) {
+      this.logger("[debug] stepInRequest failed.", error);
+      this.sendErrorResponse(
+        response,
+        0,
+        error instanceof Error ? error.message : String(error),
+      );
+      return;
+    }
+
+    response.success = true;
+    this.sendResponse(response);
+    this.sendEvent(new ContinuedEvent(1, true));
+  }
+
+  protected override async stepOutRequest(
+    response: DebugProtocol.StepOutResponse,
+    _args: DebugProtocol.StepOutArguments,
+  ): Promise<void> {
+    try {
+      await this.sessionManager.stepOut();
+    } catch (error) {
+      this.logger("[debug] stepOutRequest failed.", error);
+      this.sendErrorResponse(
+        response,
+        0,
+        error instanceof Error ? error.message : String(error),
+      );
+      return;
+    }
+
+    response.success = true;
+    this.sendResponse(response);
+    this.sendEvent(new ContinuedEvent(1, true));
+  }
+
+  protected override async pauseRequest(
+    response: DebugProtocol.PauseResponse,
+    _args: DebugProtocol.PauseArguments,
+  ): Promise<void> {
+    try {
+      await this.sessionManager.pause();
+    } catch (error) {
+      this.logger("[debug] pauseRequest failed.", error);
+      this.sendErrorResponse(
+        response,
+        0,
+        error instanceof Error ? error.message : String(error),
+      );
+      return;
+    }
+
+    response.success = true;
+    this.sendResponse(response);
+  }
+
   protected override async terminateRequest(
     response: DebugProtocol.TerminateResponse,
     _args: DebugProtocol.TerminateArguments,
@@ -695,23 +780,12 @@ export class NotebookDebugAdapter
 
   private resolveStackFrameSource(
     callFrame: Protocol.Debugger.CallFrame,
-  ): string {
+  ): string | undefined {
     if (callFrame.url.length > 0) {
       return callFrame.url;
     }
 
-    const pausedEvent = this.sessionManager.getPausedEvent();
-    const hitBreakpointId = pausedEvent?.hitBreakpoints?.[0];
-    if (hitBreakpointId) {
-      const urlFromBreakpoint = this.sessionManager
-        .getBreakpointRegistry()
-        ?.getUrlForBreakpointId(hitBreakpointId);
-      if (urlFromBreakpoint && urlFromBreakpoint.length > 0) {
-        return urlFromBreakpoint;
-      }
-    }
-
-    return this.localize("<anonymous>");
+    return this.sessionManager.getScriptUrl(callFrame.location.scriptId);
   }
 
   private async ensurePausedFrames(): Promise<StackFrameEntry[] | undefined> {

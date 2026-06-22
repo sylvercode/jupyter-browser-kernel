@@ -3,31 +3,20 @@ import assert from "node:assert/strict";
 
 import { createVariableStore } from "../../../src/debugger/variable-store.js";
 import type { BrowserDebuggerSession } from "../../../src/transport/browser-connect.js";
+import { createFakeDebuggerSession } from "../test-utils/browser-debugger-session-mock.js";
 
 function createDebuggerSession(
   releaseCalls: string[],
   failRelease = false,
 ): BrowserDebuggerSession {
-  return {
-    enable: async () => undefined,
-    disable: async () => undefined,
-    setBreakpointByUrl: async () => ({ breakpointId: "bp", locations: [] }),
-    removeBreakpoint: async () => undefined,
-    getProperties: async () => ({ result: [] }),
-    evaluateOnCallFrame: async () => ({ result: { type: "undefined" } }),
+  return createFakeDebuggerSession({
     releaseObject: async ({ objectId }) => {
       releaseCalls.push(objectId);
       if (failRelease) {
         throw new Error("release failed");
       }
     },
-    evaluate: async () => ({ result: { type: "undefined" } }),
-    resume: async () => undefined,
-    onPaused: () => ({ dispose: () => undefined }),
-    onResumed: () => ({ dispose: () => undefined }),
-    isPaused: () => false,
-    onBreakpointResolved: () => ({ dispose: () => undefined }),
-  };
+  });
 }
 
 test("allocates sequential handles starting at 1000", () => {

@@ -1,7 +1,5 @@
 import test, { after, afterEach, before } from "node:test";
 import assert from "node:assert/strict";
-import http from "node:http";
-import CDP from "chrome-remote-interface";
 
 import {
   connectToBrowserTarget,
@@ -10,86 +8,29 @@ import {
 } from "../../../src/transport/browser-connect.js";
 import { coreTargetProfile } from "../../../src/profile/core-target-profile.js";
 import { registerKernelController } from "../../../src/notebook/kernel-controller.js";
+import { createCancellationHarness } from "../../unit/test-utils/cancellation-harness.js";
+import {
+  FakeNotebookCellOutput,
+  FakeNotebookCellOutputItem,
+} from "../../unit/test-utils/fake-notebook-output.js";
 import { createLocalizeMock } from "../../unit/test-utils/localize-mock.js";
-import { startHeadlessChromium } from "../helpers/headless-chromium.js";
+import {
+  startFoundryIntegrationLifecycle,
+  type FoundryIntegrationLifecycle,
+} from "../helpers/integration-app-server.js";
 
 const runIntegration = process.env.RUN_CDP_INTEGRATION === "1";
 const host = process.env.CDP_HOST ?? "127.0.0.1";
 const cdpPort = Number(process.env.CDP_STOP_TEST_PORT ?? "9232");
 const appPort = Number(process.env.CDP_STOP_TEST_APP_PORT ?? "9332");
 
-let chromiumStop: (() => Promise<void>) | undefined;
-let appServer: http.Server | undefined;
-
-class FakeNotebookCellOutputItem {
-  private constructor(
-    public readonly kind: "text" | "error",
-    public readonly value: string | Error,
-    public readonly mime?: string,
-  ) {}
-
-  static text(value: string, mime: string): FakeNotebookCellOutputItem {
-    return new FakeNotebookCellOutputItem("text", value, mime);
-  }
-
-  static error(error: Error): FakeNotebookCellOutputItem {
-    return new FakeNotebookCellOutputItem("error", error);
-  }
-}
-
-class FakeNotebookCellOutput {
-  constructor(public readonly items: FakeNotebookCellOutputItem[]) {}
-}
-
-interface CancellationTokenLike {
-  readonly isCancellationRequested: boolean;
-  onCancellationRequested: (listener: () => void) => { dispose: () => void };
-}
-
-interface CancellationHarness {
-  token: CancellationTokenLike;
-  cancel: () => void;
-}
+let lifecycle: FoundryIntegrationLifecycle | undefined;
 
 interface RecordedExecution {
   started: boolean;
   ended: boolean;
   success?: boolean;
   outputs: FakeNotebookCellOutput[];
-}
-
-function createCancellationHarness(): CancellationHarness {
-  let isCancellationRequested = false;
-  const listeners = new Set<() => void>();
-
-  return {
-    token: {
-      get isCancellationRequested(): boolean {
-        return isCancellationRequested;
-      },
-      onCancellationRequested: (listener: () => void) => {
-        if (isCancellationRequested) {
-          queueMicrotask(listener);
-          return {
-            dispose: () => undefined,
-          };
-        }
-
-        listeners.add(listener);
-        return {
-          dispose: () => {
-            listeners.delete(listener);
-          },
-        };
-      },
-    },
-    cancel: () => {
-      isCancellationRequested = true;
-      for (const listener of listeners) {
-        listener();
-      }
-    },
-  };
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
@@ -116,49 +57,13 @@ before(async () => {
     return;
   }
 
-  const chromium = await startHeadlessChromium(host, cdpPort);
-  chromiumStop = chromium.stop;
-
-  appServer = http.createServer((request, response) => {
-    if (request.url === "/game") {
-      response.writeHead(200, { "content-type": "text/html" });
-      response.end("<html><body>foundry-target</body></html>");
-      return;
-    }
-
-    response.writeHead(200, { "content-type": "text/html" });
-    response.end("<html><body>generic-target</body></html>");
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    appServer?.once("error", reject);
-    appServer?.listen(appPort, host, () => {
-      resolve();
-    });
-  });
-
-  const browser = await CDP({ host, port: cdpPort });
-  await browser.Target.createTarget({ url: `http://${host}:${appPort}/game` });
-  await browser.close();
+  lifecycle = await startFoundryIntegrationLifecycle(host, cdpPort, appPort);
 });
 
 after(async () => {
   await disconnectActiveBrowserConnection();
 
-  if (chromiumStop) {
-    await chromiumStop();
-  }
-
-  await new Promise<void>((resolve) => {
-    if (!appServer) {
-      resolve();
-      return;
-    }
-
-    appServer.close(() => {
-      resolve();
-    });
-  });
+  await lifecycle?.stop();
 });
 
 afterEach(async () => {
