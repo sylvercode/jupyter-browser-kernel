@@ -2,7 +2,7 @@
 storyId: "10.4"
 storyKey: "10-4-implement-stepping-controls-and-pause-lifecycle-synchronization"
 title: "Implement Stepping Controls and Pause Lifecycle Synchronization"
-status: "review"
+status: "done"
 created: "2026-05-11"
 epic: "10"
 priority: "p0-blocker"
@@ -15,7 +15,7 @@ dependencies:
 
 # Story 10.4: Implement Stepping Controls and Pause Lifecycle Synchronization
 
-**Status:** review
+**Status:** done
 
 ## Story
 
@@ -158,6 +158,15 @@ So that execution control stays fully in the editor.
   - [ ] Test rapid stepping (press F10 multiple times quickly) and verify no drops or reordering.
   - [ ] Verify VS Code Call Stack and Variables update after each step.
 
+### Review Findings
+
+> Code review 2026-06-22 (branch `stepping-controls` vs `main`). 1 decision-needed (resolved/fixed), 0 patch, 3 deferred, 5 dismissed as noise.
+
+- [x] [Review][Fixed] Script-parsing source resolution needed an ordering fix — A companion commit (`4e077e1`) replaced the breakpoint-ID-based stack-frame source fallback with a `scriptId`-based one (`scriptUrlMap` populated from `Debugger.scriptParsed`). This is a **necessary enabler** for stepping: step pauses carry no `hitBreakpoints`, so the old fallback resolved stepped frames to `<anonymous>`. The defect was that `session.onScriptParsed(...)` was registered **after** `await session.enable()`; since `Debugger.enable` replays `scriptParsed` for already-parsed scripts, scripts parsed before the debug session (e.g. cells run before attaching) could be missed. Fixed by registering `onScriptParsed` before `session.enable()` (with cleanup on the enable failure / connection-lost paths). Note: this only resolves a raw script URL; full source-mapped debugging of the already-loaded application is a separate, larger feature and remains out of scope. [src/debugger/debug-session-manager.ts:launch]
+- [x] [Review][Defer] Step handlers do not mirror `resume()` — `stepOver`/`stepInto`/`stepOut` omit the `pausedEvent = undefined` / `pauseVersion += 1` that `resume()` performs. Latent inconsistency only: the sole consumer `ensurePausedFrames()` is gated on `pauseVersion`, which the `onPaused` handler bumps on the next `Debugger.paused`, and `stopRunningSession()` clears state on termination — no observed defect. [src/debugger/debug-session-manager.ts:stepOver]
+- [x] [Review][Defer] New step/pause DAP error responses are not localized — `nextRequest`/`stepInRequest`/`stepOutRequest`/`pauseRequest` pass raw `error.message` to `sendErrorResponse`, mirroring the already-shipped `continueRequest`. No new hardcoded user-facing string is introduced; consistent with existing code. [src/debugger/notebook-dap-adapter.ts:nextRequest]
+- [x] [Review][Defer] `scriptUrlMap` is never evicted — entries persist for the session lifetime (cleared only in `stopRunningSession`); across in-session page reloads stale `scriptId` entries accumulate. Minor memory growth, tied to the out-of-scope source-resolution feature above. [src/debugger/debug-session-manager.ts:scriptUrlMap]
+
 ## Dev Notes
 
 ### Story Context and Scope
@@ -250,8 +259,8 @@ Manual EDH verification is deferred to the reviewer as noted in Task 12.
 ## File List
 
 - `src/transport/browser-connect.ts` — Added `DebuggerStepOverParams`, `DebuggerStepIntoParams` type aliases; added `stepOver`, `stepInto`, `stepOut`, `pause` to `BrowserDebuggerSession` interface and `createBrowserDebuggerSession`.
-- `src/debugger/debug-session-manager.ts` — Added `stepOver`, `stepInto`, `stepOut`, `pause` to `DebugSessionManager` interface and `createDebugSessionManager`.
-- `src/debugger/notebook-dap-adapter.ts` — Added `nextRequest`, `stepInRequest`, `stepOutRequest`, `pauseRequest` handlers.
+- `src/debugger/debug-session-manager.ts` — Added `stepOver`, `stepInto`, `stepOut`, `pause` to `DebugSessionManager` interface and `createDebugSessionManager`. Added `scriptId`→URL tracking (`scriptUrlMap`) populated from a `Debugger.scriptParsed` subscription (registered before `Debugger.enable` so enable-replayed scripts are captured) and exposed via `getScriptUrl`, enabling stack-frame source resolution on step pauses (which carry no `hitBreakpoints`).
+- `src/debugger/notebook-dap-adapter.ts` — Added `nextRequest`, `stepInRequest`, `stepOutRequest`, `pauseRequest` handlers. Reworked `resolveStackFrameSource` to fall back to `DebugSessionManager.getScriptUrl(scriptId)` (instead of the breakpoint-ID lookup, which only worked on breakpoint pauses).
 - `tests/unit/debugger/notebook-dap-adapter-stepping.test.ts` — New file: 10 tests for step/pause handlers.
 - `tests/unit/debugger/notebook-dap-adapter-paused.test.ts` — New file: 5 tests for `resolveStoppedReason` mapping.
 - `tests/unit/debugger/debug-session-manager.test.ts` — 8 new tests; updated `createFakeDebuggerSession` mock.

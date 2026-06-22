@@ -219,9 +219,22 @@ export function createDebugSessionManager({
         }
       });
 
+      // Register the scriptParsed listener BEFORE enabling the Debugger domain.
+      // Debugger.enable replays Debugger.scriptParsed for already-parsed scripts;
+      // registering first guarantees those replays are captured so stack-frame
+      // source resolution works for scripts parsed before the debug session.
+      clearScriptParsedSubscription();
+      scriptParsedDisposable = session.onScriptParsed((event) => {
+        if (event.url.length > 0) {
+          scriptUrlMap.set(event.scriptId, event.url);
+        }
+      });
+
       try {
         await session.enable();
       } catch (error) {
+        clearScriptParsedSubscription();
+        scriptUrlMap.clear();
         lostDuringEnableSub.dispose();
         logger(
           "Failed to enable Debugger domain on browser session: {0}",
@@ -237,6 +250,8 @@ export function createDebugSessionManager({
       lostDuringEnableSub.dispose();
 
       if (lostDuringEnable) {
+        clearScriptParsedSubscription();
+        scriptUrlMap.clear();
         try {
           await session.disable();
         } catch {
@@ -284,13 +299,6 @@ export function createDebugSessionManager({
         }
 
         breakpointResolvedEmitter.fire(resolved);
-      });
-
-      clearScriptParsedSubscription();
-      scriptParsedDisposable = session.onScriptParsed((event) => {
-        if (event.url.length > 0) {
-          scriptUrlMap.set(event.scriptId, event.url);
-        }
       });
 
       for (const [url, desired] of cachedBreakpointsByUrl.entries()) {

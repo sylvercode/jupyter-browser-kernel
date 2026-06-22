@@ -1,5 +1,11 @@
 # Deferred Work
 
+## Deferred from: code review of 10-4-implement-stepping-controls-and-pause-lifecycle-synchronization (2026-06-22)
+
+- Step handlers (`stepOver`/`stepInto`/`stepOut`) do not mirror `resume()` — they omit clearing `pausedEvent` and bumping `pauseVersion`. Latent inconsistency only; `ensurePausedFrames()` is gated on `pauseVersion` which is bumped by the next `Debugger.paused`, and termination clears state. No observed defect.
+- New step/pause DAP error responses pass raw `error.message` to `sendErrorResponse` without `vscode.l10n.t()`, mirroring the already-shipped `continueRequest`. No new hardcoded string; consistency-with-existing-code concern.
+- `scriptUrlMap` is never evicted (cleared only on session stop); stale `scriptId` entries accumulate across in-session page reloads. Minor memory growth, tied to the out-of-scope source-resolution feature.
+
 ## Deferred from: code review of 10-2-verify-and-bind-notebook-cell-breakpoints-in-vs-code-ui (2026-05-30)
 
 - No defensive validation for a missing `result.locations` field from `Debugger.setBreakpointByUrl` — currently relies on the CDP TypeScript types declaring the field as present; low risk.
