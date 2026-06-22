@@ -126,6 +126,16 @@ export class NotebookDebugAdapter
     this.sessionManager = sessionManager;
     this.localize = localize;
     this.logger = logger;
+    // Coexistence note: all runtime interactions go through the DebugSessionManager
+    // interface, which in turn uses BrowserDebuggerSession. No code in this adapter
+    // issues raw CDP commands directly — all Debugger-domain traffic is scoped to the
+    // adapter's flat session via BrowserDebuggerSession, leaving other CDP clients
+    // (e.g., browser DevTools) unaffected.
+    //
+    // Single-subscriber pause model: pausedSubscription is the ONLY listener on
+    // onDidPaused. DebugSessionManager fires the emitter synchronously and increments
+    // a monotonic pauseVersion on each pause, so event ordering is deterministic
+    // without a separate serialization module.
     this.terminationSubscription = this.sessionManager.onDidTerminate(
       (reason) => {
         this.emitTermination(reason);
@@ -726,6 +736,11 @@ export class NotebookDebugAdapter
     }
 
     this.disposed = true;
+    // Release all event subscriptions exactly once. This does NOT close the
+    // underlying CDP client or browser connection — other DevTools sessions
+    // attached to the same target remain active after the DAP session ends.
+    // The only cleanup performed on the CDP layer is Debugger.disable, which
+    // is scoped to this adapter's flat session (see DebugSessionManager).
     this.terminationSubscription.dispose();
     this.pausedSubscription.dispose();
     this.breakpointResolvedSubscription.dispose();

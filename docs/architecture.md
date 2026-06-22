@@ -778,6 +778,8 @@ Story 10.5 (dual-client coexistence):
 - multiplexed flat-session strategy remains mandatory and unchanged.
 - adapter must never force-detach peer debugger clients.
 - pause handling must avoid deadlock by ensuring adapter state transitions are non-blocking and resumable.
+- **Verified by** `tests/integration/debugger/dual-client-coexistence.integration.test.ts` (Story 10.5, gated by `RUN_CDP_INTEGRATION=1`). The test opens two independent flat CDP sessions against the same browser target — one for the adapter and one acting as "DevTools" — and asserts that resuming or disconnecting the adapter session leaves the second session fully operational. This directly validates the Spike Q3 multiplexing pattern documented in [spike/cdp-multiplex-findings.md](../spike/cdp-multiplex-findings.md).
+- **Known limitation**: Browser DevTools does not display breakpoint markers in its Sources panel for breakpoints set by the adapter via `Debugger.setBreakpointByUrl`. The breakpoint fires correctly at runtime; only the DevTools UI glyph is missing. This is an inherent property of the CDP breakpoint model and is documented in the Debugger Domain Integration section above.
 
 ### Runtime Contracts
 
