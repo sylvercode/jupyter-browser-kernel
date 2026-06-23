@@ -159,6 +159,8 @@ export function createDebugSessionManager({
     clearPausedSubscription();
     clearBreakpointResolvedSubscription();
     clearScriptParsedSubscription();
+    // scriptUrlMap is cleared so stale scriptId → URL entries from the
+    // ended session do not bleed into a future session on the same target.
     scriptUrlMap.clear();
 
     if (!sessionToStop) {
@@ -174,6 +176,10 @@ export function createDebugSessionManager({
     }
 
     try {
+      // Coexistence: session.disable() is scoped to this adapter's flat CDP
+      // session only. The browser-level WebSocket connection and any other
+      // DevTools flat sessions attached to the same target are unaffected.
+      // Specifically, the CDP client is NOT closed here.
       await sessionToStop.disable();
     } catch {
       // Best-effort cleanup during shutdown.
@@ -264,6 +270,10 @@ export function createDebugSessionManager({
 
       clearPausedSubscription();
       pausedDisposable = session.onPaused((event) => {
+        // Single-subscriber model: this is the only onPaused listener.
+        // Incrementing pauseVersion atomically with each event provides
+        // deterministic ordering for the DAP adapter without a separate
+        // serialization module.
         pausedEvent = event;
         pauseVersion += 1;
         pausedEmitter.fire(event);

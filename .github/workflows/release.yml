@@ -33,6 +33,15 @@ jobs:
       - name: Run unit tests
         run: npm run test:unit
 
+      - name: Setup Chrome for CDP integration tests
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Run CDP integration tests
+        run: npm run test:integration:cdp
+        env:
+          CHROME_BIN: ${{ steps.setup-chrome.outputs.chrome-path }}
+
       - name: Compile extension
         run: npm run compile
 

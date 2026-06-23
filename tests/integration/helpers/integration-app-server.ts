@@ -63,8 +63,9 @@ export async function startFoundryIntegrationLifecycle(
 
   return {
     stop: async () => {
-      await appServer.stop();
       await chromium.stop();
+      // Stop the app server after stopping Chromium to ensure that any open connections are closed first.
+      await appServer.stop();
     },
   };
 }

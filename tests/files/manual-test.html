@@ -1,0 +1,163 @@
+<!doctype html>
+<!--
+  manual-test.html — breakpoint coexistence smoke test page
+  =========================================================
+
+  HOW TO USE
+  ----------
+  1. Start a local server so the page URL contains "/game" (required by coreTargetProfile):
+
+       npx http-server spike/ --port 9322 -o /game
+       # or:
+       python3 -m http.server 9322 --directory spike/
+       # then open: http://127.0.0.1:9322/game
+
+  2. Launch Chromium/Edge with remote debugging enabled:
+
+       chromium --remote-debugging-port=9222 http://127.0.0.1:9322/game
+       # or open chrome://inspect in an already-running browser and enable
+       # remote debugging on port 9222.
+
+  3. Press F5 in VS Code to open the Extension Development Host.
+     Connect to the browser via the Jupyter Browser Kernel extension.
+
+  4. Open a .ipynb notebook in VS Code and run cells against this page.
+
+  WHAT TO TEST
+  ------------
+  A) DevTools + cell breakpoint coexistence
+     - Open DevTools (F12) on this page → Sources → manual-test.html
+     - In the extension notebook cell, run: add(1, 2)
+     - Breakpoints set in DevTools should pause both clients.
+
+  B) Cell-sourced breakpoints
+     - Paste and run the CELL SCRIPTS below from a VS Code notebook cell.
+     - Set a breakpoint in VS Code on one of the numbered lines.
+     - Confirm the step/inspect experience works while DevTools stays open.
+
+  C) Force-reload teardown
+     - While paused at a breakpoint, press F5 to reload the page.
+     - Confirm the DAP session terminates with the localized connection-lost
+       message (no hung session, no orphan sockets).
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Jupyter Browser Kernel — Manual Test Page (/game)</title>
+    <style>
+      body {
+        font-family: monospace;
+        padding: 2rem;
+        background: #1e1e1e;
+        color: #d4d4d4;
+      }
+      h1 {
+        color: #4ec9b0;
+      }
+      pre {
+        background: #252526;
+        padding: 1rem;
+        border-radius: 4px;
+        color: #9cdcfe;
+      }
+      .label {
+        color: #c586c0;
+        font-weight: bold;
+      }
+      #log {
+        margin-top: 1rem;
+        border-top: 1px solid #444;
+        padding-top: 1rem;
+      }
+      .entry {
+        color: #b5cea8;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Manual Test Page</h1>
+    <p>
+      Use this page to test breakpoint coexistence between VS Code and DevTools.
+    </p>
+
+    <pre>
+<span class="label">From a VS Code notebook cell, try:</span>
+
+// Simple call (steppable in both VS Code and DevTools)
+add(3, 4)
+
+// Multi-step function (set breakpoints on individual lines in VS Code)
+runDemo()
+
+// Object inspection (useful for variable/scope pane testing)
+inspect({ x: 1, y: [2, 3], z: { nested: true } })
+  </pre>
+
+    <div id="log"></div>
+
+    <script>
+      // ─── Utility ────────────────────────────────────────────────────────────────
+
+      function logToPage(message) {
+        const div = document.getElementById("log");
+        const entry = document.createElement("div");
+        entry.className = "entry";
+        entry.textContent = "[" + new Date().toISOString() + "] " + message;
+        div.prepend(entry);
+      }
+
+      // ─── Test functions — set DevTools breakpoints anywhere in here ──────────────
+
+      /**
+       * Simple two-argument addition.  Good target for a single breakpoint.
+       */
+      function add(a, b) {
+        const result = a + b; // line: set a breakpoint here
+        return result;
+      }
+
+      /**
+       * Multi-step walkthrough.  Step through each line with next / stepIn / stepOut
+       * from VS Code while DevTools is also open.
+       */
+      function runDemo() {
+        const base = 10; // step 1
+        const doubled = base * 2; // step 2
+        const greeting = greet("world"); // step 3 — stepIn enters greet()
+        const summary = {
+          // step 4
+          base,
+          doubled,
+          greeting,
+        };
+        logToPage("runDemo result: " + JSON.stringify(summary));
+        return summary; // step 5
+      }
+
+      function greet(name) {
+        const message = "Hello, " + name + "!"; // stepIn lands here
+        return message; // stepOut returns to runDemo step 4
+      }
+
+      /**
+       * Deep object — useful for testing the Variables / Scopes pane.
+       */
+      function inspect(obj) {
+        const keys = Object.keys(obj); // set breakpoint, then expand obj in VS Code
+        const count = keys.length;
+        logToPage(
+          "inspect: " + count + " top-level key(s): " + keys.join(", "),
+        );
+        return { obj, keys, count };
+      }
+
+      // ─── Auto-run on load so the page is live ────────────────────────────────────
+
+      window.addEventListener("load", function () {
+        logToPage(
+          "Page ready. Connect the extension and run cells from VS Code.",
+        );
+      });
+    </script>
+  </body>
+</html>
