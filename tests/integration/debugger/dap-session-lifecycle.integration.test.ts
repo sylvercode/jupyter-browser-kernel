@@ -316,9 +316,10 @@ test(
         "}", // 4
         "(() => {", // 5
         "  const a = 1;", // 6  ← breakpoint
-        "  const b = debugHelper(a);", // 7  ← next lands here; stepIn into this
-        "  return b;", // 8  ← stepOut lands here
-        "})();", // 9
+        "  const extra = a + 0;", // 7  ← first next lands here
+        "  const b = debugHelper(extra);", // 8  ← second next lands here; stepIn into this
+        "  return b;", // 9  ← stepOut lands here
+        "})();", // 10
         `//# sourceURL=${cellUrl}`,
       ].join("\n");
 

@@ -1,5 +1,10 @@
 # Deferred Work
 
+## Deferred from: code review of 10-5-validate-dual-client-coexistence-and-reliability (2026-06-22)
+
+- Task 8 Clean Teardown asserts only that `Runtime.releaseObject` was called more times after disconnect (`releaseObjectCalls > before`), not that all reserved objectIds were released. The spec explicitly concedes `VariableStore` has no count method and accepts indirect spy verification, so completeness cannot be asserted directly. Acknowledged limitation.
+- `findGameTarget` returns the first `page` target whose URL includes `/game` without asserting uniqueness. Safe today because each integration suite launches a fresh dedicated Chromium, but it would silently pick the wrong target if a persistent browser with multiple `/game` tabs were ever reused.
+
 ## Deferred from: code review of 10-4-implement-stepping-controls-and-pause-lifecycle-synchronization (2026-06-22)
 
 - Step handlers (`stepOver`/`stepInto`/`stepOut`) do not mirror `resume()` — they omit clearing `pausedEvent` and bumping `pauseVersion`. Latent inconsistency only; `ensurePausedFrames()` is gated on `pauseVersion` which is bumped by the next `Debugger.paused`, and termination clears state. No observed defect.

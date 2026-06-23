@@ -69,10 +69,13 @@ before(async () => {
 
   // Create the /game page target that both sessions will attach to.
   const setupBrowser = await CDP({ host, port: dualClientCdpPort });
-  await setupBrowser.Target.createTarget({
-    url: `http://${host}:${dualClientAppPort}/game`,
-  });
-  await setupBrowser.close();
+  try {
+    await setupBrowser.Target.createTarget({
+      url: `http://${host}:${dualClientAppPort}/game`,
+    });
+  } finally {
+    await setupBrowser.close();
+  }
 });
 
 after(async () => {
@@ -380,8 +383,11 @@ test(
         sessionId: devtoolsSessionId,
       });
     } finally {
-      adapter?.dispose();
-      await browser?.close().catch(() => undefined);
+      try {
+        adapter?.dispose();
+      } finally {
+        await browser?.close().catch(() => undefined);
+      }
     }
   },
 );
@@ -478,8 +484,11 @@ test(
 
       await request("disconnect", {});
     } finally {
-      adapter?.dispose();
-      await browser?.close().catch(() => undefined);
+      try {
+        adapter?.dispose();
+      } finally {
+        await browser?.close().catch(() => undefined);
+      }
     }
   },
 );

@@ -2,7 +2,7 @@
 storyId: "10.5"
 storyKey: "10-5-validate-dual-client-coexistence-and-reliability"
 title: "Validate Dual-Client Coexistence and Reliability"
-status: "review"
+status: "done"
 created: "2026-05-11"
 epic: "10"
 priority: "p0-blocker"
@@ -17,7 +17,7 @@ dependencies:
 
 # Story 10.5: Validate Dual-Client Coexistence and Reliability
 
-**Status:** review
+**Status:** done
 
 ## Story
 
@@ -292,3 +292,17 @@ Relevant to this story:
 - ✅ 2 integration tests added in `dual-client-coexistence.integration.test.ts`; compile and type-check clean, run when `RUN_CDP_INTEGRATION=1`.
 - ✅ Architecture addendum updated with verification reference and known limitation.
 - ⚠️ CI gap: integration tests not wired into the release workflow. Reviewer should consider adding `RUN_CDP_INTEGRATION=1 npm run test:integration:cdp` as a pre-release step.
+
+### Review Findings
+
+_Code review 2026-06-22 (Blind Hunter + Edge Case Hunter + Acceptance Auditor). 5 patch (3 from resolved decisions), 2 deferred, 12 dismissed as noise/false-positive._
+
+- [x] [Review][Patch] AC 6 — add a CI step running `RUN_CDP_INTEGRATION=1 npm run test:integration:cdp` so the coexistence integration suites execute in CI (resolved decision: block). `.github/workflows/release.yml` currently runs `test:unit` only, leaving the core architectural coexistence guarantee unverified in CI.
+- [x] [Review][Patch] Task 4 — add a 10-command rapid-stepping test (resolved decision: patch). Spec requires "send 10 step commands in sequence"; strongest existing test sends 3.
+- [x] [Review][Patch] Task 6 — add a connection-loss-while-resolving-variables test (resolved decision: patch). Third specified timing scenario was untested.
+- [x] [Review][Patch] `before()` hook leaks `setupBrowser` CDP client if `createTarget` throws (no try/finally) [tests/integration/debugger/dual-client-coexistence.integration.test.ts]
+- [x] [Review][Patch] `finally` cleanup runs `adapter?.dispose()` before `browser?.close()`; a throw in `dispose()` skips the browser close [tests/integration/debugger/dual-client-coexistence.integration.test.ts, tests/integration/debugger/dap-session-lifecycle.integration.test.ts]
+- [x] [Review][Defer] Task 8 Clean Teardown asserts `releaseObjectCalls > before` (not completeness of all objectIds) [tests/integration/debugger/dap-session-lifecycle.integration.test.ts] — deferred; spec explicitly concedes `VariableStore` has no count method and accepts indirect spy verification.
+- [x] [Review][Defer] `findGameTarget` returns the first `/game` match without asserting uniqueness [tests/integration/debugger/dual-client-coexistence.integration.test.ts] — deferred; safe with the fresh dedicated Chromium per suite, fragile only if a persistent browser is ever reused.
+
+**Dismissed (false positives / noise):** spread `{ ...baseSession }` "loses `this` binding" — false (session is plain-object closures, not prototype methods); `scriptUrlMap.clear()` before `disable()` racing a late pause — false (paused subscription already disposed); `makeAdapterRequest` cross-test seq collision — false (per-test fresh buffer); `/game` page target "not closed in after()" — false (`after()` stops the whole Chromium); hardcoded ports (intentional, documented to avoid suite collision); `evalPromise.catch(() => undefined)` (intentional — script is expected to pause); unbounded message buffer (test-scoped, short-lived); fixed `waitForStoppedEvent` timeout / deadline window (negligible); shallow `instrumentedSession` (by design); missing `sessionId` null checks (defensive nit); non-informative timeout error string (nit); `manual-test.html` "violates no-static-HTML constraint" (user-confirmed intentional manual aid).

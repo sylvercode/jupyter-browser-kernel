@@ -23,6 +23,8 @@ import type { DebugProtocol } from "@vscode/debugprotocol";
 import type { BreakpointRegistry } from "../../../src/debugger/breakpoint-registry.js";
 import { createFakeSessionManager } from "../test-utils/debug-session-manager-mock.js";
 import { createAdapterHarness } from "../test-utils/notebook-dap-harness.js";
+import { createFakeDebuggerSession } from "../test-utils/browser-debugger-session-mock.js";
+import { createFakeVariableStore } from "../test-utils/variable-store-mock.js";
 
 // ── Task 12 / Subscription lifecycle ─────────────────────────────────────────
 
@@ -229,6 +231,61 @@ test("rapid next+next+continue each call matching DebugSessionManager method exa
     continuedEvents.length,
     3,
     "each step/continue must emit exactly one ContinuedEvent",
+  );
+  for (const event of continuedEvents) {
+    assert.equal(
+      event.body?.allThreadsContinued,
+      true,
+      "ContinuedEvent must set allThreadsContinued=true",
+    );
+    assert.equal(
+      event.body?.threadId,
+      1,
+      "ContinuedEvent must reference thread 1",
+    );
+  }
+
+  harness.adapter.dispose();
+});
+
+test("rapid stepping: ten sequential next commands each call stepOver exactly once and emit ten ContinuedEvents", async () => {
+  const stepCommandCount = 10;
+  let stepOverCalls = 0;
+
+  const harness = createAdapterHarness(
+    createFakeSessionManager({
+      stepOver: async () => {
+        stepOverCalls += 1;
+      },
+    }),
+    { maxPolls: 80 },
+  );
+
+  const responses = await Promise.all(
+    Array.from({ length: stepCommandCount }, () =>
+      harness.sendRequest("next", { threadId: 1 }),
+    ),
+  );
+
+  for (const response of responses) {
+    assert.equal(response?.success, true, "every next request must succeed");
+  }
+
+  assert.equal(
+    stepOverCalls,
+    stepCommandCount,
+    "stepOver must be called exactly once per next command (no lost or duplicated commands)",
+  );
+
+  const continuedEvents = harness.sentMessages.filter(
+    (m) =>
+      m.type === "event" && (m as DebugProtocol.Event).event === "continued",
+  ) as DebugProtocol.ContinuedEvent[];
+
+  assert.equal(
+    continuedEvents.length,
+    stepCommandCount,
+    "each next command must emit exactly one ContinuedEvent, no duplicates",
   );
   for (const event of continuedEvents) {
     assert.equal(
@@ -489,6 +546,83 @@ test("connection-loss while stepping does not produce duplicate ContinuedEvents"
     terminatedEvents.length,
     1,
     "connection-lost must produce exactly one TerminatedEvent after stepping",
+  );
+
+  harness.adapter.dispose();
+});
+
+test("connection-loss while variables are being resolved yields one TerminatedEvent and one graceful variables response", async () => {
+  let terminationListener: ((reason: "connection-lost") => void) | undefined;
+
+  // Deferred getProperties so the variables request is in flight when the
+  // connection is lost. resolveGetProperties is called only after the
+  // termination event is fired.
+  let resolveGetProperties: (() => void) | undefined;
+  const getPropertiesGate = new Promise<void>((resolve) => {
+    resolveGetProperties = resolve;
+  });
+
+  const variableStore = createFakeVariableStore({
+    resolve: () => ({ objectId: "obj-1", kind: "scope" }),
+  });
+
+  const debuggerSession = createFakeDebuggerSession({
+    getProperties: async () => {
+      await getPropertiesGate;
+      return { result: [] };
+    },
+  });
+
+  const harness = createAdapterHarness(
+    createFakeSessionManager({
+      onDidTerminate: (listener) => {
+        terminationListener = listener;
+        return { dispose: () => undefined };
+      },
+      getVariableStore: () => variableStore,
+      getDebuggerSession: () => debuggerSession,
+    }),
+    { maxPolls: 80 },
+  );
+
+  // Issue a variables request that blocks inside getProperties.
+  const variablesPromise = harness.sendRequest("variables", {
+    variablesReference: 1,
+  });
+
+  // Lose the connection while the request is still pending.
+  terminationListener?.("connection-lost");
+
+  // Now let the in-flight getProperties resolve; the adapter must finish the
+  // request gracefully without crashing or emitting a second TerminatedEvent.
+  resolveGetProperties?.();
+  const variablesResponse = await variablesPromise;
+
+  assert.equal(
+    variablesResponse.success,
+    true,
+    "in-flight variables request must still resolve gracefully after connection loss",
+  );
+
+  const variablesResponses = harness.sentMessages.filter(
+    (m) =>
+      m.type === "response" &&
+      (m as DebugProtocol.Response).command === "variables",
+  );
+  assert.equal(
+    variablesResponses.length,
+    1,
+    "exactly one variables response must be sent (no duplicate)",
+  );
+
+  const terminatedEvents = harness.sentMessages.filter(
+    (m) =>
+      m.type === "event" && (m as DebugProtocol.Event).event === "terminated",
+  );
+  assert.equal(
+    terminatedEvents.length,
+    1,
+    "connection-loss during variable resolution must produce exactly one TerminatedEvent",
   );
 
   harness.adapter.dispose();
