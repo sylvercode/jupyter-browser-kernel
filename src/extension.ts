@@ -130,6 +130,12 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   const debugAdapterFactory = new DebugAdapterFactory({
+    connectionStateStore,
+    getSettings: () =>
+      vscode.workspace.getConfiguration("jupyterBrowserKernel"),
+    createInlineAdapterDescriptor: (adapter) =>
+      new vscode.DebugAdapterInlineImplementation(adapter),
+    localize: vscode.l10n.t,
     logger: debugLogger,
   });
   context.subscriptions.push(

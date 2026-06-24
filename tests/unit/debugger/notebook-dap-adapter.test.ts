@@ -53,6 +53,34 @@ test("launch failure returns ErrorResponse with localized message", async () => 
   harness.adapter.dispose();
 });
 
+test("launch failure does not emit initialized event and preserves error message", async () => {
+  const expectedMessage =
+    "A browser connection is already active. Stop the existing debug session before starting another - only one active connection is supported.";
+  const harness = createAdapterHarness(
+    createFakeSessionManager({
+      launch: async () => {
+        throw new Error(expectedMessage);
+      },
+    }),
+    { maxPolls: 20 },
+  );
+
+  const response = await harness.sendRequest("launch", {});
+
+  assert.equal(response.success, false);
+  assert.equal(response.message, expectedMessage);
+
+  const initializedEvents = harness.sentMessages.filter(
+    (message) =>
+      message.type === "event" &&
+      (message as DebugProtocol.Event).event === "initialized",
+  );
+
+  assert.equal(initializedEvents.length, 0);
+
+  harness.adapter.dispose();
+});
+
 test("threads returns the single notebook-cells thread", async () => {
   const harness = createAdapterHarness(createFakeSessionManager(), {
     maxPolls: 20,

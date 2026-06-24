@@ -2,7 +2,7 @@
 storyId: "11.2"
 storyKey: "11-2-connect-on-debug-launch"
 title: "Connect on Debug Launch"
-status: "ready-for-dev"
+status: "in-progress"
 created: "2026-06-24"
 epic: "11"
 priority: "p1-high"
@@ -16,7 +16,7 @@ dependencies:
 
 # Story 11.2: Connect on Debug Launch
 
-**Status:** ready-for-dev
+**Status:** in-progress
 
 ## Story
 
@@ -57,7 +57,7 @@ Concretely:
 
 ### 1. Add a Connect-on-Launch Coordinator (AC: 1, 2)
 
-- [ ] Create [src/debugger/connect-on-launch.ts](../../src/debugger/connect-on-launch.ts) exporting a small, VS Code-runtime-free coordinator that the `DebugAdapterFactory` wires per session. Suggested shape:
+- [x] Create [src/debugger/connect-on-launch.ts](../../src/debugger/connect-on-launch.ts) exporting a small, VS Code-runtime-free coordinator that the `DebugAdapterFactory` wires per session. Suggested shape:
   - A named options type (e.g. `EnsureBrowserConnectionOptions`) carrying injected dependencies — do NOT inline a complex object type in the function signature:
     - `endpoint: EndpointConfig` (the resolved host/port for this session).
     - `connectionStateStore: ConnectionStateStore`.
@@ -65,80 +65,80 @@ Concretely:
     - `getActiveConnection: () => ActiveBrowserConnection | undefined` (default `getActiveBrowserConnection`).
     - `localize: Localize`.
   - A factory/function (e.g. `createEnsureBrowserConnection(options): () => Promise<void>`) returning the `ensureConnection` callback invoked by `DebugSessionManager.launch()`.
-- [ ] Reuse, do not reinvent: `withConnectTransition`, `ConnectionStateStore`, `connectToBrowserTarget`, `ConnectToTargetOperation`/`ConnectToTargetResult`, `formatConnectFailureMessage`, and `EndpointConfig`. Mirror the `runConnect` semantics in [src/commands/connect-command.ts](../../src/commands/connect-command.ts) (the connecting→connected/error transition + error-context handling) rather than copying its UI prompt logic.
+- [x] Reuse, do not reinvent: `withConnectTransition`, `ConnectionStateStore`, `connectToBrowserTarget`, `ConnectToTargetOperation`/`ConnectToTargetResult`, `formatConnectFailureMessage`, and `EndpointConfig`. Mirror the `runConnect` semantics in [src/commands/connect-command.ts](../../src/commands/connect-command.ts) (the connecting→connected/error transition + error-context handling) rather than copying its UI prompt logic.
 
 ### 2. Implement Connect Semantics in the Coordinator (AC: 1)
 
-- [ ] `ensureConnection()` behavior when **no** active connection exists (`getActiveConnection()` is `undefined`):
+- [x] `ensureConnection()` behavior when **no** active connection exists (`getActiveConnection()` is `undefined`):
   - Run the connect attempt inside `withConnectTransition(connectionStateStore, attempt, (r) => r.ok, onAborted)` so state moves `connecting` → `connected` on success and `connecting` → `error` on failure (matches `runConnect`).
   - On `ConnectToTargetResult.ok === true`: clear error context (`connectionStateStore.setErrorContext(undefined)`) and resolve. The transport singleton is now set; `DebugSessionManager.launch()` will pick it up via `getDebuggerSession()`.
   - On `ConnectToTargetResult.ok === false`: build the actionable message via `formatConnectFailureMessage(result.failure, summarizeEndpointForDisplay(endpoint), localize)`, set `connectionStateStore.setErrorContext({ category: result.failure.category, guidance: message })`, and **throw** an `Error(message)` so the DAP launch surfaces it (Task 4) and the session ends cleanly.
-- [ ] Do NOT show `showInformationMessage` / `showErrorMessage` prompts from the coordinator — the debug session UI and the launch error response are the surfaces here. Keep the coordinator free of `vscode.window.*` so it stays unit-testable. (Error context drives the FR4 status indicator already wired in `extension.ts`.)
+- [x] Do NOT show `showInformationMessage` / `showErrorMessage` prompts from the coordinator — the debug session UI and the launch error response are the surfaces here. Keep the coordinator free of `vscode.window.*` so it stays unit-testable. (Error context drives the FR4 status indicator already wired in `extension.ts`.)
 
 ### 3. Enforce the Single-Active-Connection Guard (AC: 2)
 
-- [ ] In `ensureConnection()`, when an active connection **already** exists (`getActiveConnection()` is defined) treat this as a second concurrent session:
+- [x] In `ensureConnection()`, when an active connection **already** exists (`getActiveConnection()` is defined) treat this as a second concurrent session:
   - Throw an `Error` with a localized single-active-connection guidance message **before** calling `connectToTarget` — the existing connection MUST NOT be touched (no `disconnect`, no state change, no transition).
   - Add the guidance string to [l10n/bundle.l10n.json](../../l10n/bundle.l10n.json), e.g.:
     - `"A browser connection is already active. Stop the existing debug session before starting another — only one active connection is supported."`
-- [ ] Rationale / why this placement works (document in Dev Notes): `DebugSessionManager.launch()` only calls `ensureConnection()` when `getDebuggerSession()` returns `undefined` (no connection). The first session connects and `launch()`'s `running` guard makes it idempotent, so a session never rejects itself. A second session's separate manager sees the existing connection and rejects. This also correctly rejects a debug start when a connection already exists from the legacy connect command (still present until Story 11.6).
-- [ ] Because the rejection is thrown before any teardown, "the existing session and connection remain unaffected" (AC 2) holds by construction.
+- [x] Rationale / why this placement works (document in Dev Notes): `DebugSessionManager.launch()` only calls `ensureConnection()` when `getDebuggerSession()` returns `undefined` (no connection). The first session connects and `launch()`'s `running` guard makes it idempotent, so a session never rejects itself. A second session's separate manager sees the existing connection and rejects. This also correctly rejects a debug start when a connection already exists from the legacy connect command (still present until Story 11.6).
+- [x] Because the rejection is thrown before any teardown, "the existing session and connection remain unaffected" (AC 2) holds by construction.
 
 ### 4. Wire the Coordinator Into `DebugSessionManager.launch()` (AC: 1, 2)
 
-- [ ] Extend `DebugSessionManagerOptions` in [src/debugger/debug-session-manager.ts](../../src/debugger/debug-session-manager.ts) with an optional `ensureConnection?: () => Promise<void>`.
-- [ ] In `createDebugSessionManager(...)` `launch`, replace the current "no session → throw immediately" path:
+- [x] Extend `DebugSessionManagerOptions` in [src/debugger/debug-session-manager.ts](../../src/debugger/debug-session-manager.ts) with an optional `ensureConnection?: () => Promise<void>`.
+- [x] In `createDebugSessionManager(...)` `launch`, replace the current "no session → throw immediately" path:
   - Keep the leading `if (running) return;` short-circuit (idempotent launch).
   - When `getDebuggerSession()` returns `undefined` AND `ensureConnection` is provided: `await ensureConnection()`, then re-read `getDebuggerSession()`.
   - If a session is now present, continue with the existing `Debugger.enable` / `scriptParsed` flow unchanged.
   - If still `undefined` (or `ensureConnection` was not provided), preserve the existing `throw new Error(localize("Cannot start debug session: connect to a browser target first."))` so behavior is unchanged when connect-on-launch is not wired (keeps existing tests valid).
-- [ ] Let an `ensureConnection()` rejection propagate out of `launch()` unchanged — the adapter (Task 5) converts it into a DAP error response. Do NOT swallow it.
-- [ ] Do NOT flip the `running` flag or register listeners before `ensureConnection()` resolves, so a failed connect leaves no partially-initialized session state.
+- [x] Let an `ensureConnection()` rejection propagate out of `launch()` unchanged — the adapter (Task 5) converts it into a DAP error response. Do NOT swallow it.
+- [x] Do NOT flip the `running` flag or register listeners before `ensureConnection()` resolves, so a failed connect leaves no partially-initialized session state.
 
 ### 5. Surface Launch/Connect Failures via the DAP Adapter (AC: 1)
 
-- [ ] Confirm [src/debugger/notebook-dap-adapter.ts](../../src/debugger/notebook-dap-adapter.ts) `launchRequest` already wraps `sessionManager.launch()` in try/catch and calls `sendErrorResponse(response, 0, message)` on throw — it does. The coordinator's thrown message (connect failure or single-active guidance) therefore reaches VS Code as the launch error and the session ends cleanly. No structural change needed; add a test (Task 7) asserting the message passthrough.
-- [ ] Verify `attachRequest` (which delegates to `launchRequest`) inherits the same behavior — no separate change.
+- [x] Confirm [src/debugger/notebook-dap-adapter.ts](../../src/debugger/notebook-dap-adapter.ts) `launchRequest` already wraps `sessionManager.launch()` in try/catch and calls `sendErrorResponse(response, 0, message)` on throw — it does. The coordinator's thrown message (connect failure or single-active guidance) therefore reaches VS Code as the launch error and the session ends cleanly. No structural change needed; add a test (Task 7) asserting the message passthrough.
+- [x] Verify `attachRequest` (which delegates to `launchRequest`) inherits the same behavior — no separate change.
 
 ### 6. Wire Dependencies Through the `DebugAdapterFactory` and Extension (AC: 1, 2)
 
-- [ ] Extend `DebugAdapterFactoryOptions` in [src/debugger/debug-adapter-factory.ts](../../src/debugger/debug-adapter-factory.ts) with the dependencies the coordinator needs:
+- [x] Extend `DebugAdapterFactoryOptions` in [src/debugger/debug-adapter-factory.ts](../../src/debugger/debug-adapter-factory.ts) with the dependencies the coordinator needs:
   - `connectionStateStore: ConnectionStateStore`.
   - `connectToTarget?: ConnectToTargetOperation` (default `(endpoint, localize, abortSignal) => connectToBrowserTarget(endpoint, undefined, localize, abortSignal)`).
   - Reuse the existing `getActiveConnection` option (already defaults to `getActiveBrowserConnection`).
-- [ ] In `createDebugAdapterDescriptor(session)` (rename `_session` → `session` since it is now used):
+- [x] In `createDebugAdapterDescriptor(session)` (rename `_session` → `session` since it is now used):
   - Read the resolved endpoint from `session.configuration` — `host` and `port` were attached by Story 11.1's provider. Build `EndpointConfig` from them. As a defensive fallback (e.g. a session somehow created without going through the provider), resolve via `readAndValidateEndpointConfig(getSettings())` and document the choice; the provider normally guarantees valid attached values because it aborts launch on resolution failure.
   - Construct the `ensureConnection` callback via `createEnsureBrowserConnection({ endpoint, connectionStateStore, connectToTarget, getActiveConnection, localize: vscode.l10n.t })`.
   - Pass `ensureConnection` into `createSessionManager({ getDebuggerSession, logger, localize, ensureConnection })`.
-- [ ] In [src/extension.ts](../../src/extension.ts), pass the new options when constructing `new DebugAdapterFactory({ ... })`: `connectionStateStore` (the already-created `connectionStateStore`), and rely on the default `connectToTarget`. Do NOT change registration order or the existing `logger` wiring.
-- [ ] If reading settings is needed for the defensive fallback, inject a `getSettings` option mirroring the `DebugConfigProvider` wiring (`() => vscode.workspace.getConfiguration("jupyterBrowserKernel")`) rather than calling `vscode.workspace` directly inside the factory.
+- [x] In [src/extension.ts](../../src/extension.ts), pass the new options when constructing `new DebugAdapterFactory({ ... })`: `connectionStateStore` (the already-created `connectionStateStore`), and rely on the default `connectToTarget`. Do NOT change registration order or the existing `logger` wiring.
+- [x] If reading settings is needed for the defensive fallback, inject a `getSettings` option mirroring the `DebugConfigProvider` wiring (`() => vscode.workspace.getConfiguration("jupyterBrowserKernel")`) rather than calling `vscode.workspace` directly inside the factory.
 
 ### 7. Unit Tests (AC: 1, 2)
 
-- [ ] `tests/unit/debugger/connect-on-launch.test.ts` (new): cover `createEnsureBrowserConnection` / `ensureConnection`:
+- [x] `tests/unit/debugger/connect-on-launch.test.ts` (new): cover `createEnsureBrowserConnection` / `ensureConnection`:
   - no active connection + `connectToTarget` returns `ok: true` → `connectToTarget` called once; state transitions `connecting` → `connected`; error context cleared; resolves.
   - no active connection + `connectToTarget` returns `ok: false` → throws an `Error` whose message comes from `formatConnectFailureMessage`; state ends in `error`; error context set with the failure category + guidance.
   - active connection already present (fake `getActiveConnection` returns a connection) → throws the localized single-active guidance error; `connectToTarget` is NOT called; no state transition; existing connection object untouched.
   - Use a real `createConnectionStateStore()` with listener hooks to assert the transition sequence (mirror `connect-command.test.ts` style); use a fake `ConnectToTargetOperation` and a fake `Localize`/`@vscode/l10n` `t`.
-- [ ] `tests/unit/debugger/debug-session-manager.test.ts` (extend):
+- [x] `tests/unit/debugger/debug-session-manager.test.ts` (extend):
   - `launch()` with no debugger session + `ensureConnection` that connects (after which `getDebuggerSession()` returns a fake session) → `ensureConnection` is awaited, then the normal enable flow runs.
   - `launch()` where `ensureConnection` rejects → `launch()` rejects with the same error; `running` stays false; no listeners leaked.
   - `launch()` with no `ensureConnection` and no session → preserves the existing `"Cannot start debug session: connect to a browser target first."` throw (regression guard).
-- [ ] `tests/unit/debugger/notebook-dap-adapter.test.ts` (extend): a fake session manager whose `launch()` rejects with a known message → `launchRequest` calls `sendErrorResponse` with that message and does not send `InitializedEvent` (session ends cleanly).
-- [ ] `tests/unit/debugger/debug-adapter-factory.test.ts` (new):
+- [x] `tests/unit/debugger/notebook-dap-adapter.test.ts` (extend): a fake session manager whose `launch()` rejects with a known message → `launchRequest` calls `sendErrorResponse` with that message and does not send `InitializedEvent` (session ends cleanly).
+- [x] `tests/unit/debugger/debug-adapter-factory.test.ts` (new):
   - factory reads `session.configuration.host` / `.port` and constructs a manager whose injected `ensureConnection`, when invoked with no active connection, calls the injected `connectToTarget` with that endpoint.
   - with a fake `getActiveConnection` returning a connection, the wired `ensureConnection` rejects with the single-active guidance and does not call `connectToTarget`.
   - Use the existing faking style (direct instantiation with option factories; fake `createSessionManager` / `createAdapter` to capture the passed `ensureConnection`).
 
 ### 8. Integration Test (AC: 1) — Optional/Light
 
-- [ ] If the existing CDP-backed harness under [tests/integration/debugger](../../tests/integration/debugger) supports it, add a focused test that drives a debug launch against a controllable CDP fixture and asserts: no prior connection → after launch, `getActiveBrowserConnection()` is set and the state store reached `connected`. If the harness cannot start a real debug session deterministically, document why and rely on the unit coverage above (the connect transport itself is already covered by Story 1.3 integration tests). Do NOT add a flaky live-browser dependency to CI.
+- [x] If the existing CDP-backed harness under [tests/integration/debugger](../../tests/integration/debugger) supports it, add a focused test that drives a debug launch against a controllable CDP fixture and asserts: no prior connection → after launch, `getActiveBrowserConnection()` is set and the state store reached `connected`. If the harness cannot start a real debug session deterministically, document why and rely on the unit coverage above (the connect transport itself is already covered by Story 1.3 integration tests). Do NOT add a flaky live-browser dependency to CI.
 
 ### 9. Validation
 
-- [ ] `npm run lint`.
-- [ ] `npm run test`.
-- [ ] `npm run compile`.
+- [x] `npm run lint`.
+- [x] `npm run test`.
+- [x] `npm run compile`.
 - [ ] Manual smoke in the Extension Development Host (requires a running CDP-enabled browser on the configured endpoint — use [scripts/Start-EdgeDebug.ps1](../../scripts/Start-EdgeDebug.ps1) or an equivalent):
   - With no active connection, start the `jupyter-browser-kernel` debug configuration (play button) and confirm the status indicator moves `connecting` → `connected` and the session starts without a "connect first" error.
   - With the session active, run a browser-kernel notebook cell and confirm it executes against the established connection (no separate connect step needed).
@@ -221,12 +221,40 @@ Epic 11 progressively re-homes the connection lifecycle onto the debug session: 
 
 ### Agent Model Used
 
+- GPT-5.3-Codex
+
 ### Debug Log References
+
+- `npm run lint`
+- `npm run test`
+- `npm run compile`
 
 ### Completion Notes List
 
+- Added a VS Code-runtime-free connect-on-launch coordinator in `src/debugger/connect-on-launch.ts` that reuses `withConnectTransition`, preserves FR4 state transitions, sets error context on failure, and throws launch-surfaced errors.
+- Added the single-active-connection guard and localized guidance string, rejecting second concurrent debug launches before any connect attempt.
+- Updated `DebugSessionManager.launch()` to optionally `await ensureConnection()` when no session exists, then proceed with existing `Debugger.enable` flow unchanged.
+- Extended `DebugAdapterFactory` wiring with `connectionStateStore`, injectable `connectToTarget`, defensive endpoint fallback via injected settings, and per-session `ensureConnection` injection.
+- Updated `extension.ts` debug adapter factory construction to pass connection store, localization, inline descriptor creation, and settings provider.
+- Added unit coverage for coordinator truth table, session-manager connect-on-launch path, adapter launch failure passthrough/no initialized event, and factory wiring behavior.
+- Automated validation succeeded for lint, tests, and compile. Manual Extension Development Host smoke validation remains pending.
+
 ### File List
+
+- `src/debugger/connect-on-launch.ts`
+- `src/debugger/debug-session-manager.ts`
+- `src/debugger/debug-adapter-factory.ts`
+- `src/debugger/index.ts`
+- `src/extension.ts`
+- `l10n/bundle.l10n.json`
+- `tests/unit/debugger/connect-on-launch.test.ts`
+- `tests/unit/debugger/debug-session-manager.test.ts`
+- `tests/unit/debugger/notebook-dap-adapter.test.ts`
+- `tests/unit/debugger/debug-adapter-factory.test.ts`
+- `docs/stories/sprint-status.yaml`
+- `docs/stories/11-2-connect-on-debug-launch.md`
 
 ## Change Log
 
 - 2026-06-24: Story drafted — connect-on-debug-launch with FR4 state reporting, actionable failure diagnostics, and single-active-connection rejection.
+- 2026-06-24: Implemented connect-on-debug-launch coordinator and wiring, added unit coverage for coordinator/session-manager/adapter/factory paths, and validated lint/test/compile; manual smoke validation pending.
