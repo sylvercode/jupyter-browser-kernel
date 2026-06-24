@@ -37,7 +37,7 @@ documentCounts:
 workflowType: prd
 workflow: edit
 projectName: jupyter-browser-kernel
-lastEdited: 2026-05-11
+lastEdited: 2026-06-23
 editHistory:
   - date: 2026-03-18
     changes: Reframed the product as a browser execution platform with Foundry as the first MVP profile, split core platform and profile scope, and regrouped requirements.
@@ -75,6 +75,8 @@ editHistory:
     changes: Added FR39 for post-MVP full VS Code native notebook-cell debugging and linked it to a new post-MVP core epic.
   - date: 2026-05-11
     changes: Follow-up PRD validation fixes: moved FR39 into a dedicated post-MVP core debugging subsection, extended J4 traceability to include FR39, added measurable debug-session coexistence NFR coverage, and standardized post-MVP core FR labels.
+  - date: 2026-06-23
+    changes: Added FR40 for post-MVP core debug-session-driven connection lifecycle (start/restart/stop = connect/reconnect/disconnect, endpoints configured as debug configurations with settings as fallback defaults), linked it to new Epic 11, and updated traceability to note FR40 supersedes the Epic 1 standalone command surface for FR1/FR5/FR6.
 ---
 
 # Product Requirements Document - jupyter-browser-kernel
@@ -448,7 +450,7 @@ This product is a VS Code-only developer tool. Its core job is deterministic Jav
 
 ## Functional Requirements
 
-Traceability highlights: FR1 through FR23 plus FR38 cover the platform execution contract used by MVP journeys; FR24 through FR26 (observation extensions), FR37 (parameterized execution), and FR39 (VS Code-native debugging) are post-MVP core-platform enhancements mapped to existing journeys as post-MVP expansions; FR27 through FR36 cover post-MVP app-specific profile requirements (Foundry).
+Traceability highlights: FR1 through FR23 plus FR38 cover the platform execution contract used by MVP journeys; FR24 through FR26 (observation extensions), FR37 (parameterized execution), and FR39 and FR40 (VS Code-native debugging and debug-session-driven connection lifecycle) are post-MVP core-platform enhancements mapped to existing journeys as post-MVP expansions; FR27 through FR36 cover post-MVP app-specific profile requirements (Foundry). FR40 re-expresses the FR1/FR5/FR6 connection-control capabilities through the debug session lifecycle, superseding the standalone command surface delivered in Epic 1.
 
 ### Core Platform Requirements
 
@@ -525,6 +527,7 @@ Traceability highlights: FR1 through FR23 plus FR38 cover the platform execution
 #### Core Debugging Extensions [Post-MVP Core]
 
 - FR39 [Post-MVP Core]: A user can start a VS Code debug session for notebook-cell execution and see breakpoint verification, paused-line highlighting, call stack, variables, and watch evaluation in native VS Code debug surfaces.
+- FR40 [Post-MVP Core]: A user can establish, reconnect, and end the browser execution connection through the VS Code debug session lifecycle (start = connect, restart = reconnect, stop = disconnect), with connection endpoints defined as debug configurations carrying host and port, workspace endpoint settings retained only as fallback defaults, and a single active connection at a time.
 
 ## Non-Functional Requirements
 
@@ -576,13 +579,13 @@ Traceability highlights: FR1 through FR23 plus FR38 cover the platform execution
 
 This table maps each user journey to the scope items, functional requirements, and non-functional requirements it exercises. Use this as the primary cross-reference for epic and story decomposition.
 
-| Journey                               | Scope Items              | FRs                                            | NFRs                         |
-| ------------------------------------- | ------------------------ | ---------------------------------------------- | ---------------------------- |
+| Journey                               | Scope Items              | FRs                                                        | NFRs                         |
+| ------------------------------------- | ------------------------ | ---------------------------------------------------------- | ---------------------------- |
 | J1: Rapid Snippet Iteration           | Core 1–11                | FR1–FR18, FR22–FR23, FR38; post-MVP: FR24–FR26, FR37, FR39 | NFR1, NFR3, NFR5–9, NFR12–13 |
-| J2: Safe Experimentation and Reversal | Core 3–4, 10             | FR8–FR17, FR19–FR21; post-MVP: FR37            | NFR1, NFR3, NFR5–6           |
-| J3: Connection and Target Recovery    | Core 1–2, 4–5            | FR1–FR7                                        | NFR2, NFR4, NFR8–9           |
-| J4: Diagnosing Unexpected Behavior    | Core 2, 4, 7             | FR14–FR18; post-MVP: FR24–FR26, FR39           | NFR3, NFR5–6, NFR8, NFR15–18 |
-| J5: Adding an App Profile (Post-MVP)  | Profile scope (post-MVP) | FR27–FR36                                      | NFR10–11, NFR14              |
+| J2: Safe Experimentation and Reversal | Core 3–4, 10             | FR8–FR17, FR19–FR21; post-MVP: FR37                        | NFR1, NFR3, NFR5–6           |
+| J3: Connection and Target Recovery    | Core 1–2, 4–5            | FR1–FR7                                                    | NFR2, NFR4, NFR8–9           |
+| J4: Diagnosing Unexpected Behavior    | Core 2, 4, 7             | FR14–FR18; post-MVP: FR24–FR26, FR39                       | NFR3, NFR5–6, NFR8, NFR15–18 |
+| J5: Adding an App Profile (Post-MVP)  | Profile scope (post-MVP) | FR27–FR36                                                  | NFR10–11, NFR14              |
 
 ## Glossary
 

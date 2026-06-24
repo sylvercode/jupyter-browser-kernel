@@ -1,5 +1,5 @@
-# generated: 2026-04-02
-# last_updated: 2026-05-14
+# generated: 2026-06-24
+# last_updated: 2026-06-24
 # project: jupyter-browser-kernel
 # project_key: NOKEY
 # tracking_system: file-system
@@ -34,8 +34,8 @@
 # - SM typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
-generated: 2026-04-02
-last_updated: 2026-06-23
+generated: 2026-06-24
+last_updated: 2026-06-24
 project: jupyter-browser-kernel
 project_key: NOKEY
 tracking_system: file-system
@@ -123,3 +123,27 @@ development_status:
   10-4-implement-stepping-controls-and-pause-lifecycle-synchronization: done
   10-5-validate-dual-client-coexistence-and-reliability: done
   epic-10-retrospective: done
+
+  # ── Epic 11: Debug-Session-Driven Connection Lifecycle (Post-MVP Core) ────
+  epic-11: backlog
+  11-1-configure-cdp-endpoint-via-debug-configuration-attributes: backlog
+  11-2-connect-on-debug-launch: backlog
+  11-3-reconnect-on-debug-restart: backlog
+  11-4-disconnect-on-debug-stop: backlog
+  11-5-prompt-to-start-a-debug-session-when-running-a-cell-without-one: backlog
+  11-6-retire-connect-disconnect-reconnect-commands-and-migrate-state-reporting: backlog
+  epic-11-retrospective: optional
+
+# VALIDATION SUMMARY:
+# ════════════════════
+# Total epics: 11
+# Total stories: 34
+# Epics done: 3 (Epic 1, Epic 2, Epic 10)
+# Epics in-progress: 0
+# Epics backlog: 8 (Epic 3, 4, 5, 6, 7, 8, 9, 11)
+# Stories done: 18 (1-1 to 1-7, 2-1 to 2-5, 2-spike, 10-1 to 10-5)
+# Stories ready-for-dev: 0
+# Stories in-progress: 0
+# Stories review: 0
+# Stories backlog: 16
+# Retrospectives completed: 3 (Epic 1, 2, 10)

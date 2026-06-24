@@ -59,3 +59,9 @@ Users can inject prompted placeholder values before execution for dynamic, repea
 Users can debug notebook cells fully inside VS Code with verified breakpoints, pause and step controls, call stack, variables, and watches, while preserving browser DevTools coexistence.
 **FRs covered:** FR39
 **Depends on:** Epic 1, Epic 2
+
+## Epic 11: Debug-Session-Driven Connection Lifecycle (Post-MVP Core)
+
+Users manage the browser execution connection through the VS Code debug session (start = connect, restart = reconnect, stop = disconnect), configure endpoints as multi-profile debug configurations with settings as fallback defaults, and run notebook cells without a separate connect step, retiring the standalone connect/disconnect/reconnect commands.
+**FRs covered:** FR40 (re-expresses FR1, FR5, FR6 delivery surface)
+**Depends on:** Epic 1, Epic 2, Epic 10
