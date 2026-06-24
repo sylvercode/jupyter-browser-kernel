@@ -131,6 +131,101 @@ test("launch enables debugger and subscribes paused listener", async () => {
   manager.dispose();
 });
 
+test("launch calls ensureConnection before enabling debugger when no session exists", async () => {
+  createConnectionStateStore();
+
+  const state = createState();
+  let connected = false;
+
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () =>
+      connected ? createStateTrackingSession(state) : undefined,
+    ensureConnection: async () => {
+      state.sequence.push("ensureConnection");
+      connected = true;
+    },
+    logger: () => undefined,
+  });
+
+  await manager.launch();
+
+  assert.deepEqual(state.sequence, [
+    "ensureConnection",
+    "enable",
+    "onPaused",
+    "onBreakpointResolved",
+  ]);
+
+  manager.dispose();
+});
+
+test("launch propagates ensureConnection rejection and does not mark session running", async () => {
+  createConnectionStateStore();
+
+  let ensureCalls = 0;
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () => undefined,
+    ensureConnection: async () => {
+      ensureCalls += 1;
+      throw new Error("connect-on-launch failed");
+    },
+    logger: () => undefined,
+  });
+
+  await assert.rejects(async () => {
+    await manager.launch();
+  }, /connect-on-launch failed/);
+
+  await assert.rejects(async () => {
+    await manager.launch();
+  }, /connect-on-launch failed/);
+
+  assert.equal(ensureCalls, 2);
+  assert.equal(manager.getDebuggerSession(), undefined);
+
+  manager.dispose();
+});
+
+test("launch without ensureConnection keeps connect-first fallback error", async () => {
+  createConnectionStateStore();
+
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () => undefined,
+    logger: () => undefined,
+  });
+
+  await assert.rejects(async () => {
+    await manager.launch();
+  }, /Cannot start debug session: connect to a browser target first\./);
+
+  manager.dispose();
+});
+
+test("launch invokes ensureConnection even when getDebuggerSession returns a session", async () => {
+  createConnectionStateStore();
+
+  const state = createState();
+  let ensureCalls = 0;
+
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () => createStateTrackingSession(state),
+    ensureConnection: async () => {
+      ensureCalls += 1;
+      throw new Error("single-active guard");
+    },
+    logger: () => undefined,
+  });
+
+  await assert.rejects(async () => {
+    await manager.launch();
+  }, /single-active guard/);
+
+  assert.equal(ensureCalls, 1);
+  assert.deepEqual(state.sequence, []);
+
+  manager.dispose();
+});
+
 test("terminate clears registry before disabling debugger", async () => {
   createConnectionStateStore();
 

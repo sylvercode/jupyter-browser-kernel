@@ -10,3 +10,7 @@ export {
   NotebookDebugAdapter,
   type NotebookDebugAdapterOptions,
 } from "./notebook-dap-adapter";
+export {
+  createEnsureBrowserConnection,
+  type EnsureBrowserConnectionOptions,
+} from "./connect-on-launch";

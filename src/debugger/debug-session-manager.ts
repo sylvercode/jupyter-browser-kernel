@@ -52,6 +52,7 @@ export interface DebugSessionManagerOptions {
   getDebuggerSession: () => BrowserDebuggerSession | undefined;
   logger: (message: string, error?: unknown) => void;
   localize?: Localize;
+  ensureConnection?: () => Promise<void>;
 }
 
 type DebuggerPausedEvent = ProtocolMappingApi.Events["Debugger.paused"][0];
@@ -112,6 +113,7 @@ export function createDebugSessionManager({
   getDebuggerSession,
   logger,
   localize = defaultLocalize,
+  ensureConnection,
 }: DebugSessionManagerOptions): DebugSessionManager {
   const terminateEmitter = new SimpleEmitter<DebugSessionTerminationReason>();
   const pausedEmitter = new SimpleEmitter<DebuggerPausedEvent>();
@@ -207,7 +209,12 @@ export function createDebugSessionManager({
         return;
       }
 
-      const session = getDebuggerSession();
+      let session = getDebuggerSession();
+      if (ensureConnection) {
+        await ensureConnection();
+        session = getDebuggerSession();
+      }
+
       if (!session) {
         throw new Error(
           localize(

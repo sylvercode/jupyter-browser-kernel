@@ -1,5 +1,11 @@
 # Deferred Work
 
+## Deferred from: code review of 11-2-connect-on-debug-launch (2026-06-24)
+
+- Error context not set when `connectToTarget` throws instead of returning `{ ok: false }` ([src/debugger/connect-on-launch.ts](../../src/debugger/connect-on-launch.ts) `createEnsureBrowserConnection`). Out-of-contract throw path: state transitions to `error` via `withConnectTransition`, but `setErrorContext` is never called, so the FR4 status indicator lacks guidance text. Mirrors the existing `runConnect` pattern; low risk because the transport returns results by contract.
+- Defensive endpoint fallback in `resolveEndpointFromSessionConfiguration` ([src/debugger/debug-adapter-factory.ts](../../src/debugger/debug-adapter-factory.ts)) is all-or-nothing: a partially-provided `session.configuration` (only host or only port, or a wrong type) discards both and falls back to settings, and validation errors attribute the fix to the settings surface rather than the debug config. Triggers only when Story 11.1's `DebugConfigProvider` (which normally attaches both validated fields) is bypassed.
+- Coordinator `onAborted` is a no-op (`() => undefined`) and diverges from `runConnect`, which disconnects an aborted-but-succeeded connection. Not triggerable today — a debug launch is not user-cancelable mid-connect; cancellation/teardown is Story 11.4.
+
 ## Deferred from: code review of 10-5-validate-dual-client-coexistence-and-reliability (2026-06-22)
 
 - Task 8 Clean Teardown asserts only that `Runtime.releaseObject` was called more times after disconnect (`releaseObjectCalls > before`), not that all reserved objectIds were released. The spec explicitly concedes `VariableStore` has no count method and accepts indirect spy verification, so completeness cannot be asserted directly. Acknowledged limitation.
