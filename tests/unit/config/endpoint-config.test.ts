@@ -5,9 +5,11 @@ import {
   CDP_PORT_MAX,
   CDP_PORT_MIN,
   readEndpointConfig,
+  resolveDebugConfigurationEndpoint,
   summarizeEndpointForDisplay,
   validateEndpointConfig,
 } from "../../../src/config/endpoint-config";
+import { makeSettings } from "../test-utils/make-settings";
 
 test("validateEndpointConfig accepts valid host and port", () => {
   const result = validateEndpointConfig({ host: "localhost", port: 9222 });
@@ -159,4 +161,211 @@ test("summarizeEndpointForDisplay preserves port in output", () => {
     summarizeEndpointForDisplay({ host: "remote.host", port: 9333 }),
     "[redacted-host]:9333",
   );
+});
+
+// ---------------------------------------------------------------------------
+// resolveDebugConfigurationEndpoint
+// ---------------------------------------------------------------------------
+
+const validSettings = makeSettings("localhost", 9222);
+
+test("resolveDebugConfigurationEndpoint: both host and port from config → sources are debug-config", () => {
+  const result = resolveDebugConfigurationEndpoint(
+    {
+      type: "t",
+      request: "launch",
+      name: "n",
+      host: "192.168.1.1",
+      port: 9333,
+    },
+    validSettings,
+  );
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.endpoint.host, "192.168.1.1");
+    assert.equal(result.endpoint.port, 9333);
+    assert.equal(result.sources.host, "debug-config");
+    assert.equal(result.sources.port, "debug-config");
+  }
+});
+
+test("resolveDebugConfigurationEndpoint: omit host → falls back to settings, port stays debug-config", () => {
+  const result = resolveDebugConfigurationEndpoint(
+    { type: "t", request: "launch", name: "n", port: 9333 },
+    validSettings,
+  );
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.endpoint.host, "localhost");
+    assert.equal(result.endpoint.port, 9333);
+    assert.equal(result.sources.host, "settings");
+    assert.equal(result.sources.port, "debug-config");
+  }
+});
+
+test("resolveDebugConfigurationEndpoint: omit port → falls back to settings, host stays debug-config", () => {
+  const result = resolveDebugConfigurationEndpoint(
+    { type: "t", request: "launch", name: "n", host: "127.0.0.1" },
+    validSettings,
+  );
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.endpoint.host, "127.0.0.1");
+    assert.equal(result.endpoint.port, 9222);
+    assert.equal(result.sources.host, "debug-config");
+    assert.equal(result.sources.port, "settings");
+  }
+});
+
+test("resolveDebugConfigurationEndpoint: omit both → both fall back to settings", () => {
+  const result = resolveDebugConfigurationEndpoint(
+    { type: "t", request: "launch", name: "n" },
+    validSettings,
+  );
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.endpoint.host, "localhost");
+    assert.equal(result.endpoint.port, 9222);
+    assert.equal(result.sources.host, "settings");
+    assert.equal(result.sources.port, "settings");
+  }
+});
+
+test("resolveDebugConfigurationEndpoint: port 0 → failure naming port with debug-config corrective action", () => {
+  const result = resolveDebugConfigurationEndpoint(
+    { type: "t", request: "launch", name: "n", host: "localhost", port: 0 },
+    validSettings,
+  );
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.error.field, "port");
+    assert.match(result.error.correctiveAction, /launch\.json/);
+    assert.match(result.error.correctiveAction, /"port"/);
+  }
+});
+
+test("resolveDebugConfigurationEndpoint: port 70000 → failure naming port with debug-config corrective action", () => {
+  const result = resolveDebugConfigurationEndpoint(
+    { type: "t", request: "launch", name: "n", host: "localhost", port: 70000 },
+    validSettings,
+  );
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.error.field, "port");
+    assert.match(result.error.correctiveAction, /launch\.json/);
+  }
+});
+
+test("resolveDebugConfigurationEndpoint: non-integer port → failure naming port with debug-config corrective action", () => {
+  const result = resolveDebugConfigurationEndpoint(
+    {
+      type: "t",
+      request: "launch",
+      name: "n",
+      host: "localhost",
+      port: 9222.5,
+    },
+    validSettings,
+  );
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.error.field, "port");
+    assert.match(result.error.correctiveAction, /launch\.json/);
+  }
+});
+
+test("resolveDebugConfigurationEndpoint: port is a string (wrong type) → failure naming port with debug-config corrective action", () => {
+  const result = resolveDebugConfigurationEndpoint(
+    {
+      type: "t",
+      request: "launch",
+      name: "n",
+      host: "localhost",
+      port: "9222" as unknown as number,
+    },
+    validSettings,
+  );
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.error.field, "port");
+    assert.match(result.error.correctiveAction, /launch\.json/);
+    assert.match(result.error.correctiveAction, /"port"/);
+  }
+});
+
+test("resolveDebugConfigurationEndpoint: empty string host → failure naming host with debug-config corrective action", () => {
+  const result = resolveDebugConfigurationEndpoint(
+    { type: "t", request: "launch", name: "n", host: "", port: 9222 },
+    validSettings,
+  );
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.error.field, "host");
+    assert.match(result.error.correctiveAction, /launch\.json/);
+    assert.match(result.error.correctiveAction, /"host"/);
+  }
+});
+
+test("resolveDebugConfigurationEndpoint: host is non-string (wrong type) → failure naming host with debug-config corrective action", () => {
+  const result = resolveDebugConfigurationEndpoint(
+    {
+      type: "t",
+      request: "launch",
+      name: "n",
+      host: 42 as unknown as string,
+      port: 9222,
+    },
+    validSettings,
+  );
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.error.field, "host");
+    assert.match(result.error.correctiveAction, /launch\.json/);
+  }
+});
+
+test("resolveDebugConfigurationEndpoint: invalid settings host after fallback → failure with settings corrective action", () => {
+  const badHostSettings = makeSettings("", 9222);
+
+  const result = resolveDebugConfigurationEndpoint(
+    { type: "t", request: "launch", name: "n", port: 9222 },
+    badHostSettings,
+  );
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.error.field, "host");
+    assert.match(
+      result.error.correctiveAction,
+      /jupyterBrowserKernel\.cdpHost/,
+    );
+  }
+});
+
+test("resolveDebugConfigurationEndpoint: invalid settings port after fallback → failure with settings corrective action", () => {
+  const badPortSettings = makeSettings("localhost", 0);
+
+  const result = resolveDebugConfigurationEndpoint(
+    { type: "t", request: "launch", name: "n", host: "localhost" },
+    badPortSettings,
+  );
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.error.field, "port");
+    assert.match(
+      result.error.correctiveAction,
+      /jupyterBrowserKernel\.cdpPort/,
+    );
+  }
 });

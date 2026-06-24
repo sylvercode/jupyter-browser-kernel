@@ -33,7 +33,9 @@
           {
             "type": "jupyter-browser-kernel",
             "request": "launch",
-            "name": "%debugger.jupyterBrowserKernel.launch.label%"
+            "name": "%debugger.jupyterBrowserKernel.launch.label%",
+            "host": "localhost",
+            "port": 9222
           }
         ],
         "configurationSnippets": [
@@ -43,13 +45,28 @@
             "body": {
               "type": "jupyter-browser-kernel",
               "request": "launch",
-              "name": "%debugger.jupyterBrowserKernel.launch.label%"
+              "name": "%debugger.jupyterBrowserKernel.launch.label%",
+              "host": "localhost",
+              "port": 9222
             }
           }
         ],
         "configurationAttributes": {
           "launch": {
-            "properties": {}
+            "properties": {
+              "host": {
+                "type": "string",
+                "description": "%debugger.jupyterBrowserKernel.host.description%",
+                "default": "localhost"
+              },
+              "port": {
+                "type": "number",
+                "description": "%debugger.jupyterBrowserKernel.port.description%",
+                "default": 9222,
+                "minimum": 1,
+                "maximum": 65535
+              }
+            }
           }
         }
       }

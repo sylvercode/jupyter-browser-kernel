@@ -126,7 +126,7 @@ development_status:
 
   # ── Epic 11: Debug-Session-Driven Connection Lifecycle (Post-MVP Core) ────
   epic-11: in-progress
-  11-1-configure-cdp-endpoint-via-debug-configuration-attributes: ready-for-dev
+  11-1-configure-cdp-endpoint-via-debug-configuration-attributes: review
   11-2-connect-on-debug-launch: backlog
   11-3-reconnect-on-debug-restart: backlog
   11-4-disconnect-on-debug-stop: backlog
