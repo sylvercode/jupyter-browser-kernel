@@ -118,6 +118,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const debugConfigProvider = new DebugConfigProvider({
     localize: vscode.l10n.t,
+    getSettings: () =>
+      vscode.workspace.getConfiguration("jupyterBrowserKernel"),
+    showError: (message) => vscode.window.showErrorMessage(message),
   });
   context.subscriptions.push(
     vscode.debug.registerDebugConfigurationProvider(

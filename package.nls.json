@@ -11,6 +11,8 @@
   "debugger.jupyterBrowserKernel.launch.label": "Browser Kernel Debug",
   "debugger.jupyterBrowserKernel.snippet.label": "Jupyter Browser Kernel: Browser Kernel Debug",
   "debugger.jupyterBrowserKernel.snippet.description": "Launch a Browser Kernel debug session against the active connected browser target.",
+  "debugger.jupyterBrowserKernel.host.description": "CDP endpoint host name or IP address.",
+  "debugger.jupyterBrowserKernel.port.description": "CDP remote debugging TCP port.",
   "configuration.title": "Jupyter Browser Kernel",
   "configuration.cdpHost.description": "CDP endpoint host name or IP address.",
   "configuration.cdpHost.markdownDescription": "Host for the Browser CDP endpoint. Use a resolvable hostname or IP address, for example `localhost` or `127.0.0.1`.",
