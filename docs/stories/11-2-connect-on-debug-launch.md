@@ -2,7 +2,7 @@
 storyId: "11.2"
 storyKey: "11-2-connect-on-debug-launch"
 title: "Connect on Debug Launch"
-status: "in-progress"
+status: "done"
 created: "2026-06-24"
 epic: "11"
 priority: "p1-high"
@@ -16,7 +16,7 @@ dependencies:
 
 # Story 11.2: Connect on Debug Launch
 
-**Status:** in-progress
+**Status:** done
 
 ## Story
 
@@ -81,7 +81,7 @@ Concretely:
   - Throw an `Error` with a localized single-active-connection guidance message **before** calling `connectToTarget` — the existing connection MUST NOT be touched (no `disconnect`, no state change, no transition).
   - Add the guidance string to [l10n/bundle.l10n.json](../../l10n/bundle.l10n.json), e.g.:
     - `"A browser connection is already active. Stop the existing debug session before starting another — only one active connection is supported."`
-- [x] Rationale / why this placement works (document in Dev Notes): `DebugSessionManager.launch()` only calls `ensureConnection()` when `getDebuggerSession()` returns `undefined` (no connection). The first session connects and `launch()`'s `running` guard makes it idempotent, so a session never rejects itself. A second session's separate manager sees the existing connection and rejects. This also correctly rejects a debug start when a connection already exists from the legacy connect command (still present until Story 11.6).
+- [x] Rationale / why this placement works (document in Dev Notes): `DebugSessionManager.launch()` invokes `ensureConnection()` whenever it is provided — **not** only when `getDebuggerSession()` returns `undefined`. This is required because the single-active rejection itself lives **inside** `ensureConnection()`: a second session's separate manager sees the first session's connection via `getDebuggerSession()` (truthy), so if `launch()` skipped `ensureConnection()` whenever a session already existed, the second session would never produce the rejection and would silently proceed onto the existing connection. The first session connects and `launch()`'s `running` guard makes it idempotent, so a session never rejects itself. The second session calls `ensureConnection()`, sees the existing connection, and rejects. This also correctly rejects a debug start when a connection already exists from the legacy connect command (still present until Story 11.6).
 - [x] Because the rejection is thrown before any teardown, "the existing session and connection remain unaffected" (AC 2) holds by construction.
 
 ### 4. Wire the Coordinator Into `DebugSessionManager.launch()` (AC: 1, 2)
@@ -89,7 +89,7 @@ Concretely:
 - [x] Extend `DebugSessionManagerOptions` in [src/debugger/debug-session-manager.ts](../../src/debugger/debug-session-manager.ts) with an optional `ensureConnection?: () => Promise<void>`.
 - [x] In `createDebugSessionManager(...)` `launch`, replace the current "no session → throw immediately" path:
   - Keep the leading `if (running) return;` short-circuit (idempotent launch).
-  - When `getDebuggerSession()` returns `undefined` AND `ensureConnection` is provided: `await ensureConnection()`, then re-read `getDebuggerSession()`.
+  - When `ensureConnection` is provided: `await ensureConnection()`, then re-read `getDebuggerSession()`. Invoke `ensureConnection()` **unconditionally** (not gated on `getDebuggerSession()` being `undefined`) — the single-active rejection lives inside `ensureConnection()`, so a second session (which sees the first session's connection via `getDebuggerSession()`) must still call it to be rejected rather than proceeding onto the existing connection.
   - If a session is now present, continue with the existing `Debugger.enable` / `scriptParsed` flow unchanged.
   - If still `undefined` (or `ensureConnection` was not provided), preserve the existing `throw new Error(localize("Cannot start debug session: connect to a browser target first."))` so behavior is unchanged when connect-on-launch is not wired (keeps existing tests valid).
 - [x] Let an `ensureConnection()` rejection propagate out of `launch()` unchanged — the adapter (Task 5) converts it into a DAP error response. Do NOT swallow it.
@@ -144,6 +144,16 @@ Concretely:
   - With the session active, run a browser-kernel notebook cell and confirm it executes against the established connection (no separate connect step needed).
   - Start a **second** `jupyter-browser-kernel` debug session and confirm it is rejected with the single-active guidance, while the first session and its connection keep working.
   - Point the configuration at an unreachable `port`, start the session, and confirm an actionable failure diagnostic appears and the debug session ends cleanly (no dangling session, state returns to `error`/`disconnected`).
+
+### Review Findings
+
+_Code review 2026-06-24 (adversarial: Blind Hunter + Edge Case Hunter + Acceptance Auditor). 1 decision-needed, 1 patch, 3 deferred, 3 dismissed as noise._
+
+- [x] [Review][Decision→Patched] TOCTOU race on the single-active-connection guard — Two concurrent `jupyter-browser-kernel` debug launches could both observe `getActiveConnection() === undefined` before either set the singleton; `connectToBrowserTarget` calls `clearActiveBrowserConnection()` immediately before assigning, so the second connect would silently **close the first connection**, violating AC2. **Fixed:** added an in-flight guard in [src/debugger/connect-on-launch.ts](../../src/debugger/connect-on-launch.ts) that rejects when `connectionStateStore.getState() === "connecting"` (the state is set synchronously by `withConnectTransition.beginTransition` before the first `await` yields, so a racing second launch is rejected before it can start a competing connect). Added localized "already being established" guidance and a unit test that parks a connect in flight and asserts the racing second launch is rejected without a second `connectToTarget` call. [src/debugger/connect-on-launch.ts:29], [src/transport/browser-connect.ts:764]
+- [x] [Review][Patch] Story Task 4 guard wording contradicted the (correct) implementation [src/debugger/debug-session-manager.ts:213] — **Fixed:** corrected the Task 3 rationale and Task 4 wording to state that `ensureConnection()` is invoked **unconditionally** (not gated on `getDebuggerSession()` being `undefined`). The shipped `if (ensureConnection)` is required because the single-active rejection lives inside `ensureConnection()`: a second session sees the first session's singleton via `getDebuggerSession()` (truthy), so a `!session` guard would skip the rejection and wrongly proceed to `enable()` on the existing connection. No code change — the implementation and the "even when getDebuggerSession returns a session" test were already correct.
+- [x] [Review][Defer] Error context not set when `connectToTarget` throws instead of returning `{ ok: false }` [src/debugger/connect-on-launch.ts:37] — deferred, pre-existing pattern. The `ConnectToTargetOperation` contract returns a result; `runConnect` only sets error context on `ok === false` too. State still transitions to `error` via `withConnectTransition`; only the guidance text is missing on the out-of-contract throw path.
+- [x] [Review][Defer] Defensive endpoint fallback is all-or-nothing and attributes errors to settings [src/debugger/debug-adapter-factory.ts:60] — deferred, defensive path only. If `session.configuration` has only one of host/port (or a wrong type), the factory discards both and reads settings, and any error names the settings surface rather than the debug config. Story 11.1's `DebugConfigProvider` normally attaches both validated fields, so this triggers only when the provider is bypassed.
+- [x] [Review][Defer] Coordinator `onAborted` no-op diverges from `runConnect` cleanup [src/debugger/connect-on-launch.ts:41] — deferred, not triggerable today. `runConnect` disconnects an aborted-but-succeeded connection; the coordinator passes `() => undefined`. A debug launch is not user-cancelable mid-connect in this story (cancellation/teardown is Story 11.4), so no resource leak can occur yet.
 
 ## Dev Notes
 

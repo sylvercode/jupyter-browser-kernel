@@ -143,3 +143,56 @@ test("ensureConnection rejects when an active connection already exists", async 
   assert.equal(connectCalls, 0);
   assert.deepEqual(connectionStateStore.getHistory(), ["disconnected"]);
 });
+
+test("ensureConnection rejects a racing second launch while a connect is in flight", async () => {
+  const connectionStateStore = createConnectionStateStore();
+
+  let resolveFirstConnect: (() => void) | undefined;
+  let firstConnectStarted: (() => void) | undefined;
+  const firstConnectReached = new Promise<void>((resolve) => {
+    firstConnectStarted = resolve;
+  });
+
+  let connectCalls = 0;
+  const ensureConnection = createEnsureBrowserConnection({
+    endpoint,
+    connectionStateStore,
+    connectToTarget: async () => {
+      connectCalls += 1;
+      firstConnectStarted?.();
+      await new Promise<void>((resolve) => {
+        resolveFirstConnect = resolve;
+      });
+      return {
+        ok: true,
+        endpoint,
+        connectedTarget: {
+          targetId: "target-1",
+          sessionId: "session-1",
+        },
+      };
+    },
+    getActiveConnection: () => undefined,
+    localize,
+  });
+
+  // First launch begins connecting and parks inside connectToTarget; the store
+  // is now in the synchronously-set `connecting` state.
+  const firstLaunch = ensureConnection();
+  await firstConnectReached;
+  assert.equal(connectionStateStore.getState(), "connecting");
+
+  // A second launch racing in before the first connect resolves must be
+  // rejected without starting another connect.
+  await assert.rejects(async () => {
+    await ensureConnection();
+  }, /A browser connection is already being established\./);
+
+  assert.equal(connectCalls, 1);
+
+  // Let the first connect finish cleanly.
+  resolveFirstConnect?.();
+  await firstLaunch;
+
+  assert.equal(connectionStateStore.getState(), "connected");
+});

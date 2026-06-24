@@ -35,6 +35,20 @@ export function createEnsureBrowserConnection({
       );
     }
 
+    // In-flight guard: `withConnectTransition` sets the state to `connecting`
+    // synchronously (before its first `await` yields), so a second debug launch
+    // racing into `ensureConnection()` before the first connect completes will
+    // observe `connecting` here and be rejected instead of clobbering the
+    // in-progress connection (the transport closes any prior connection right
+    // before assigning the new singleton).
+    if (connectionStateStore.getState() === "connecting") {
+      throw new Error(
+        localize(
+          "A browser connection is already being established. Wait for it to finish before starting another - only one active connection is supported.",
+        ),
+      );
+    }
+
     const connectResult = await withConnectTransition(
       connectionStateStore,
       (abortSignal) => connectToTarget(endpoint, localize, abortSignal),
