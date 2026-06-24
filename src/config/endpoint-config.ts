@@ -160,7 +160,7 @@ export function resolveDebugConfigurationEndpoint(
       ok: false,
       error: {
         field: "host",
-        message: localize("Invalid CDP host: host cannot be empty."),
+        message: localize("Invalid CDP host: host must be a string."),
         correctiveAction: localize(
           'Set the "host" attribute in your launch.json debug configuration to a hostname or IP address, for example localhost.',
         ),

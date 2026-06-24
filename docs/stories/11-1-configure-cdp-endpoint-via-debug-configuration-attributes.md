@@ -2,7 +2,7 @@
 storyId: "11.1"
 storyKey: "11-1-configure-cdp-endpoint-via-debug-configuration-attributes"
 title: "Configure CDP Endpoint via Debug Configuration Attributes"
-status: "review"
+status: "done"
 created: "2026-06-24"
 epic: "11"
 priority: "p1-high"
@@ -15,7 +15,7 @@ dependencies:
 
 # Story 11.1: Configure CDP Endpoint via Debug Configuration Attributes
 
-**Status:** review
+**Status:** done
 
 ## Story
 
@@ -130,6 +130,12 @@ Concretely:
   - Edit `launch.json` with a valid `host`/`port`, start the configuration, and confirm no resolution error is shown. (The session will not yet connect — connect-on-launch is Story 11.2; confirming "resolves without a diagnostic" is the bar here.)
   - Set `port` to `0` (or a non-integer), start the configuration, and confirm a clear diagnostic names the `port` attribute and the session does not start.
   - Remove `host`/`port` from the config and confirm it resolves using the `jupyterBrowserKernel.cdpHost` / `cdpPort` settings without error.
+
+### Review Findings
+
+_Code review 2026-06-24 (branch `cdp-via-debug-config` vs `main`). Layers: Blind Hunter, Edge Case Hunter, Acceptance Auditor (full pass). 1 patch, 1 dismissed as noise._
+
+- [x] [Review][Patch] Non-string `host` reuses the "host cannot be empty" diagnostic [src/config/endpoint-config.ts:166] — FIXED 2026-06-24: non-string branch now emits `Invalid CDP host: host must be a string.` (new l10n string) with test assertion. — When `rawConfig["host"]` is present but not a string (e.g. `42`, `true`), the resolver returns `message: "Invalid CDP host: host cannot be empty."`, which is factually wrong: the value is the wrong type, not empty. The corrective action correctly names the `host` attribute, so it is still actionable, but the message misleads. Flagged independently by Blind Hunter and Edge Case Hunter. Low severity (the manifest schema declares `type: "string"`, but launch.json schema violations do not block launching). Fix: emit a type-accurate message for the non-string branch, or accept the imprecision (the story's "reuse the existing message" guidance targeted the empty/source split, not the type-mismatch branch).
 
 ## Dev Notes
 

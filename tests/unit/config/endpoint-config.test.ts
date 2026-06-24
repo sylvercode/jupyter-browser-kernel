@@ -330,6 +330,10 @@ test("resolveDebugConfigurationEndpoint: host is non-string (wrong type) → fai
   assert.equal(result.ok, false);
   if (!result.ok) {
     assert.equal(result.error.field, "host");
+    assert.equal(
+      result.error.message,
+      "Invalid CDP host: host must be a string.",
+    );
     assert.match(result.error.correctiveAction, /launch\.json/);
   }
 });
