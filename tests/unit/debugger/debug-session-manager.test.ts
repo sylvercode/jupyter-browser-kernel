@@ -335,9 +335,9 @@ test("terminate resets state even when disconnectActiveConnection throws", async
 
   await manager.launch();
 
-  await assert.rejects(async () => {
+  await assert.doesNotReject(async () => {
     await manager.terminate();
-  }, /disconnect failed/);
+  });
 
   assert.equal(disconnectCalls, 1);
   assert.equal(connectionStateStore.getState(), "disconnected");
@@ -415,6 +415,46 @@ test("connection-state disconnected transition emits terminated exactly once", a
 
   connectionStateStore.setState("disconnected");
   connectionStateStore.setState("error");
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (reasons.length > 0) {
+      break;
+    }
+    await Promise.resolve();
+  }
+
+  assert.deepEqual(reasons, ["connection-lost"]);
+
+  subscription.dispose();
+  manager.dispose();
+});
+
+test("connection-state disconnected emits termination even if stop teardown hangs", async () => {
+  const connectionStateStore = createConnectionStateStore();
+
+  const state = createState();
+  const base = createStateTrackingSession(state);
+  const hangingSession: BrowserDebuggerSession = {
+    ...base,
+    disable: async () =>
+      await new Promise<void>(() => {
+        // Never resolves to simulate transport teardown hang.
+      }),
+  };
+
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () => hangingSession,
+    logger: () => undefined,
+  });
+
+  const reasons: string[] = [];
+  const subscription = manager.onDidTerminate((reason) => {
+    reasons.push(reason);
+  });
+
+  await manager.launch();
+
+  connectionStateStore.setState("disconnected");
 
   for (let attempt = 0; attempt < 20; attempt += 1) {
     if (reasons.length > 0) {

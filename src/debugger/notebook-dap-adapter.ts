@@ -629,6 +629,7 @@ export class NotebookDebugAdapter
     await this.sessionManager.disconnect();
     response.success = true;
     this.sendResponse(response);
+    this.sendTerminatedOnce(new TerminatedEvent());
   }
 
   protected override async continueRequest(
@@ -768,14 +769,7 @@ export class NotebookDebugAdapter
 
   private emitTermination(reason: DebugSessionTerminationReason): void {
     if (reason === "connection-lost") {
-      this.sendTerminatedOnce(
-        new TerminatedEvent({
-          reason: "connection-lost",
-          description: this.localize(
-            "Browser connection lost; debug session terminated.",
-          ),
-        }),
-      );
+      this.sendTerminatedOnce(new TerminatedEvent());
     }
   }
 

@@ -126,7 +126,7 @@ test("terminate emits terminated event so one stop cleanly ends session", async 
   harness.adapter.dispose();
 });
 
-test("disconnect request routes through session manager disconnect", async () => {
+test("disconnect request routes through session manager disconnect and emits terminated", async () => {
   let disconnectCalls = 0;
 
   const harness = createAdapterHarness(
@@ -142,6 +142,14 @@ test("disconnect request routes through session manager disconnect", async () =>
 
   assert.equal(response.success, true);
   assert.equal(disconnectCalls, 1);
+
+  const terminatedEvents = harness.sentMessages.filter(
+    (message) =>
+      message.type === "event" &&
+      (message as DebugProtocol.Event).event === "terminated",
+  );
+
+  assert.equal(terminatedEvents.length, 1);
 
   harness.adapter.dispose();
 });

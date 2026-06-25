@@ -209,9 +209,8 @@ export function createDebugSessionManager({
     }
 
     emittedConnectionLost = true;
-    void stopRunningSession().finally(() => {
-      terminateEmitter.fire("connection-lost");
-    });
+    terminateEmitter.fire("connection-lost");
+    void stopRunningSession();
   });
 
   const applyDisconnectedConnectionState = (): void => {
@@ -225,6 +224,11 @@ export function createDebugSessionManager({
 
     try {
       await disconnectActiveConnection?.();
+    } catch (error) {
+      logger(
+        "Failed to disconnect active browser connection during debug stop: {0}",
+        error,
+      );
     } finally {
       applyDisconnectedConnectionState();
     }
