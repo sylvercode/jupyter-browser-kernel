@@ -2,7 +2,7 @@
 storyId: "11.3"
 storyKey: "11-3-reconnect-on-debug-restart"
 title: "Reconnect on Debug Restart"
-status: review
+status: done
 created: "2026-06-25"
 epic: "11"
 priority: "p1-high"
@@ -15,7 +15,7 @@ dependencies:
 
 # Story 11.3: Reconnect on Debug Restart
 
-**Status:** review
+**Status:** done
 
 ## Story
 
@@ -200,6 +200,12 @@ GPT-5.3-Codex
 - `tests/unit/debugger/notebook-dap-adapter.test.ts`
 - `tests/unit/test-utils/debug-session-manager-mock.ts`
 
+### Review Findings
+
+- [x] [Review][Defer] `sendErrorResponse` uses error code `0` [src/debugger/notebook-dap-adapter.ts] — deferred, pre-existing; `launchRequest` uses the same pattern, not introduced by 11.3
+- [x] [Review][Defer] No concurrent-restart guard in `restart()` [src/debugger/debug-session-manager.ts] — deferred, pre-existing; same gap exists in `launch()` directly; VS Code debug UI prevents rapid re-invocation
+
 ## Change Log
 
 - 2026-06-25: Implemented Story 11.3 restart lifecycle support for DAP restart requests, deterministic reconnect sequencing, restart regression coverage, and completed manual Extension Development Host smoke validation. Story moved to review.
+- 2026-06-25: Code review complete. 0 decision-needed, 0 patch, 2 defer, 2 dismissed. Story status set to done.
