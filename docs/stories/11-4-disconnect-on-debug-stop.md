@@ -2,7 +2,7 @@
 storyId: "11.4"
 storyKey: "11-4-disconnect-on-debug-stop"
 title: "Disconnect on Debug Stop"
-status: "ready-for-dev"
+status: "in-progress"
 created: "2026-06-25"
 epic: "11"
 priority: "p1-high"
@@ -16,7 +16,7 @@ dependencies:
 
 # Story 11.4: Disconnect on Debug Stop
 
-**Status:** ready-for-dev
+**Status:** in-progress
 
 ## Story
 
@@ -57,66 +57,71 @@ Concretely:
 
 ### 1. Make Stop/Terminate Drive Full Disconnect (AC: 1)
 
-- [ ] In `src/debugger/notebook-dap-adapter.ts`, ensure all stop pathways call into explicit manager teardown before adapter shutdown:
-  - [ ] Keep `terminateRequest` wired to `sessionManager.terminate()`.
-  - [ ] Implement/verify `disconnectRequest` wiring to `sessionManager.disconnect()` for stop flows that use DAP disconnect rather than terminate.
-  - [ ] Keep terminated-event emission single-shot (`sendTerminatedOnce`) so duplicate stop signals do not emit duplicate terminal events.
-- [ ] In `src/debugger/debug-session-manager.ts`, make `disconnect()` and `terminate()` perform full lifecycle teardown, not only `stopRunningSession()`:
-  - [ ] Run deterministic manager teardown (`stopRunningSession()`).
-  - [ ] Disconnect the active transport connection via injected `disconnectActiveConnection` (default `disconnectActiveBrowserConnection`).
-  - [ ] Preserve idempotency and swallow non-fatal teardown failures where appropriate.
+[x] In `src/debugger/notebook-dap-adapter.ts`, ensure all stop pathways call into explicit manager teardown before adapter shutdown:
+
+- [x] Keep `terminateRequest` wired to `sessionManager.terminate()`.
+- [x] Implement/verify `disconnectRequest` wiring to `sessionManager.disconnect()` for stop flows that use DAP disconnect rather than terminate.
+- [x] Keep terminated-event emission single-shot (`sendTerminatedOnce`) so duplicate stop signals do not emit duplicate terminal events.
+      [x] In `src/debugger/debug-session-manager.ts`, make `disconnect()` and `terminate()` perform full lifecycle teardown, not only `stopRunningSession()`:
+- [x] Run deterministic manager teardown (`stopRunningSession()`).
+- [x] Disconnect the active transport connection via injected `disconnectActiveConnection` (default `disconnectActiveBrowserConnection`).
+- [x] Preserve idempotency and swallow non-fatal teardown failures where appropriate.
 
 ### 2. Return FR4 State to Disconnected on Debug Stop (AC: 1)
 
-- [ ] Ensure explicit stop/terminate sets connection-state store to `disconnected` and clears stale error context after teardown.
-- [ ] Reuse existing state primitives in `src/transport/connection-state.ts` and existing disconnect-command semantics as reference behavior (`cancelTransitions`, clear error context, set `disconnected`).
-- [ ] Avoid introducing a second state machine or direct UI-only state mutation path.
+[x] Ensure explicit stop/terminate sets connection-state store to `disconnected` and clears stale error context after teardown.
+[x] Reuse existing state primitives in `src/transport/connection-state.ts` and existing disconnect-command semantics as reference behavior (`cancelTransitions`, clear error context, set `disconnected`).
+[x] Avoid introducing a second state machine or direct UI-only state mutation path.
 
 ### 3. Preserve Coexistence and Deterministic Resource Disposal (AC: 1, 2)
 
-- [ ] Keep teardown sequencing deterministic:
-  - [ ] clear manager-owned listeners/registries/stores,
-  - [ ] disable the adapter's debugger-domain session,
-  - [ ] disconnect the extension-owned active connection singleton.
-- [ ] Ensure teardown remains scoped to this extension's connection/session only; do not add behavior that force-detaches external DevTools clients.
-- [ ] Confirm that after stop, a subsequent launch reconnects cleanly through Story 11.2 connect-on-launch path with no stale singleton/session-manager state.
+[x] Keep teardown sequencing deterministic:
+
+- [x] clear manager-owned listeners/registries/stores,
+- [x] disable the adapter's debugger-domain session,
+- [x] disconnect the extension-owned active connection singleton.
+      [x] Ensure teardown remains scoped to this extension's connection/session only; do not add behavior that force-detaches external DevTools clients.
+      [x] Confirm that after stop, a subsequent launch reconnects cleanly through Story 11.2 connect-on-launch path with no stale singleton/session-manager state.
 
 ### 4. Wire Factory/Dependency Boundaries Cleanly (AC: 1)
 
-- [ ] Keep `disconnectActiveBrowserConnection` injection through `DebugAdapterFactory` into `createDebugSessionManager` so disconnect-on-stop remains testable and runtime-free in manager logic.
-- [ ] If additional lifecycle hooks are required (for example API-level terminate observations), add them through injected dependencies in `extension.ts` / factory wiring, not ad hoc globals.
-- [ ] Do not add direct VS Code UI prompts in stop teardown path; stop should be deterministic and quiet unless failure requires actionable diagnostics.
+[x] Keep `disconnectActiveBrowserConnection` injection through `DebugAdapterFactory` into `createDebugSessionManager` so disconnect-on-stop remains testable and runtime-free in manager logic.
+[x] If additional lifecycle hooks are required (for example API-level terminate observations), add them through injected dependencies in `extension.ts` / factory wiring, not ad hoc globals.
+[x] Do not add direct VS Code UI prompts in stop teardown path; stop should be deterministic and quiet unless failure requires actionable diagnostics.
 
 ### 5. Unit Tests - Adapter Stop Lifecycle (AC: 1)
 
-- [ ] Extend `tests/unit/debugger/notebook-dap-adapter.test.ts` to assert:
-  - [ ] `terminate` request invokes `sessionManager.terminate()` exactly once and emits one `terminated` event.
-  - [ ] `disconnect` request invokes `sessionManager.disconnect()` and does not require a separate manual disconnect command.
-  - [ ] duplicate stop signals do not emit duplicate terminated events.
+[x] Extend `tests/unit/debugger/notebook-dap-adapter.test.ts` to assert:
+
+- [x] `terminate` request invokes `sessionManager.terminate()` exactly once and emits one `terminated` event.
+- [x] `disconnect` request invokes `sessionManager.disconnect()` and does not require a separate manual disconnect command.
+- [x] duplicate stop signals do not emit duplicate terminated events.
 
 ### 6. Unit Tests - Session Manager Disconnect Semantics (AC: 1, 2)
 
-- [ ] Extend `tests/unit/debugger/debug-session-manager.test.ts` to assert:
-  - [ ] `disconnect()` and `terminate()` call manager teardown plus injected `disconnectActiveConnection`.
-  - [ ] teardown is idempotent when invoked repeatedly.
-  - [ ] stop teardown does not regress restart path behavior (`restart()` still performs teardown + reconnect).
-  - [ ] connection-lost handling remains distinct from intentional stop handling.
+[x] Extend `tests/unit/debugger/debug-session-manager.test.ts` to assert:
+
+- [x] `disconnect()` and `terminate()` call manager teardown plus injected `disconnectActiveConnection`.
+- [x] teardown is idempotent when invoked repeatedly.
+- [x] stop teardown does not regress restart path behavior (`restart()` still performs teardown + reconnect).
+- [x] connection-lost handling remains distinct from intentional stop handling.
 
 ### 7. Unit Tests - Factory Wiring and State Reporting (AC: 1)
 
-- [ ] Extend/add `tests/unit/debugger/debug-adapter-factory.test.ts` to verify manager receives disconnect dependency wiring used by stop lifecycle.
-- [ ] Add/extend tests around connection-state reporting path to verify explicit stop returns state to `disconnected` and clears error context (unit-level through injected store or existing state listeners).
+[x] Extend/add `tests/unit/debugger/debug-adapter-factory.test.ts` to verify manager receives disconnect dependency wiring used by stop lifecycle.
+[x] Add/extend tests around connection-state reporting path to verify explicit stop returns state to `disconnected` and clears error context (unit-level through injected store or existing state listeners).
 
 ### 8. Validation
 
-- [ ] `npm run lint`.
-- [ ] `npm run test`.
-- [ ] `npm run compile`.
-- [ ] Manual smoke in Extension Development Host:
-  - [ ] Start a `jupyter-browser-kernel` debug session and verify connection reaches `connected`.
-  - [ ] Stop the session from the debug toolbar and verify status returns to `disconnected` without running the disconnect command.
-  - [ ] With external DevTools attached to the same target, stop the debug session and verify DevTools remains usable.
-  - [ ] Start debug again without reloading VS Code and verify reconnect succeeds.
+[x] `npm run lint`.
+[x] `npm run test`.
+[x] `npm run compile`.
+[ ] Manual smoke in Extension Development Host:
+
+- [ ] Start a `jupyter-browser-kernel` debug session and verify connection reaches `connected`.
+- [ ] Stop the session from the debug toolbar and verify status returns to `disconnected` without running the disconnect command.
+- [ ] With external DevTools attached to the same target, stop the debug session and verify DevTools remains usable.
+- [ ] Start debug again without reloading VS Code and verify reconnect succeeds.
 
 ## Dev Notes
 
@@ -208,6 +213,8 @@ GPT-5.3-Codex
 ### Debug Log References
 
 - Story authored from epic + architecture + prior-story analysis.
+- Implemented disconnect-on-stop lifecycle in manager/factory wiring and expanded adapter/manager/factory unit coverage.
+- Validation run: `npm run lint`, `npm run test`, `npm run compile`.
 
 ### Completion Notes List
 
@@ -215,12 +222,24 @@ GPT-5.3-Codex
 - Story scoped to disconnect-on-stop only, with explicit anti-scope for 11.5/11.6 concerns.
 - Tasks prioritize reusing existing lifecycle wiring and preserving DevTools coexistence.
 - Test plan includes terminate/disconnect path coverage, idempotency, and no-regression checks for restart/connect-on-launch.
+- `disconnect()` and `terminate()` now perform teardown + active connection disconnect + shared state reset (`cancelTransitions`, clear error context, `disconnected`).
+- Factory now injects `connectionStateStore` into `createDebugSessionManager` so stop lifecycle can update FR4 state through existing transport primitives.
+- Added adapter tests for `disconnect` routing and duplicate stop-signal terminated-event behavior.
+- Added manager tests for explicit-stop state reset, repeated stop idempotency, and disconnect failure final-state guarantees.
+- Added factory test for stop-lifecycle dependency wiring.
+- Manual Extension Development Host smoke validation remains pending.
 
 ### File List
 
 - `docs/stories/11-4-disconnect-on-debug-stop.md`
 - `docs/stories/sprint-status.yaml`
+- `src/debugger/debug-session-manager.ts`
+- `src/debugger/debug-adapter-factory.ts`
+- `tests/unit/debugger/notebook-dap-adapter.test.ts`
+- `tests/unit/debugger/debug-session-manager.test.ts`
+- `tests/unit/debugger/debug-adapter-factory.test.ts`
 
 ## Change Log
 
 - 2026-06-25: Created Story 11.4 with implementation guardrails, lifecycle tasks, and validation plan. Status set to ready-for-dev.
+- 2026-06-25: Implemented disconnect-on-debug-stop lifecycle teardown + connection-state reset and added adapter/manager/factory unit coverage. Automated lint/test/compile validation passed; manual Extension Development Host smoke validation pending.

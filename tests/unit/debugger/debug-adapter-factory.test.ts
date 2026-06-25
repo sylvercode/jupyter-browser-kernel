@@ -124,3 +124,35 @@ test("factory-wired ensureConnection rejects when active connection already exis
 
   assert.equal(connectCalls, 0);
 });
+
+test("factory wires disconnect lifecycle dependencies into session manager", () => {
+  let capturedManagerOptions: DebugSessionManagerOptions | undefined;
+
+  const connectionStateStore = createConnectionStateStore();
+  const fakeManager: DebugSessionManager = createFakeSessionManager();
+
+  const factory = new DebugAdapterFactory({
+    connectionStateStore,
+    createSessionManager: (options) => {
+      capturedManagerOptions = options;
+      return fakeManager;
+    },
+    createAdapter: () => ({}) as NotebookDebugAdapter,
+    createInlineAdapterDescriptor: () =>
+      ({ type: "inline" }) as unknown as vscode.DebugAdapterDescriptor,
+    localize: ((messageOrOptions: string | { message: string }) =>
+      typeof messageOrOptions === "string"
+        ? messageOrOptions
+        : messageOrOptions.message) as DebugAdapterFactoryOptions["localize"],
+    logger: () => undefined,
+  });
+
+  const session = createDebugSessionWithEndpoint("localhost", 9222);
+  factory.createDebugAdapterDescriptor(session);
+
+  assert.ok(capturedManagerOptions?.disconnectActiveConnection);
+  assert.equal(
+    capturedManagerOptions?.connectionStateStore,
+    connectionStateStore,
+  );
+});

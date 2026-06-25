@@ -2,7 +2,10 @@ import type * as vscode from "vscode";
 import type ProtocolMappingApi from "devtools-protocol/types/protocol-mapping";
 
 import type { BrowserDebuggerSession } from "../transport/browser-connect";
-import { onDidChangeConnectionState } from "../transport/connection-state";
+import {
+  onDidChangeConnectionState,
+  type ConnectionStateStore,
+} from "../transport/connection-state";
 import type { Localize } from "../config/endpoint-config";
 import { createVariableStore, type VariableStore } from "./variable-store";
 import {
@@ -55,6 +58,10 @@ export interface DebugSessionManagerOptions {
   localize?: Localize;
   ensureConnection?: () => Promise<void>;
   disconnectActiveConnection?: () => Promise<void>;
+  connectionStateStore?: Pick<
+    ConnectionStateStore,
+    "cancelTransitions" | "setErrorContext" | "setState"
+  >;
 }
 
 type DebuggerPausedEvent = ProtocolMappingApi.Events["Debugger.paused"][0];
@@ -117,6 +124,7 @@ export function createDebugSessionManager({
   localize = defaultLocalize,
   ensureConnection,
   disconnectActiveConnection,
+  connectionStateStore,
 }: DebugSessionManagerOptions): DebugSessionManager {
   const terminateEmitter = new SimpleEmitter<DebugSessionTerminationReason>();
   const pausedEmitter = new SimpleEmitter<DebuggerPausedEvent>();
@@ -205,6 +213,22 @@ export function createDebugSessionManager({
       terminateEmitter.fire("connection-lost");
     });
   });
+
+  const applyDisconnectedConnectionState = (): void => {
+    connectionStateStore?.cancelTransitions();
+    connectionStateStore?.setErrorContext(undefined);
+    connectionStateStore?.setState("disconnected");
+  };
+
+  const disconnectWithStateReset = async (): Promise<void> => {
+    await stopRunningSession();
+
+    try {
+      await disconnectActiveConnection?.();
+    } finally {
+      applyDisconnectedConnectionState();
+    }
+  };
 
   const launch = async (): Promise<void> => {
     if (running) {
@@ -380,10 +404,10 @@ export function createDebugSessionManager({
       await session.pause();
     },
     disconnect: async () => {
-      await stopRunningSession();
+      await disconnectWithStateReset();
     },
     terminate: async () => {
-      await stopRunningSession();
+      await disconnectWithStateReset();
     },
     getDebuggerSession: () => runningSession,
     getBreakpointRegistry: () => breakpointRegistry,

@@ -265,6 +265,113 @@ test("terminate clears registry before disabling debugger", async () => {
   manager.dispose();
 });
 
+test("disconnect tears down session, disconnects active connection, and resets state", async () => {
+  const connectionStateStore = createConnectionStateStore();
+  connectionStateStore.setState("error");
+  connectionStateStore.setErrorContext({
+    category: "endpoint-connectivity",
+    guidance: "stale",
+  });
+
+  const state = createState();
+  let disconnectCalls = 0;
+
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () => createStateTrackingSession(state),
+    disconnectActiveConnection: async () => {
+      disconnectCalls += 1;
+      state.sequence.push("disconnectActiveConnection");
+    },
+    connectionStateStore,
+    logger: () => undefined,
+  });
+
+  manager.recordSetBreakpoints("vscode-notebook-cell://test/cell-1.js", [
+    { line: 5 },
+  ]);
+
+  await manager.launch();
+  await manager.disconnect();
+
+  assert.equal(disconnectCalls, 1);
+  assert.deepEqual(state.sequence, [
+    "enable",
+    "onPaused",
+    "onBreakpointResolved",
+    "setBreakpointByUrl",
+    "disposePaused",
+    "disposeBreakpointResolved",
+    "removeBreakpoint",
+    "disable",
+    "disconnectActiveConnection",
+  ]);
+  assert.equal(connectionStateStore.getState(), "disconnected");
+  assert.equal(connectionStateStore.getErrorContext(), undefined);
+
+  manager.dispose();
+});
+
+test("terminate resets state even when disconnectActiveConnection throws", async () => {
+  const connectionStateStore = createConnectionStateStore();
+  connectionStateStore.setState("error");
+  connectionStateStore.setErrorContext({
+    category: "endpoint-connectivity",
+    guidance: "stale",
+  });
+
+  const state = createState();
+  let disconnectCalls = 0;
+
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () => createStateTrackingSession(state),
+    disconnectActiveConnection: async () => {
+      disconnectCalls += 1;
+      state.sequence.push("disconnectActiveConnection");
+      throw new Error("disconnect failed");
+    },
+    connectionStateStore,
+    logger: () => undefined,
+  });
+
+  await manager.launch();
+
+  await assert.rejects(async () => {
+    await manager.terminate();
+  }, /disconnect failed/);
+
+  assert.equal(disconnectCalls, 1);
+  assert.equal(connectionStateStore.getState(), "disconnected");
+  assert.equal(connectionStateStore.getErrorContext(), undefined);
+
+  manager.dispose();
+});
+
+test("disconnect is idempotent across repeated stop signals", async () => {
+  const connectionStateStore = createConnectionStateStore();
+  const state = createState();
+  let disconnectCalls = 0;
+
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () => createStateTrackingSession(state),
+    disconnectActiveConnection: async () => {
+      disconnectCalls += 1;
+      state.sequence.push("disconnectActiveConnection");
+    },
+    connectionStateStore,
+    logger: () => undefined,
+  });
+
+  await manager.launch();
+  await manager.disconnect();
+  await manager.terminate();
+
+  assert.equal(disconnectCalls, 2);
+  assert.equal(connectionStateStore.getState(), "disconnected");
+  assert.equal(connectionStateStore.getErrorContext(), undefined);
+
+  manager.dispose();
+});
+
 test("enable failure is logged and re-thrown for DAP launch path", async () => {
   createConnectionStateStore();
 

@@ -167,6 +167,7 @@ export class DebugAdapterFactory
       localize: this.localize,
       ensureConnection,
       disconnectActiveConnection: disconnectActiveBrowserConnection,
+      connectionStateStore: this.connectionStateStore,
     });
 
     const adapter = this.createAdapter({
