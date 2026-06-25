@@ -406,6 +406,90 @@ test("launch creates registry and replays each cached payload once", async () =>
   manager.dispose();
 });
 
+test("restart tears down and reconnects in deterministic order", async () => {
+  createConnectionStateStore();
+
+  const state = createState();
+  let connected = true;
+  let disconnectCalls = 0;
+  const ensureCalls: string[] = [];
+
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () =>
+      connected ? createStateTrackingSession(state) : undefined,
+    ensureConnection: async () => {
+      ensureCalls.push("ensureConnection");
+      connected = true;
+    },
+    disconnectActiveConnection: async () => {
+      disconnectCalls += 1;
+      connected = false;
+      state.sequence.push("disconnectActiveConnection");
+    },
+    logger: () => undefined,
+  });
+
+  manager.recordSetBreakpoints("vscode-notebook-cell://test/restart-cell.js", [
+    { line: 11 },
+  ]);
+
+  await manager.launch();
+  await manager.restart();
+
+  assert.equal(disconnectCalls, 1);
+  assert.deepEqual(ensureCalls, ["ensureConnection", "ensureConnection"]);
+  assert.deepEqual(state.sequence.slice(0, 13), [
+    "enable",
+    "onPaused",
+    "onBreakpointResolved",
+    "setBreakpointByUrl",
+    "disposePaused",
+    "disposeBreakpointResolved",
+    "removeBreakpoint",
+    "disable",
+    "disconnectActiveConnection",
+    "enable",
+    "onPaused",
+    "onBreakpointResolved",
+    "setBreakpointByUrl",
+  ]);
+
+  manager.dispose();
+});
+
+test("restart suppresses planned disconnect from connection-lost termination", async () => {
+  const connectionStateStore = createConnectionStateStore();
+
+  const state = createState();
+  let connected = true;
+
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () =>
+      connected ? createStateTrackingSession(state) : undefined,
+    ensureConnection: async () => {
+      connected = true;
+    },
+    disconnectActiveConnection: async () => {
+      connected = false;
+      connectionStateStore.setState("disconnected");
+    },
+    logger: () => undefined,
+  });
+
+  const reasons: string[] = [];
+  const subscription = manager.onDidTerminate((reason) => {
+    reasons.push(reason);
+  });
+
+  await manager.launch();
+  await manager.restart();
+
+  assert.deepEqual(reasons, []);
+
+  subscription.dispose();
+  manager.dispose();
+});
+
 test("terminate survives removeBreakpoint failures and still disables", async () => {
   createConnectionStateStore();
 

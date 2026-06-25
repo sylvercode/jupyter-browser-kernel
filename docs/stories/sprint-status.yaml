@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-24
-last_updated: 2026-06-24
+last_updated: 2026-06-25
 project: jupyter-browser-kernel
 project_key: NOKEY
 tracking_system: file-system
@@ -128,7 +128,7 @@ development_status:
   epic-11: in-progress
   11-1-configure-cdp-endpoint-via-debug-configuration-attributes: done
   11-2-connect-on-debug-launch: done
-  11-3-reconnect-on-debug-restart: ready-for-dev
+  11-3-reconnect-on-debug-restart: review
   11-4-disconnect-on-debug-stop: backlog
   11-5-prompt-to-start-a-debug-session-when-running-a-cell-without-one: backlog
   11-6-retire-connect-disconnect-reconnect-commands-and-migrate-state-reporting: backlog

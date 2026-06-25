@@ -168,6 +168,7 @@ export class NotebookDebugAdapter
       supportsConfigurationDoneRequest: true,
       supportsTerminateRequest: true,
       supportTerminateDebuggee: false,
+      supportsRestartRequest: true,
       supportsEvaluateForHovers: true,
       supportsConditionalBreakpoints: true,
       supportsHitConditionalBreakpoints: false,
@@ -200,6 +201,23 @@ export class NotebookDebugAdapter
     _args: DebugProtocol.AttachRequestArguments,
   ): Promise<void> {
     await this.launchRequest(response, {});
+  }
+
+  protected override async restartRequest(
+    response: DebugProtocol.RestartResponse,
+    _args: DebugProtocol.RestartArguments,
+  ): Promise<void> {
+    try {
+      await this.sessionManager.restart();
+      response.success = true;
+      this.sendResponse(response);
+    } catch (error) {
+      this.sendErrorResponse(
+        response,
+        0,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
   }
 
   protected override threadsRequest(

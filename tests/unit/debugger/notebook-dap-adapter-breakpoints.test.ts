@@ -208,6 +208,7 @@ test("initialize capability snapshot includes breakpoint flags", async () => {
     supportsConfigurationDoneRequest: true,
     supportsTerminateRequest: true,
     supportTerminateDebuggee: false,
+    supportsRestartRequest: true,
     supportsEvaluateForHovers: true,
     supportsConditionalBreakpoints: true,
     supportsHitConditionalBreakpoints: false,

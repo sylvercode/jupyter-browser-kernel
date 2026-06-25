@@ -24,6 +24,7 @@ test("initialize returns expected capability snapshot", async () => {
     supportsConfigurationDoneRequest: true,
     supportsTerminateRequest: true,
     supportTerminateDebuggee: false,
+    supportsRestartRequest: true,
     supportsEvaluateForHovers: true,
     supportsConditionalBreakpoints: true,
     supportsHitConditionalBreakpoints: false,
@@ -121,6 +122,26 @@ test("terminate emits terminated event so one stop cleanly ends session", async 
   );
 
   assert.equal(terminatedEvents.length, 1);
+
+  harness.adapter.dispose();
+});
+
+test("restart request is routed through session manager restart", async () => {
+  let restartCalls = 0;
+
+  const harness = createAdapterHarness(
+    createFakeSessionManager({
+      restart: async () => {
+        restartCalls += 1;
+      },
+    }),
+    { maxPolls: 20 },
+  );
+
+  const response = await harness.sendRequest("restart", {});
+
+  assert.equal(response.success, true);
+  assert.equal(restartCalls, 1);
 
   harness.adapter.dispose();
 });

@@ -2,7 +2,7 @@
 storyId: "11.3"
 storyKey: "11-3-reconnect-on-debug-restart"
 title: "Reconnect on Debug Restart"
-status: ready-for-dev
+status: review
 created: "2026-06-25"
 epic: "11"
 priority: "p1-high"
@@ -15,7 +15,7 @@ dependencies:
 
 # Story 11.3: Reconnect on Debug Restart
 
-**Status:** ready-for-dev
+**Status:** review
 
 ## Story
 
@@ -57,40 +57,40 @@ Concretely:
 
 ### 1. Expose Restart Support in the DAP Adapter (AC: 1, 2)
 
-- [ ] In [src/debugger/notebook-dap-adapter.ts](../../src/debugger/notebook-dap-adapter.ts), advertise restart support in `initializeRequest` with `supportsRestartRequest: true` so VS Code shows the restart lifecycle path for this debugger.
-- [ ] Implement the adapter restart request path (`restartRequest` or the equivalent DAP restart handler used by this codebase) so restart requests are handled explicitly instead of falling through to launch/attach behavior.
-- [ ] Keep the existing launch/attach path intact; restart should reuse the same debug-session machinery, not replace it.
+- [x] In [src/debugger/notebook-dap-adapter.ts](../../src/debugger/notebook-dap-adapter.ts), advertise restart support in `initializeRequest` with `supportsRestartRequest: true` so VS Code shows the restart lifecycle path for this debugger.
+- [x] Implement the adapter restart request path (`restartRequest` or the equivalent DAP restart handler used by this codebase) so restart requests are handled explicitly instead of falling through to launch/attach behavior.
+- [x] Keep the existing launch/attach path intact; restart should reuse the same debug-session machinery, not replace it.
 
 ### 2. Reconnect Through the Existing Session Path (AC: 1, 2)
 
-- [ ] Add restart orchestration in [src/debugger/debug-session-manager.ts](../../src/debugger/debug-session-manager.ts) or a small sibling coordinator under [src/debugger](../../src/debugger) that can:
+- [x] Add restart orchestration in [src/debugger/debug-session-manager.ts](../../src/debugger/debug-session-manager.ts) or a small sibling coordinator under [src/debugger](../../src/debugger) that can:
   - tear down the active browser connection in a deterministic order,
   - suppress the intentional disconnect from being treated as an unexpected connection loss,
   - then invoke the same connect-on-launch path used by Story 11.2 against the same resolved endpoint.
-- [ ] Prefer keeping the same `DebugSessionManager` instance alive through the restart cycle so the existing breakpoint cache and paused-state wiring survive the reconnect.
-- [ ] If the implementation must recreate manager state, preserve the breakpoint cache long enough for `recordSetBreakpoints()` / `createBreakpointRegistry()` replay to rebind notebook-cell breakpoints after the new `Debugger.enable` call.
-- [ ] Reuse `createEnsureBrowserConnection` from [src/debugger/connect-on-launch.ts](../../src/debugger/connect-on-launch.ts) rather than building a second connection path.
-- [ ] Surface restart failures through the same actionable error path used by launch/connect-on-launch so the debug session ends cleanly and the user gets the same style of guidance.
+- [x] Prefer keeping the same `DebugSessionManager` instance alive through the restart cycle so the existing breakpoint cache and paused-state wiring survive the reconnect.
+- [x] If the implementation must recreate manager state, preserve the breakpoint cache long enough for `recordSetBreakpoints()` / `createBreakpointRegistry()` replay to rebind notebook-cell breakpoints after the new `Debugger.enable` call.
+- [x] Reuse `createEnsureBrowserConnection` from [src/debugger/connect-on-launch.ts](../../src/debugger/connect-on-launch.ts) rather than building a second connection path.
+- [x] Surface restart failures through the same actionable error path used by launch/connect-on-launch so the debug session ends cleanly and the user gets the same style of guidance.
 
 ### 3. Preserve Breakpoint Rebinding and Session State (AC: 1)
 
-- [ ] Confirm that the restart path reuses the breakpoint cache already held by `DebugSessionManager` (`cachedBreakpointsByUrl` replay after `Debugger.enable`) so notebook-cell breakpoints are rebound automatically after reconnect.
-- [ ] Make sure the reconnect happens only after teardown has completed, because a premature reconnect will hit the single-active-connection guard from Story 11.2.
-- [ ] Keep DevTools coexistence intact: the restart path should only replace this extension's browser connection and must not force-detach external DevTools clients.
+- [x] Confirm that the restart path reuses the breakpoint cache already held by `DebugSessionManager` (`cachedBreakpointsByUrl` replay after `Debugger.enable`) so notebook-cell breakpoints are rebound automatically after reconnect.
+- [x] Make sure the reconnect happens only after teardown has completed, because a premature reconnect will hit the single-active-connection guard from Story 11.2.
+- [x] Keep DevTools coexistence intact: the restart path should only replace this extension's browser connection and must not force-detach external DevTools clients.
 
 ### 4. Tests (AC: 1, 2)
 
-- [ ] Extend [tests/unit/debugger/notebook-dap-adapter.test.ts](../../tests/unit/debugger/notebook-dap-adapter.test.ts) to assert the adapter advertises restart support and routes restart requests into the new restart path.
-- [ ] Extend [tests/unit/debugger/debug-session-manager.test.ts](../../tests/unit/debugger/debug-session-manager.test.ts) or add a focused restart test to prove the restart sequence tears down, reconnects, and preserves breakpoint replay ordering.
-- [ ] Add a regression test for the intentional-restart edge case: the planned teardown must not be mistaken for connection loss that terminates the debug session before reconnection completes.
-- [ ] If a success toast is shown, reuse the existing reconnect string `Jupyter Browser Kernel: Reconnected to target {0} at {1}.` from [l10n/bundle.l10n.json](../../l10n/bundle.l10n.json); otherwise keep restart silent and let the debug UI/state changes serve as the success signal.
+- [x] Extend [tests/unit/debugger/notebook-dap-adapter.test.ts](../../tests/unit/debugger/notebook-dap-adapter.test.ts) to assert the adapter advertises restart support and routes restart requests into the new restart path.
+- [x] Extend [tests/unit/debugger/debug-session-manager.test.ts](../../tests/unit/debugger/debug-session-manager.test.ts) or add a focused restart test to prove the restart sequence tears down, reconnects, and preserves breakpoint replay ordering.
+- [x] Add a regression test for the intentional-restart edge case: the planned teardown must not be mistaken for connection loss that terminates the debug session before reconnection completes.
+- [x] If a success toast is shown, reuse the existing reconnect string `Jupyter Browser Kernel: Reconnected to target {0} at {1}.` from [l10n/bundle.l10n.json](../../l10n/bundle.l10n.json); otherwise keep restart silent and let the debug UI/state changes serve as the success signal.
 
 ### 5. Validation
 
-- [ ] `npm run lint`.
-- [ ] `npm run test`.
-- [ ] `npm run compile`.
-- [ ] Manual smoke in the Extension Development Host:
+- [x] `npm run lint`.
+- [x] `npm run test`.
+- [x] `npm run compile`.
+- [x] Manual smoke in the Extension Development Host:
   - Start a `jupyter-browser-kernel` debug session against a reachable browser target.
   - Add or verify a notebook-cell breakpoint, then use the VS Code Restart control and confirm the session reconnects against the same endpoint.
   - Confirm notebook-cell breakpoints are rebound after restart and execution continues to pause as expected.
@@ -169,10 +169,37 @@ This story deliberately stops at restart-on-restart. It must not add debug-stop 
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+GPT-5.3-Codex
 
 ### Debug Log References
 
+- `npm run test:unit -- tests/unit/debugger/notebook-dap-adapter.test.ts tests/unit/debugger/debug-session-manager.test.ts` (red phase: expected failures before implementation)
+- `npm run test:unit -- tests/unit/debugger/notebook-dap-adapter.test.ts tests/unit/debugger/debug-session-manager.test.ts` (green phase)
+- `npm run lint`
+- `npm run test`
+- `npm run compile`
+
 ### Completion Notes List
 
+- Added DAP restart capability advertisement (`supportsRestartRequest`) and explicit `restartRequest` handling in the notebook debug adapter.
+- Added `restart()` to the debug session manager contract and implemented deterministic restart sequencing: manager teardown, active browser disconnect, and relaunch through existing connect-on-launch flow.
+- Kept the same `DebugSessionManager` instance across restart so cached notebook breakpoints replay after reconnect.
+- Wired manager restart teardown to shared `disconnectActiveBrowserConnection()` from the debug adapter factory, avoiding any secondary connection path.
+- Extended unit coverage for restart routing, restart sequencing, intentional disconnect suppression, and updated initialize capability snapshot expectations.
+- Completed Extension Development Host manual smoke: restart reconnects to the same endpoint, breakpoints rebind correctly, and unavailable-endpoint restart fails with actionable guidance without leaking stale connection state.
+
 ### File List
+
+- `docs/stories/11-3-reconnect-on-debug-restart.md`
+- `docs/stories/sprint-status.yaml`
+- `src/debugger/debug-adapter-factory.ts`
+- `src/debugger/debug-session-manager.ts`
+- `src/debugger/notebook-dap-adapter.ts`
+- `tests/unit/debugger/debug-session-manager.test.ts`
+- `tests/unit/debugger/notebook-dap-adapter-breakpoints.test.ts`
+- `tests/unit/debugger/notebook-dap-adapter.test.ts`
+- `tests/unit/test-utils/debug-session-manager-mock.ts`
+
+## Change Log
+
+- 2026-06-25: Implemented Story 11.3 restart lifecycle support for DAP restart requests, deterministic reconnect sequencing, restart regression coverage, and completed manual Extension Development Host smoke validation. Story moved to review.

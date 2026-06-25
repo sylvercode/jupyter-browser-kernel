@@ -18,6 +18,7 @@ export function createFakeSessionManager(
 
   return {
     launch: overrides.launch ?? (async () => undefined),
+    restart: overrides.restart ?? (async () => undefined),
     resume: overrides.resume ?? (async () => undefined),
     stepOver: overrides.stepOver ?? (async () => undefined),
     stepInto: overrides.stepInto ?? (async () => undefined),
