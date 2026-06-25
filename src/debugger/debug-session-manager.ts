@@ -22,6 +22,7 @@ export interface DebugBreakpointResolvedEvent {
 
 export interface DebugSessionManager {
   launch: () => Promise<void>;
+  restart: () => Promise<void>;
   resume: () => Promise<void>;
   stepOver: () => Promise<void>;
   stepInto: () => Promise<void>;
@@ -53,6 +54,7 @@ export interface DebugSessionManagerOptions {
   logger: (message: string, error?: unknown) => void;
   localize?: Localize;
   ensureConnection?: () => Promise<void>;
+  disconnectActiveConnection?: () => Promise<void>;
 }
 
 type DebuggerPausedEvent = ProtocolMappingApi.Events["Debugger.paused"][0];
@@ -114,6 +116,7 @@ export function createDebugSessionManager({
   logger,
   localize = defaultLocalize,
   ensureConnection,
+  disconnectActiveConnection,
 }: DebugSessionManagerOptions): DebugSessionManager {
   const terminateEmitter = new SimpleEmitter<DebugSessionTerminationReason>();
   const pausedEmitter = new SimpleEmitter<DebuggerPausedEvent>();
@@ -203,127 +206,135 @@ export function createDebugSessionManager({
     });
   });
 
-  return {
-    launch: async () => {
-      if (running) {
+  const launch = async (): Promise<void> => {
+    if (running) {
+      return;
+    }
+
+    let session = getDebuggerSession();
+    if (ensureConnection) {
+      await ensureConnection();
+      session = getDebuggerSession();
+    }
+
+    if (!session) {
+      throw new Error(
+        localize(
+          "Cannot start debug session: connect to a browser target first.",
+        ),
+      );
+    }
+
+    emittedConnectionLost = false;
+
+    let lostDuringEnable = false;
+    const lostDuringEnableSub = onDidChangeConnectionState((state) => {
+      if (state === "disconnected" || state === "error") {
+        lostDuringEnable = true;
+      }
+    });
+
+    // Register the scriptParsed listener BEFORE enabling the Debugger domain.
+    // Debugger.enable replays Debugger.scriptParsed for already-parsed scripts;
+    // registering first guarantees those replays are captured so stack-frame
+    // source resolution works for scripts parsed before the debug session.
+    clearScriptParsedSubscription();
+    scriptParsedDisposable = session.onScriptParsed((event) => {
+      if (event.url.length > 0) {
+        scriptUrlMap.set(event.scriptId, event.url);
+      }
+    });
+
+    try {
+      await session.enable();
+    } catch (error) {
+      clearScriptParsedSubscription();
+      scriptUrlMap.clear();
+      lostDuringEnableSub.dispose();
+      logger("Failed to enable Debugger domain on browser session: {0}", error);
+      throw new Error(
+        localize(
+          "Failed to enable Debugger domain on browser session: {0}",
+          toErrorMessage(error),
+        ),
+      );
+    }
+    lostDuringEnableSub.dispose();
+
+    if (lostDuringEnable) {
+      clearScriptParsedSubscription();
+      scriptUrlMap.clear();
+      try {
+        await session.disable();
+      } catch {
+        // Best-effort cleanup; connection is already gone.
+      }
+      throw new Error(
+        localize("Browser connection lost; debug session terminated."),
+      );
+    }
+
+    clearPausedSubscription();
+    pausedDisposable = session.onPaused((event) => {
+      // Single-subscriber model: this is the only onPaused listener.
+      // Incrementing pauseVersion atomically with each event provides
+      // deterministic ordering for the DAP adapter without a separate
+      // serialization module.
+      pausedEvent = event;
+      pauseVersion += 1;
+      pausedEmitter.fire(event);
+    });
+
+    const nextVariableStore = createVariableStore({
+      debuggerSession: session,
+      logger,
+    });
+    variableStore = nextVariableStore;
+
+    const nextRegistry = createBreakpointRegistry({
+      debuggerSession: session,
+      logger,
+      localize,
+    });
+    breakpointRegistry = nextRegistry;
+
+    clearBreakpointResolvedSubscription();
+    breakpointResolvedDisposable = session.onBreakpointResolved((event) => {
+      const registry = breakpointRegistry;
+      if (!registry) {
         return;
       }
 
-      let session = getDebuggerSession();
-      if (ensureConnection) {
-        await ensureConnection();
-        session = getDebuggerSession();
+      const resolved = registry.resolveRuntimeBreakpoint(
+        event.breakpointId,
+        event.location,
+      );
+
+      if (!resolved) {
+        return;
       }
 
-      if (!session) {
-        throw new Error(
-          localize(
-            "Cannot start debug session: connect to a browser target first.",
-          ),
-        );
+      breakpointResolvedEmitter.fire(resolved);
+    });
+
+    for (const [url, desired] of cachedBreakpointsByUrl.entries()) {
+      await nextRegistry.replace(url, desired);
+    }
+
+    runningSession = session;
+    running = true;
+  };
+
+  return {
+    launch,
+    restart: async () => {
+      await stopRunningSession();
+
+      if (disconnectActiveConnection) {
+        await disconnectActiveConnection();
       }
 
-      emittedConnectionLost = false;
-
-      let lostDuringEnable = false;
-      const lostDuringEnableSub = onDidChangeConnectionState((state) => {
-        if (state === "disconnected" || state === "error") {
-          lostDuringEnable = true;
-        }
-      });
-
-      // Register the scriptParsed listener BEFORE enabling the Debugger domain.
-      // Debugger.enable replays Debugger.scriptParsed for already-parsed scripts;
-      // registering first guarantees those replays are captured so stack-frame
-      // source resolution works for scripts parsed before the debug session.
-      clearScriptParsedSubscription();
-      scriptParsedDisposable = session.onScriptParsed((event) => {
-        if (event.url.length > 0) {
-          scriptUrlMap.set(event.scriptId, event.url);
-        }
-      });
-
-      try {
-        await session.enable();
-      } catch (error) {
-        clearScriptParsedSubscription();
-        scriptUrlMap.clear();
-        lostDuringEnableSub.dispose();
-        logger(
-          "Failed to enable Debugger domain on browser session: {0}",
-          error,
-        );
-        throw new Error(
-          localize(
-            "Failed to enable Debugger domain on browser session: {0}",
-            toErrorMessage(error),
-          ),
-        );
-      }
-      lostDuringEnableSub.dispose();
-
-      if (lostDuringEnable) {
-        clearScriptParsedSubscription();
-        scriptUrlMap.clear();
-        try {
-          await session.disable();
-        } catch {
-          // Best-effort cleanup; connection is already gone.
-        }
-        throw new Error(
-          localize("Browser connection lost; debug session terminated."),
-        );
-      }
-
-      clearPausedSubscription();
-      pausedDisposable = session.onPaused((event) => {
-        // Single-subscriber model: this is the only onPaused listener.
-        // Incrementing pauseVersion atomically with each event provides
-        // deterministic ordering for the DAP adapter without a separate
-        // serialization module.
-        pausedEvent = event;
-        pauseVersion += 1;
-        pausedEmitter.fire(event);
-      });
-
-      const nextVariableStore = createVariableStore({
-        debuggerSession: session,
-        logger,
-      });
-      variableStore = nextVariableStore;
-
-      const nextRegistry = createBreakpointRegistry({
-        debuggerSession: session,
-        logger,
-        localize,
-      });
-      breakpointRegistry = nextRegistry;
-
-      clearBreakpointResolvedSubscription();
-      breakpointResolvedDisposable = session.onBreakpointResolved((event) => {
-        const registry = breakpointRegistry;
-        if (!registry) {
-          return;
-        }
-
-        const resolved = registry.resolveRuntimeBreakpoint(
-          event.breakpointId,
-          event.location,
-        );
-
-        if (!resolved) {
-          return;
-        }
-
-        breakpointResolvedEmitter.fire(resolved);
-      });
-
-      for (const [url, desired] of cachedBreakpointsByUrl.entries()) {
-        await nextRegistry.replace(url, desired);
-      }
-
-      runningSession = session;
-      running = true;
+      await launch();
     },
     resume: async () => {
       const session = runningSession;

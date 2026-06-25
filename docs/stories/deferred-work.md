@@ -1,5 +1,10 @@
 # Deferred Work
 
+## Deferred from: code review of 11-3-reconnect-on-debug-restart (2026-06-25)
+
+- `sendErrorResponse(response, 0, ...)` uses error code `0` in `restartRequest` ([src/debugger/notebook-dap-adapter.ts](../../src/debugger/notebook-dap-adapter.ts)). Pre-existing pattern from `launchRequest`; non-standard but harmless for the current VS Code DAP client.
+- No concurrent-restart guard in `restart()` ([src/debugger/debug-session-manager.ts](../../src/debugger/debug-session-manager.ts)). Two rapid `restart()` invocations could overlap in the `launch()` phase. Pre-existing gap mirrored by `launch()` itself; VS Code debug UI disables the restart control during restart.
+
 ## Deferred from: code review of 11-2-connect-on-debug-launch (2026-06-24)
 
 - Error context not set when `connectToTarget` throws instead of returning `{ ok: false }` ([src/debugger/connect-on-launch.ts](../../src/debugger/connect-on-launch.ts) `createEnsureBrowserConnection`). Out-of-contract throw path: state transitions to `error` via `withConnectTransition`, but `setErrorContext` is never called, so the FR4 status indicator lacks guidance text. Mirrors the existing `runConnect` pattern; low risk because the transport returns results by contract.

@@ -2,6 +2,7 @@ import type * as vscode from "vscode";
 
 import {
   connectToBrowserTarget,
+  disconnectActiveBrowserConnection,
   getActiveBrowserConnection,
   type ActiveBrowserConnection,
 } from "../transport/browser-connect";
@@ -165,6 +166,7 @@ export class DebugAdapterFactory
       logger: this.logger,
       localize: this.localize,
       ensureConnection,
+      disconnectActiveConnection: disconnectActiveBrowserConnection,
     });
 
     const adapter = this.createAdapter({

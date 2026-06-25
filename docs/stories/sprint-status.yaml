@@ -1,5 +1,5 @@
 # generated: 2026-06-24
-# last_updated: 2026-06-24
+# last_updated: 2026-06-25 (code review)
 # project: jupyter-browser-kernel
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-24
-last_updated: 2026-06-24
+last_updated: 2026-06-25
 project: jupyter-browser-kernel
 project_key: NOKEY
 tracking_system: file-system
@@ -128,7 +128,7 @@ development_status:
   epic-11: in-progress
   11-1-configure-cdp-endpoint-via-debug-configuration-attributes: done
   11-2-connect-on-debug-launch: done
-  11-3-reconnect-on-debug-restart: backlog
+  11-3-reconnect-on-debug-restart: done
   11-4-disconnect-on-debug-stop: backlog
   11-5-prompt-to-start-a-debug-session-when-running-a-cell-without-one: backlog
   11-6-retire-connect-disconnect-reconnect-commands-and-migrate-state-reporting: backlog
@@ -141,9 +141,9 @@ development_status:
 # Epics done: 3 (Epic 1, Epic 2, Epic 10)
 # Epics in-progress: 1 (Epic 11)
 # Epics backlog: 7 (Epic 3, 4, 5, 6, 7, 8, 9)
-# Stories done: 20 (1-1 to 1-7, 2-1 to 2-5, 2-spike, 10-1 to 10-5, 11-1, 11-2)
-# Stories ready-for-dev: 0
+# Stories done: 21 (1-1 to 1-7, 2-1 to 2-5, 2-spike, 10-1 to 10-5, 11-1, 11-2, 11-3)
+# Stories ready-for-dev: 1
 # Stories in-progress: 0
 # Stories review: 0
-# Stories backlog: 14
+# Stories backlog: 13
 # Retrospectives completed: 3 (Epic 1, 2, 10)
