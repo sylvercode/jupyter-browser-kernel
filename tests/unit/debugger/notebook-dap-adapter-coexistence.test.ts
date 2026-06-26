@@ -118,7 +118,7 @@ test("dispose releases all three subscriptions (terminate, paused, breakpointRes
 
 // ── Task 12 / Connection-loss ─────────────────────────────────────────────────
 
-test("connection-lost emits single TerminatedEvent with connection-lost reason in body", () => {
+test("connection-lost emits single TerminatedEvent without restart payload", () => {
   let terminationListener: ((reason: "connection-lost") => void) | undefined;
 
   const harness = createAdapterHarness(
@@ -147,19 +147,10 @@ test("connection-lost emits single TerminatedEvent with connection-lost reason i
     "exactly one TerminatedEvent must be emitted",
   );
 
-  // The restart field carries {reason, description} per emitTermination implementation.
-  const restart = terminatedEvents[0]?.body?.restart as
-    | Record<string, unknown>
-    | undefined;
   assert.equal(
-    restart?.["reason"],
-    "connection-lost",
-    "TerminatedEvent body must carry the connection-lost reason",
-  );
-  assert.ok(
-    typeof restart?.["description"] === "string" &&
-      (restart["description"] as string).length > 0,
-    "TerminatedEvent body must carry a non-empty description for the user",
+    terminatedEvents[0]?.body?.restart,
+    undefined,
+    "TerminatedEvent should not request restart on connection loss",
   );
 
   harness.adapter.dispose();

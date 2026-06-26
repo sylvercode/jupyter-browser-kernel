@@ -126,6 +126,34 @@ test("terminate emits terminated event so one stop cleanly ends session", async 
   harness.adapter.dispose();
 });
 
+test("disconnect request routes through session manager disconnect and emits terminated", async () => {
+  let disconnectCalls = 0;
+
+  const harness = createAdapterHarness(
+    createFakeSessionManager({
+      disconnect: async () => {
+        disconnectCalls += 1;
+      },
+    }),
+    { maxPolls: 20 },
+  );
+
+  const response = await harness.sendRequest("disconnect", {});
+
+  assert.equal(response.success, true);
+  assert.equal(disconnectCalls, 1);
+
+  const terminatedEvents = harness.sentMessages.filter(
+    (message) =>
+      message.type === "event" &&
+      (message as DebugProtocol.Event).event === "terminated",
+  );
+
+  assert.equal(terminatedEvents.length, 1);
+
+  harness.adapter.dispose();
+});
+
 test("restart request is routed through session manager restart", async () => {
   let restartCalls = 0;
 
@@ -164,6 +192,42 @@ test("connection-lost followed by terminate emits terminated event exactly once"
 
   const response = await harness.sendRequest("terminate", {});
   assert.equal(response.success, true);
+
+  const terminatedEvents = harness.sentMessages.filter(
+    (message) =>
+      message.type === "event" &&
+      (message as DebugProtocol.Event).event === "terminated",
+  );
+
+  assert.equal(terminatedEvents.length, 1);
+
+  harness.adapter.dispose();
+});
+
+test("terminate followed by disconnect still emits terminated event exactly once", async () => {
+  let terminateCalls = 0;
+  let disconnectCalls = 0;
+
+  const harness = createAdapterHarness(
+    createFakeSessionManager({
+      terminate: async () => {
+        terminateCalls += 1;
+      },
+      disconnect: async () => {
+        disconnectCalls += 1;
+      },
+    }),
+    { maxPolls: 20 },
+  );
+
+  const terminateResponse = await harness.sendRequest("terminate", {});
+  assert.equal(terminateResponse.success, true);
+
+  const disconnectResponse = await harness.sendRequest("disconnect", {});
+  assert.equal(disconnectResponse.success, true);
+
+  assert.equal(terminateCalls, 1);
+  assert.equal(disconnectCalls, 1);
 
   const terminatedEvents = harness.sentMessages.filter(
     (message) =>

@@ -265,6 +265,113 @@ test("terminate clears registry before disabling debugger", async () => {
   manager.dispose();
 });
 
+test("disconnect tears down session, disconnects active connection, and resets state", async () => {
+  const connectionStateStore = createConnectionStateStore();
+  connectionStateStore.setState("error");
+  connectionStateStore.setErrorContext({
+    category: "endpoint-connectivity",
+    guidance: "stale",
+  });
+
+  const state = createState();
+  let disconnectCalls = 0;
+
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () => createStateTrackingSession(state),
+    disconnectActiveConnection: async () => {
+      disconnectCalls += 1;
+      state.sequence.push("disconnectActiveConnection");
+    },
+    connectionStateStore,
+    logger: () => undefined,
+  });
+
+  manager.recordSetBreakpoints("vscode-notebook-cell://test/cell-1.js", [
+    { line: 5 },
+  ]);
+
+  await manager.launch();
+  await manager.disconnect();
+
+  assert.equal(disconnectCalls, 1);
+  assert.deepEqual(state.sequence, [
+    "enable",
+    "onPaused",
+    "onBreakpointResolved",
+    "setBreakpointByUrl",
+    "disposePaused",
+    "disposeBreakpointResolved",
+    "removeBreakpoint",
+    "disable",
+    "disconnectActiveConnection",
+  ]);
+  assert.equal(connectionStateStore.getState(), "disconnected");
+  assert.equal(connectionStateStore.getErrorContext(), undefined);
+
+  manager.dispose();
+});
+
+test("terminate resets state even when disconnectActiveConnection throws", async () => {
+  const connectionStateStore = createConnectionStateStore();
+  connectionStateStore.setState("error");
+  connectionStateStore.setErrorContext({
+    category: "endpoint-connectivity",
+    guidance: "stale",
+  });
+
+  const state = createState();
+  let disconnectCalls = 0;
+
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () => createStateTrackingSession(state),
+    disconnectActiveConnection: async () => {
+      disconnectCalls += 1;
+      state.sequence.push("disconnectActiveConnection");
+      throw new Error("disconnect failed");
+    },
+    connectionStateStore,
+    logger: () => undefined,
+  });
+
+  await manager.launch();
+
+  await assert.doesNotReject(async () => {
+    await manager.terminate();
+  });
+
+  assert.equal(disconnectCalls, 1);
+  assert.equal(connectionStateStore.getState(), "disconnected");
+  assert.equal(connectionStateStore.getErrorContext(), undefined);
+
+  manager.dispose();
+});
+
+test("disconnect is idempotent across repeated stop signals", async () => {
+  const connectionStateStore = createConnectionStateStore();
+  const state = createState();
+  let disconnectCalls = 0;
+
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () => createStateTrackingSession(state),
+    disconnectActiveConnection: async () => {
+      disconnectCalls += 1;
+      state.sequence.push("disconnectActiveConnection");
+    },
+    connectionStateStore,
+    logger: () => undefined,
+  });
+
+  await manager.launch();
+  await manager.disconnect();
+  await manager.terminate();
+
+  assert.equal(disconnectCalls, 2);
+  assert.equal(connectionStateStore.getState(), "disconnected");
+  assert.equal(connectionStateStore.getErrorContext(), undefined);
+
+  manager.dispose();
+});
+
 test("enable failure is logged and re-thrown for DAP launch path", async () => {
   createConnectionStateStore();
 
@@ -308,6 +415,46 @@ test("connection-state disconnected transition emits terminated exactly once", a
 
   connectionStateStore.setState("disconnected");
   connectionStateStore.setState("error");
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (reasons.length > 0) {
+      break;
+    }
+    await Promise.resolve();
+  }
+
+  assert.deepEqual(reasons, ["connection-lost"]);
+
+  subscription.dispose();
+  manager.dispose();
+});
+
+test("connection-state disconnected emits termination even if stop teardown hangs", async () => {
+  const connectionStateStore = createConnectionStateStore();
+
+  const state = createState();
+  const base = createStateTrackingSession(state);
+  const hangingSession: BrowserDebuggerSession = {
+    ...base,
+    disable: async () =>
+      await new Promise<void>(() => {
+        // Never resolves to simulate transport teardown hang.
+      }),
+  };
+
+  const manager = createDebugSessionManager({
+    getDebuggerSession: () => hangingSession,
+    logger: () => undefined,
+  });
+
+  const reasons: string[] = [];
+  const subscription = manager.onDidTerminate((reason) => {
+    reasons.push(reason);
+  });
+
+  await manager.launch();
+
+  connectionStateStore.setState("disconnected");
 
   for (let attempt = 0; attempt < 20; attempt += 1) {
     if (reasons.length > 0) {
