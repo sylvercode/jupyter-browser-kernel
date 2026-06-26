@@ -220,9 +220,8 @@ export function createDebugSessionManager({
   };
 
   const disconnectWithStateReset = async (): Promise<void> => {
-    await stopRunningSession();
-
     try {
+      await stopRunningSession();
       await disconnectActiveConnection?.();
     } catch (error) {
       logger(

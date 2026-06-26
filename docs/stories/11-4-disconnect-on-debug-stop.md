@@ -2,7 +2,7 @@
 storyId: "11.4"
 storyKey: "11-4-disconnect-on-debug-stop"
 title: "Disconnect on Debug Stop"
-status: "in-progress"
+status: "done"
 created: "2026-06-25"
 epic: "11"
 priority: "p1-high"
@@ -16,7 +16,7 @@ dependencies:
 
 # Story 11.4: Disconnect on Debug Stop
 
-**Status:** in-progress
+**Status:** done
 
 ## Story
 
@@ -239,7 +239,16 @@ GPT-5.3-Codex
 - `tests/unit/debugger/debug-session-manager.test.ts`
 - `tests/unit/debugger/debug-adapter-factory.test.ts`
 
+### Review Findings
+
+- [x] [Review][Patch] `stopRunningSession()` outside `try` in `disconnectWithStateReset` — if `clearAll()` or `variableStore.dispose()` rejects, the `finally` block never runs: `applyDisconnectedConnectionState()` is skipped, `cancelTransitions()` is not called, and `connectionStateStore` remains stuck in its pre-stop state. Fix: move `await stopRunningSession()` inside the `try` block. [src/debugger/debug-session-manager.ts]
+- [x] [Review][Defer] `terminateEmitter.fire("connection-lost")` moved before `void stopRunningSession()` — VS Code may send a follow-up `disconnect`/`terminate` concurrently with still-running connection-lost cleanup; CDP commands in-flight when `disconnectActiveConnection()` closes the WebSocket fail silently. Intentional design (test explicitly validates this ordering to avoid hangs); acceptable for connection-loss scenario. [src/debugger/debug-session-manager.ts] — deferred, pre-existing
+- [x] [Review][Defer] `disconnectActiveConnection` called twice when `disconnect()` + `terminate()` are both invoked — `stopRunningSession()` is idempotent via `running` flag but `disconnectActiveConnection?.()` has no equivalent guard; second call operates on already-disconnected transport (caught, end state still `disconnected`). Test acknowledges this with `disconnectCalls === 2`. [src/debugger/debug-session-manager.ts] — deferred, pre-existing
+- [x] [Review][Defer] Misleading "Failed to disconnect active browser connection" log emitted on every normal connection-loss teardown — when the browser crashes and VS Code responds with `disconnect`, `disconnectActiveConnection()` throws on a dead transport; the catch logs it as an error even though it is expected behavior in this path. [src/debugger/debug-session-manager.ts] — deferred, pre-existing
+- [x] [Review][Defer] `void stopRunningSession()` in connection-lost handler silently swallows errors — fire-and-forget with no error logging if `clearAll`/`dispose` throws; acceptable as best-effort cleanup in a failure scenario. [src/debugger/debug-session-manager.ts] — deferred, pre-existing
+
 ## Change Log
 
 - 2026-06-25: Created Story 11.4 with implementation guardrails, lifecycle tasks, and validation plan. Status set to ready-for-dev.
 - 2026-06-25: Implemented disconnect-on-debug-stop lifecycle teardown + connection-state reset and added adapter/manager/factory unit coverage. Automated lint/test/compile validation passed; manual Extension Development Host smoke validation pending.
+- 2026-06-25: Code review complete. 1 patch, 4 deferred, 2 dismissed.

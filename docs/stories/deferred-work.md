@@ -1,5 +1,12 @@
 # Deferred Work
 
+## Deferred from: code review of 11-4-disconnect-on-debug-stop (2026-06-25)
+
+- `terminateEmitter.fire("connection-lost")` moved before `void stopRunningSession()` — VS Code may send a follow-up `disconnect`/`terminate` concurrently with still-running connection-lost cleanup; CDP in-flight commands fail when `disconnectActiveConnection()` closes the WebSocket. Intentional to avoid hang scenarios; test validates this ordering. [src/debugger/debug-session-manager.ts]
+- `disconnectActiveConnection` called twice when `disconnect()` + `terminate()` both fire — `stopRunningSession()` is idempotent but `disconnectActiveConnection` has no guard; second call throws on already-closed transport, caught gracefully. End state always `disconnected`. [src/debugger/debug-session-manager.ts]
+- Misleading "Failed to disconnect active browser connection" log on normal connection-loss teardown — expected failure from calling disconnect on a dead transport, logged as an error. [src/debugger/debug-session-manager.ts]
+- `void stopRunningSession()` in connection-lost handler silently drops errors from `clearAll`/`dispose` — intentional best-effort cleanup in failure scenario. [src/debugger/debug-session-manager.ts]
+
 ## Deferred from: code review of 11-3-reconnect-on-debug-restart (2026-06-25)
 
 - `sendErrorResponse(response, 0, ...)` uses error code `0` in `restartRequest` ([src/debugger/notebook-dap-adapter.ts](../../src/debugger/notebook-dap-adapter.ts)). Pre-existing pattern from `launchRequest`; non-standard but harmless for the current VS Code DAP client.
