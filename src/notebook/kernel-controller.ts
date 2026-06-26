@@ -5,6 +5,10 @@ import {
   createKernelRuntime,
   type ExecutionFailure,
 } from "../kernel";
+import {
+  createEnsureSessionReadyForExecution,
+  type EnsureSessionReadyForExecution,
+} from "./debug-session-preflight";
 
 let executionOrder = 0;
 
@@ -22,10 +26,29 @@ export interface KernelControllerApi extends NotebookApi {
   l10n: LocalizationApi;
 }
 
+interface SessionPreflightApi {
+  debug: typeof vscode.debug;
+  workspace: typeof vscode.workspace;
+  window: typeof vscode.window;
+}
+
 export interface KernelControllerOptions {
   onTransportError?:
     | ((failure: ExecutionFailure) => Promise<void>)
     | ((failure: ExecutionFailure) => void);
+  ensureSessionReady?: EnsureSessionReadyForExecution;
+}
+
+function supportsSessionPreflight(
+  api: KernelControllerApi,
+): api is KernelControllerApi & SessionPreflightApi {
+  const typedApi = api as Partial<SessionPreflightApi>;
+
+  return (
+    typedApi.debug !== undefined &&
+    typedApi.workspace !== undefined &&
+    typedApi.window !== undefined
+  );
 }
 
 export function registerKernelController(
@@ -50,7 +73,23 @@ export function registerKernelController(
     options?.onTransportError,
   );
 
+  const ensureSessionReady: EnsureSessionReadyForExecution =
+    options?.ensureSessionReady ??
+    (supportsSessionPreflight(api)
+      ? createEnsureSessionReadyForExecution({
+          debug: api.debug,
+          workspace: api.workspace,
+          window: api.window,
+          localize: api.l10n.t,
+        })
+      : async () => ({ ready: true }));
+
   controller.executeHandler = async (cells, _notebook, executionController) => {
+    const preflight = await ensureSessionReady();
+    if (!preflight.ready) {
+      return;
+    }
+
     for (const cell of cells) {
       executionOrder += 1;
       const wasCancelled = await executeCell({
