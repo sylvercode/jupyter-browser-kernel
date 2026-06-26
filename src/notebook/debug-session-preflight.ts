@@ -108,7 +108,9 @@ function toStableSerialization(value: unknown): string {
   return `{${entries.join(",")}}`;
 }
 
-function toLaunchConfigurationKey(configuration: vscode.DebugConfiguration): string {
+function toLaunchConfigurationKey(
+  configuration: vscode.DebugConfiguration,
+): string {
   return toStableSerialization(configuration);
 }
 
@@ -314,6 +316,10 @@ function toErrorMessage(error: unknown): string {
 export function createEnsureSessionReadyForExecution(
   api: ExecutionSessionPreflightApi,
 ): EnsureSessionReadyForExecution {
+  const notify = (messageCall: () => Thenable<string | undefined>): void => {
+    void Promise.resolve(messageCall()).catch(() => undefined);
+  };
+
   return async () => {
     const getActiveConnection =
       api.getActiveConnection ?? getActiveBrowserConnection;
@@ -330,9 +336,11 @@ export function createEnsureSessionReadyForExecution(
         return { ready: true };
       }
 
-      await api.window.showWarningMessage(
-        api.localize(
-          "Browser Kernel debug session did not reach connected state. Wait for connection and run the cell again.",
+      notify(() =>
+        api.window.showWarningMessage(
+          api.localize(
+            "Browser Kernel debug session did not reach connected state. Wait for connection and run the cell again.",
+          ),
         ),
       );
       return { ready: false };
@@ -349,9 +357,11 @@ export function createEnsureSessionReadyForExecution(
     );
 
     if (decision !== startAction) {
-      await api.window.showInformationMessage(
-        api.localize(
-          "Cell execution canceled. Start a Browser Kernel debug session to run notebook cells.",
+      notify(() =>
+        api.window.showInformationMessage(
+          api.localize(
+            "Cell execution canceled. Start a Browser Kernel debug session to run notebook cells.",
+          ),
         ),
       );
       return { ready: false };
@@ -364,9 +374,11 @@ export function createEnsureSessionReadyForExecution(
     });
 
     if (!candidate) {
-      await api.window.showErrorMessage(
-        api.localize(
-          'No "jupyter-browser-kernel" launch configuration was found. Add one in launch.json and try again.',
+      notify(() =>
+        api.window.showErrorMessage(
+          api.localize(
+            'No "jupyter-browser-kernel" launch configuration was found. Add one in launch.json and try again.',
+          ),
         ),
       );
       return { ready: false };
@@ -379,19 +391,23 @@ export function createEnsureSessionReadyForExecution(
         getStartTarget(candidate),
       );
     } catch (error) {
-      await api.window.showErrorMessage(
-        api.localize(
-          "Failed to start Browser Kernel debug session: {0}",
-          toErrorMessage(error),
+      notify(() =>
+        api.window.showErrorMessage(
+          api.localize(
+            "Failed to start Browser Kernel debug session: {0}",
+            toErrorMessage(error),
+          ),
         ),
       );
       return { ready: false };
     }
 
     if (!debugStarted) {
-      await api.window.showErrorMessage(
-        api.localize(
-          "Browser Kernel debug session did not start. Check your debug configuration and try again.",
+      notify(() =>
+        api.window.showErrorMessage(
+          api.localize(
+            "Browser Kernel debug session did not start. Check your debug configuration and try again.",
+          ),
         ),
       );
       return { ready: false };
@@ -399,9 +415,11 @@ export function createEnsureSessionReadyForExecution(
 
     const connected = await waitForConnectedTransport(api);
     if (!connected) {
-      await api.window.showWarningMessage(
-        api.localize(
-          "Debug session started, but no active Browser connection became ready. Wait for Connected and run the cell again.",
+      notify(() =>
+        api.window.showWarningMessage(
+          api.localize(
+            "Debug session started, but no active Browser connection became ready. Wait for Connected and run the cell again.",
+          ),
         ),
       );
       return { ready: false };

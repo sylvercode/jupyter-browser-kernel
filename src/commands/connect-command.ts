@@ -132,8 +132,8 @@ export async function showConnectOutcome(
 
   runtime.connectionStateStore.setErrorContext(undefined);
 
-  try {
-    await runtime.showInformationMessage(
+  void Promise.resolve(
+    runtime.showInformationMessage(
       runtime.localize({
         message: successMessage,
         args: [connectResult.connectedTarget.targetId, endpointSummary],
@@ -142,10 +142,10 @@ export async function showConnectOutcome(
           "{1} is the redacted or loopback-safe endpoint summary shown to the user.",
         ],
       }),
-    );
-  } catch {
+    ),
+  ).catch(() => {
     // non-fatal: info message failed to display
-  }
+  });
 }
 
 export async function runConnect(

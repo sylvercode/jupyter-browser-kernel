@@ -31,15 +31,15 @@ export async function executeDisconnectCommand(
     runtime.connectionStateStore.setState("disconnected");
   }
 
-  try {
-    await runtime.showInformationMessage(
+  void Promise.resolve(
+    runtime.showInformationMessage(
       runtime.localize(
         "Jupyter Browser Kernel: Disconnected from browser target.",
       ),
-    );
-  } catch {
+    ),
+  ).catch(() => {
     // non-fatal: info message failed to display
-  }
+  });
 }
 
 export function createDefaultDisconnectCommandRuntime(
