@@ -310,7 +310,7 @@ test("executeCell writes structured error output for runtime exception", async (
   assert.ok(!("className" in renderedError));
 });
 
-test("executeCell reports reconnect prompt when no active session", async () => {
+test("executeCell reports debug-session guidance when no active session", async () => {
   const { execution, notebookExecution } = createExecutionRecorder();
   const reportedFailures: { kind: string; message: string }[] = [];
 
@@ -340,14 +340,14 @@ test("executeCell reports reconnect prompt when no active session", async () => 
     {
       kind: "no-session",
       message:
-        "No active browser session. Run Jupyter Browser Kernel: Reconnect and try again.",
+        "No active Browser Kernel debug session. Start a debug session and run the cell again.",
     },
   ]);
   assert.equal(execution.outputs.length, 1);
   assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
   assert.match(
     String(execution.outputs[0]?.items[0]?.value),
-    /No active browser session/,
+    /No active Browser Kernel debug session/,
   );
 });
 

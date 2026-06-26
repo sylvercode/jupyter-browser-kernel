@@ -1,5 +1,14 @@
 # Deferred Work
 
+## Deferred from: code review of 11-5-prompt-to-start-a-debug-session-when-running-a-cell-without-one (2026-06-26)
+
+- 15-second connection-ready timeout hardcoded (`CONNECTION_READY_TIMEOUT_MS = 15000`) with no user setting. Slow or remote browser targets may need longer. [src/notebook/debug-session-preflight.ts]
+- `ignoreFocusOut: true` on the multi-config quick-pick is non-standard for pickers the user did not explicitly open. Low-priority UX concern. [src/notebook/debug-session-preflight.ts]
+- `onDidTerminateDebugSession` callback assumes `activeDebugSession` is already cleared by the time the event fires — VS Code practice supports this but it is undocumented. [src/notebook/debug-session-preflight.ts]
+- Out-of-scope production changes in `connect-command.ts`, `disconnect-command.ts`, and `kernel-transport-failure-reporter.ts` (fire-and-forget notification refactor + type widening). Safe and consistent with new pattern but outside story scope.
+- `toStableSerialization` serializes JS `undefined` values as the string `"undefined"` via template coercion (`JSON.stringify(undefined)` returns the JS value `undefined`, not a string). Structurally equivalent configs with explicit-undefined vs absent keys produce different dedup keys. Affects only malformed launch configs. [src/notebook/debug-session-preflight.ts]
+- `supportsSessionPreflight` uses `as Partial<SessionPreflightApi>` cast without structural validation. Runtime logic is correct; TypeScript type safety is loose. [src/notebook/kernel-controller.ts]
+
 ## Deferred from: code review of 11-4-disconnect-on-debug-stop (2026-06-25)
 
 - `terminateEmitter.fire("connection-lost")` moved before `void stopRunningSession()` — VS Code may send a follow-up `disconnect`/`terminate` concurrently with still-running connection-lost cleanup; CDP in-flight commands fail when `disconnectActiveConnection()` closes the WebSocket. Intentional to avoid hang scenarios; test validates this ordering. [src/debugger/debug-session-manager.ts]

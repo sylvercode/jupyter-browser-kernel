@@ -178,3 +178,112 @@ test("executeHandler stops dispatching remaining cells after cancellation", asyn
   assert.equal(executionCount, 1);
   assert.deepEqual(executionOrders, [1]);
 });
+
+test("executeHandler skips execution when session preflight blocks run", async () => {
+  resetExecutionOrderForTests();
+
+  const controller: FakeNotebookController = {
+    id: "",
+    notebookType: "",
+    label: "",
+    supportedLanguages: [],
+  };
+
+  const api = {
+    notebooks: {
+      createNotebookController: () => controller,
+    },
+    l10n: {
+      t: createLocalizeMock(),
+    },
+    NotebookCellOutput: FakeNotebookCellOutput,
+    NotebookCellOutputItem: FakeNotebookCellOutputItem,
+  };
+
+  registerKernelController(api as never, {
+    ensureSessionReady: async () => ({ ready: false }),
+  });
+
+  let executionCount = 0;
+  const executionController = {
+    createNotebookCellExecution: () => {
+      executionCount += 1;
+      return {
+        start: () => undefined,
+        end: () => undefined,
+        replaceOutput: async () => undefined,
+        token: createCancellationToken(),
+      };
+    },
+  };
+
+  await controller.executeHandler?.(
+    [{ document: { getText: () => "1 + 1" } }],
+    {},
+    executionController,
+  );
+
+  assert.equal(executionCount, 0);
+});
+
+test("executeHandler waits for session preflight readiness before dispatch", async () => {
+  resetExecutionOrderForTests();
+
+  const controller: FakeNotebookController = {
+    id: "",
+    notebookType: "",
+    label: "",
+    supportedLanguages: [],
+  };
+
+  const api = {
+    notebooks: {
+      createNotebookController: () => controller,
+    },
+    l10n: {
+      t: createLocalizeMock(),
+    },
+    NotebookCellOutput: FakeNotebookCellOutput,
+    NotebookCellOutputItem: FakeNotebookCellOutputItem,
+  };
+
+  let releasePreflight: (() => void) | undefined;
+
+  registerKernelController(api as never, {
+    ensureSessionReady: async () => {
+      await new Promise<void>((resolve) => {
+        releasePreflight = resolve;
+      });
+
+      return { ready: true };
+    },
+  });
+
+  let executionCount = 0;
+  const executionController = {
+    createNotebookCellExecution: () => {
+      executionCount += 1;
+      return {
+        start: () => undefined,
+        end: () => undefined,
+        replaceOutput: async () => undefined,
+        token: createCancellationToken(),
+      };
+    },
+  };
+
+  const runPromise = controller.executeHandler?.(
+    [{ document: { getText: () => "1 + 1" } }],
+    {},
+    executionController,
+  );
+
+  await Promise.resolve();
+
+  assert.equal(executionCount, 0);
+
+  releasePreflight?.();
+  await runPromise;
+
+  assert.equal(executionCount, 1);
+});

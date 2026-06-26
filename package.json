@@ -20,6 +20,7 @@
   "main": "./dist/extension.mjs",
   "l10n": "./l10n",
   "activationEvents": [
+    "onNotebook:jupyter-notebook",
     "onDebug:jupyter-browser-kernel",
     "onDebugResolve:jupyter-browser-kernel"
   ],

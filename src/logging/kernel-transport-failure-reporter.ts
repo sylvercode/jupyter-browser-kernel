@@ -14,7 +14,7 @@ export interface KernelTransportFailureReporterDeps {
   disconnectActiveConnection?: () => Promise<void>;
   outputChannel: { appendLine: (value: string) => void };
   localize: Localize;
-  showErrorMessage: (message: string) => Promise<void>;
+  showErrorMessage: (message: string) => PromiseLike<unknown> | void;
   now?: () => Date;
 }
 
@@ -62,6 +62,6 @@ export function createKernelTransportFailureReporter({
       connectionStateStore?.setState("error");
     }
 
-    await showErrorMessage(userMessage);
+    void Promise.resolve(showErrorMessage(userMessage)).catch(() => undefined);
   };
 }

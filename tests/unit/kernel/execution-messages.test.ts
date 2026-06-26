@@ -14,7 +14,7 @@ test("getKernelFailureCellOutputMessage returns no-session message for no-sessio
   const localize = createLocalizeMock();
   const message = getKernelFailureCellOutputMessage(localize, "no-session");
   assert.ok(message.length > 0);
-  assert.ok(message.includes("Reconnect"));
+  assert.ok(message.includes("debug session"));
 });
 
 test("getKernelFailureCellOutputMessage returns transport message for transport-error kind", () => {
@@ -48,7 +48,7 @@ test("getKernelFailureNotificationMessage returns timeout message for timeout ki
 test("getKernelFailureNotificationMessage returns no-session message for no-session kind", () => {
   const localize = createLocalizeMock();
   const message = getKernelFailureNotificationMessage(localize, "no-session");
-  assert.ok(message.includes("Reconnect"));
+  assert.ok(message.includes("debug session"));
 });
 
 test("getKernelFailureNotificationMessage returns transport message for transport-error kind", () => {

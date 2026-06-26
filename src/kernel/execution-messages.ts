@@ -3,7 +3,7 @@ import type { ExecutionFailureKind } from "./execution-result";
 
 export function getNoActiveSessionMessage(localize: Localize): string {
   return localize(
-    "No active browser session. Run Jupyter Browser Kernel: Reconnect and try again.",
+    "No active Browser Kernel debug session. Start a debug session and run the cell again.",
   );
 }
 
