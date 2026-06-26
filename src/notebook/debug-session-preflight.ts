@@ -27,6 +27,13 @@ export interface DebugLaunchQuickPickItem extends vscode.QuickPickItem {
   candidate: DebugLaunchCandidate;
 }
 
+export type DebugLaunchResolutionOutcome = "selected" | "none" | "cancelled";
+
+export interface DebugLaunchResolution {
+  outcome: DebugLaunchResolutionOutcome;
+  candidate?: DebugLaunchCandidate;
+}
+
 interface WorkspaceConfigurationApi {
   workspaceFolders: readonly vscode.WorkspaceFolder[] | undefined;
   getConfiguration: typeof vscode.workspace.getConfiguration;
@@ -168,13 +175,33 @@ export async function resolveBrowserKernelLaunchConfiguration({
     options: vscode.QuickPickOptions,
   ) => Thenable<DebugLaunchQuickPickItem | undefined>;
 }): Promise<DebugLaunchCandidate | undefined> {
+  const result = await resolveBrowserKernelLaunchSelection({
+    workspace,
+    localize,
+    showQuickPick,
+  });
+  return result.candidate;
+}
+
+export async function resolveBrowserKernelLaunchSelection({
+  workspace,
+  localize,
+  showQuickPick,
+}: {
+  workspace: WorkspaceConfigurationApi;
+  localize: Localize;
+  showQuickPick: (
+    items: readonly DebugLaunchQuickPickItem[],
+    options: vscode.QuickPickOptions,
+  ) => Thenable<DebugLaunchQuickPickItem | undefined>;
+}): Promise<DebugLaunchResolution> {
   const candidates = collectLaunchCandidates(workspace);
   if (candidates.length === 0) {
-    return undefined;
+    return { outcome: "none" };
   }
 
   if (candidates.length === 1) {
-    return candidates[0];
+    return { outcome: "selected", candidate: candidates[0] };
   }
 
   const quickPickItems: DebugLaunchQuickPickItem[] = candidates.map(
@@ -189,7 +216,11 @@ export async function resolveBrowserKernelLaunchConfiguration({
     ignoreFocusOut: true,
   });
 
-  return selection?.candidate;
+  if (!selection) {
+    return { outcome: "cancelled" };
+  }
+
+  return { outcome: "selected", candidate: selection.candidate };
 }
 
 function hasActiveBrowserKernelSession(debug: DebugLifecycleApi): boolean {
@@ -207,7 +238,7 @@ function hasConnectedTransport(
 
   const stateStore = getConnectionStateStore();
   if (!stateStore) {
-    return true;
+    return false;
   }
 
   return stateStore.getState() === "connected";
@@ -227,6 +258,20 @@ async function waitForConnectedTransport(
 
   return new Promise<boolean>((resolve) => {
     let settled = false;
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    let connectionSubscription: { dispose: () => void } | undefined;
+    let debugStartSubscription: { dispose: () => void } | undefined;
+    let debugTerminateSubscription: { dispose: () => void } | undefined;
+
+    const disposeSubscriptions = (): void => {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+
+      connectionSubscription?.dispose();
+      debugStartSubscription?.dispose();
+      debugTerminateSubscription?.dispose();
+    };
 
     const finish = (ready: boolean): void => {
       if (settled) {
@@ -234,10 +279,7 @@ async function waitForConnectedTransport(
       }
 
       settled = true;
-      clearTimeout(timeoutHandle);
-      connectionSubscription.dispose();
-      debugStartSubscription.dispose();
-      debugTerminateSubscription.dispose();
+      disposeSubscriptions();
       resolve(ready);
     };
 
@@ -247,48 +289,57 @@ async function waitForConnectedTransport(
       }
     };
 
-    const connectionSubscription = (
-      api.subscribeConnectionState ?? onDidChangeConnectionState
-    )((state) => {
-      if (state === "connected") {
-        maybeFinishReady();
-      }
-
-      if (
-        (state === "disconnected" || state === "error") &&
-        !hasActiveBrowserKernelSession(api.debug)
-      ) {
-        finish(false);
-      }
-    });
-
-    const debugStartSubscription = api.debug.onDidStartDebugSession(
-      (session) => {
-        if (session.type !== BROWSER_KERNEL_DEBUG_TYPE) {
-          return;
+    try {
+      connectionSubscription = (
+        api.subscribeConnectionState ?? onDidChangeConnectionState
+      )((state) => {
+        if (state === "connected") {
+          maybeFinishReady();
         }
 
-        maybeFinishReady();
-      },
-    );
-
-    const debugTerminateSubscription = api.debug.onDidTerminateDebugSession(
-      (session) => {
-        if (session.type !== BROWSER_KERNEL_DEBUG_TYPE) {
-          return;
-        }
-
-        if (!hasActiveBrowserKernelSession(api.debug)) {
+        if (
+          (state === "disconnected" || state === "error") &&
+          !hasActiveBrowserKernelSession(api.debug)
+        ) {
           finish(false);
         }
-      },
-    );
+      });
 
-    const timeoutHandle = setTimeout(() => {
+      debugStartSubscription = api.debug.onDidStartDebugSession((session) => {
+        if (session.type !== BROWSER_KERNEL_DEBUG_TYPE) {
+          return;
+        }
+
+        maybeFinishReady();
+      });
+
+      debugTerminateSubscription = api.debug.onDidTerminateDebugSession(
+        (session) => {
+          if (session.type !== BROWSER_KERNEL_DEBUG_TYPE) {
+            return;
+          }
+
+          if (!hasActiveBrowserKernelSession(api.debug)) {
+            finish(false);
+          }
+        },
+      );
+
+      timeoutHandle = setTimeout(() => {
+        finish(false);
+      }, CONNECTION_READY_TIMEOUT_MS);
+
+      // If the session disappeared between the outer pre-check and subscription setup,
+      // fail immediately instead of waiting for timeout.
+      if (!hasActiveBrowserKernelSession(api.debug)) {
+        finish(false);
+        return;
+      }
+
+      maybeFinishReady();
+    } catch {
       finish(false);
-    }, CONNECTION_READY_TIMEOUT_MS);
-
-    maybeFinishReady();
+    }
   });
 }
 
@@ -320,7 +371,9 @@ export function createEnsureSessionReadyForExecution(
     void Promise.resolve(messageCall()).catch(() => undefined);
   };
 
-  return async () => {
+  let inFlight: Promise<DebugSessionPreflightResult> | undefined;
+
+  const runPreflight = async (): Promise<DebugSessionPreflightResult> => {
     const getActiveConnection =
       api.getActiveConnection ?? getActiveBrowserConnection;
     const getConnectionStateStore =
@@ -331,7 +384,20 @@ export function createEnsureSessionReadyForExecution(
     }
 
     if (hasActiveBrowserKernelSession(api.debug)) {
-      const connected = await waitForConnectedTransport(api);
+      let connected = false;
+      try {
+        connected = await waitForConnectedTransport(api);
+      } catch {
+        notify(() =>
+          api.window.showWarningMessage(
+            api.localize(
+              "Unable to monitor Browser Kernel debug session readiness. Run the cell again.",
+            ),
+          ),
+        );
+        return { ready: false };
+      }
+
       if (connected) {
         return { ready: true };
       }
@@ -367,13 +433,24 @@ export function createEnsureSessionReadyForExecution(
       return { ready: false };
     }
 
-    const candidate = await resolveBrowserKernelLaunchConfiguration({
+    const launchResolution = await resolveBrowserKernelLaunchSelection({
       workspace: api.workspace,
       localize: api.localize,
       showQuickPick: api.window.showQuickPick,
     });
 
-    if (!candidate) {
+    if (launchResolution.outcome === "cancelled") {
+      notify(() =>
+        api.window.showInformationMessage(
+          api.localize(
+            "Cell execution canceled. Start a Browser Kernel debug session to run notebook cells.",
+          ),
+        ),
+      );
+      return { ready: false };
+    }
+
+    if (!launchResolution.candidate) {
       notify(() =>
         api.window.showErrorMessage(
           api.localize(
@@ -387,8 +464,8 @@ export function createEnsureSessionReadyForExecution(
     let debugStarted: boolean;
     try {
       debugStarted = await api.debug.startDebugging(
-        candidate.folder,
-        getStartTarget(candidate),
+        launchResolution.candidate.folder,
+        getStartTarget(launchResolution.candidate),
       );
     } catch (error) {
       notify(() =>
@@ -413,7 +490,20 @@ export function createEnsureSessionReadyForExecution(
       return { ready: false };
     }
 
-    const connected = await waitForConnectedTransport(api);
+    let connected = false;
+    try {
+      connected = await waitForConnectedTransport(api);
+    } catch {
+      notify(() =>
+        api.window.showWarningMessage(
+          api.localize(
+            "Unable to monitor Browser Kernel debug session readiness. Run the cell again.",
+          ),
+        ),
+      );
+      return { ready: false };
+    }
+
     if (!connected) {
       notify(() =>
         api.window.showWarningMessage(
@@ -426,5 +516,17 @@ export function createEnsureSessionReadyForExecution(
     }
 
     return { ready: true };
+  };
+
+  return async () => {
+    if (inFlight) {
+      return inFlight;
+    }
+
+    inFlight = runPreflight().finally(() => {
+      inFlight = undefined;
+    });
+
+    return inFlight;
   };
 }

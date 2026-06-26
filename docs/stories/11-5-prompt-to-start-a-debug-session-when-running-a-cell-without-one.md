@@ -2,7 +2,7 @@
 storyId: "11.5"
 storyKey: "11-5-prompt-to-start-a-debug-session-when-running-a-cell-without-one"
 title: "Prompt to Start a Debug Session When Running a Cell Without One"
-status: in-progress
+status: done
 created: "2026-06-26"
 epic: "11"
 priority: "p1-high"
@@ -17,7 +17,7 @@ dependencies:
 
 # Story 11.5: Prompt to Start a Debug Session When Running a Cell Without One
 
-**Status:** in-progress
+**Status:** done
 
 ## Story
 
@@ -251,7 +251,24 @@ GPT-5.3-Codex
 - `tests/unit/logging/kernel-transport-failure-reporter.test.ts`
 - `docs/stories/11-5-prompt-to-start-a-debug-session-when-running-a-cell-without-one.md`
 
+### Review Findings
+
+- [x] [Review][Patch] Missing `"{0} ({1)}"` localization key in bundle [l10n/bundle.l10n.json] — `toCandidateLabel` calls `localize("{0} ({1)}", ...)` but this format key is absent from `bundle.l10n.json`. In a localized build the label renders using the raw format string as a fallback (English-only accident), so the folder-qualified config name will not translate.
+- [x] [Review][Patch] `hasConnectedTransport` false positive when state store is absent [src/notebook/debug-session-preflight.ts:~193] — If `getConnectionStateStore()` returns `undefined` but an active connection object exists, the function returns `true` (connected). The safe default when state is unknown should be `false`; the current logic bypasses the preflight gate against a potentially uninitialized transport and produces a downstream CDP error instead of a clean preflight rejection.
+- [x] [Review][Patch] Subscriptions in `waitForConnectedTransport` can throw → uncaught rejection [src/notebook/debug-session-preflight.ts:~220–250] — `onDidStartDebugSession`, `onDidTerminateDebugSession`, and `subscribeConnectionState` are called synchronously inside a `new Promise` executor without try-catch. A synchronous throw from any of them escapes the executor as an unhandled rejection, leaves already-registered subscriptions undisposed, and surfaces to `executeHandler` with no user-facing error.
+- [x] [Review][Patch] Quick-pick Escape shows misleading "no config found" error after user dismisses picker [src/notebook/debug-session-preflight.ts:~330] — `resolveBrowserKernelLaunchConfiguration` returns `undefined` both when no configs exist AND when the user presses Escape. The call site does not distinguish these cases and unconditionally shows "No 'jupyter-browser-kernel' launch configuration was found. Add one in launch.json." When configs exist but the user dismissed the picker, this message is incorrect and tells them to create a config that already exists. AC 2 requires "if no configuration can be resolved the prompt explains how to define one" — this message fires even when one IS defined.
+- [x] [Review][Patch] TOCTOU: session terminates during subscription setup in `waitForConnectedTransport` → 15-second hang [src/notebook/debug-session-preflight.ts:~210] — There is a microtask-boundary gap between `hasActiveBrowserKernelSession` returning `true` in the outer function and the `onDidTerminateDebugSession` subscription being registered inside the Promise executor. If the session terminates in that gap, the event is missed. The end-of-executor `maybeFinishReady()` only checks `hasConnectedTransport`, not whether the session is gone. The result is a 15-second wait before the "did not reach connected state" message fires.
+- [x] [Review][Patch] `createEnsureSessionReadyForExecution` full flow and `waitForConnectedTransport` have no direct unit tests — task marked [x] incorrectly [tests/unit/notebook/debug-session-preflight.test.ts] — The 4 tests in `debug-session-preflight.test.ts` cover only `resolveBrowserKernelLaunchConfiguration`. The `kernel-controller.test.ts` preflight tests use an injectable stub override, so the real consent→startDebugging→waitForConnected path is never exercised. The story task "Add focused tests around connection readiness sequencing to prevent execute-before-connected regressions" is marked [x] but the actual sequencing logic is untested.
+- [x] [Review][Patch] Concurrent preflight calls can each independently show the "Start?" prompt [src/notebook/debug-session-preflight.ts:~300 / src/notebook/kernel-controller.ts] — If `executeHandler` is invoked concurrently for different cells before the first preflight completes, both calls pass the `hasConnectedTransport` and `hasActiveBrowserKernelSession` checks independently and both show the Start/Cancel prompt. There is no in-flight guard or shared Promise to coalesce concurrent preflights. The user sees duplicate prompts; both consents call `startDebugging`, and the second attempt hits the Epic 11 single-connection guard with an error message.
+- [x] [Review][Defer] 15-second connection-ready timeout is hardcoded with no user configuration [src/notebook/debug-session-preflight.ts:12] — `CONNECTION_READY_TIMEOUT_MS = 15000` is a magic constant. Slow or remote browser targets may need a longer window. Acceptable for v1; configurable timeout can be revisited in a follow-up. — deferred, pre-existing
+- [x] [Review][Defer] `ignoreFocusOut: true` on the multi-config quick-pick forces explicit cancel [src/notebook/debug-session-preflight.ts:~192] — Prevents accidental dismissal via focus loss but is non-standard for pickers the user did not explicitly invoke. Low-priority UX concern. — deferred, pre-existing
+- [x] [Review][Defer] `onDidTerminateDebugSession` behavior depends on undocumented VS Code `activeDebugSession` ordering [src/notebook/debug-session-preflight.ts:~257] — The terminate-subscription callback assumes `activeDebugSession` is cleared by the time the event fires. VS Code practice supports this but it is undocumented. — deferred, pre-existing
+- [x] [Review][Defer] Out-of-scope production file changes in connect/disconnect commands and transport reporter [src/commands/connect-command.ts, src/commands/disconnect-command.ts, src/logging/kernel-transport-failure-reporter.ts] — These files received fire-and-forget notification refactoring and a type widening not listed in the story scope. The changes are safe and consistent with the new pattern but add surface area outside the story boundary. — deferred, pre-existing
+- [x] [Review][Defer] `toStableSerialization` serializes `undefined` values as the literal string `undefined` via template coercion [src/notebook/debug-session-preflight.ts:~100] — `JSON.stringify(undefined)` returns the JS value `undefined`, not the string `"undefined"`. In the template literal context this renders as `undefined`, which means two configs differing only by explicit-undefined vs absent keys produce different dedup keys. Only affects structurally malformed launch configs. — deferred, pre-existing
+- [x] [Review][Defer] `supportsSessionPreflight` uses an unconstrained `as Partial<SessionPreflightApi>` cast [src/notebook/kernel-controller.ts:~44] — TypeScript accepts the cast without structural validation. If `KernelControllerApi` and `SessionPreflightApi` diverge, the guard can silently pass or fail with no compile-time warning. Runtime duck-typing is correct; type safety is loose. — deferred, pre-existing
+
 ## Change Log
 
 - 2026-06-26: Created Story 11.5 with implementation guardrails, deterministic debug-start prompt flow, and validation plan. Status set to ready-for-dev.
 - 2026-06-26: Implemented notebook run-cell preflight prompt/start flow, deterministic launch config resolution, connection-readiness gating, localization updates, and unit test coverage. Automated validation passed; manual smoke checklist remains open.
+- 2026-06-26: Code review completed. 7 patch findings, 6 deferred. Findings appended above.

@@ -1,8 +1,11 @@
 export {
   createEnsureSessionReadyForExecution,
   resolveBrowserKernelLaunchConfiguration,
+  resolveBrowserKernelLaunchSelection,
   type DebugLaunchCandidate,
   type DebugLaunchQuickPickItem,
+  type DebugLaunchResolution,
+  type DebugLaunchResolutionOutcome,
   type DebugSessionPreflightResult,
   type EnsureSessionReadyForExecution,
   type ExecutionSessionPreflightApi,
