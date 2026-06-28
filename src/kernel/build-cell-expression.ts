@@ -1,3 +1,5 @@
+import { getRuntilmeCellBridgeHelperPrelude } from "./runtilme-cell-bridge";
+
 export interface BuildCellExpressionOptions {
   isolate: boolean;
 }
@@ -7,18 +9,22 @@ export function buildCellExpression(
   sourceUri: string,
   options: BuildCellExpressionOptions,
 ): string {
+  const helperPrelude = getRuntilmeCellBridgeHelperPrelude();
+
   if (!options.isolate) {
-    return `${userCode}\n//# sourceURL=${sourceUri}\n`;
+    return `${helperPrelude}\n${userCode}\n//# sourceURL=${sourceUri}\n`;
   }
 
   const isolationStart = "await (async()=>{";
   const isolationEnd = `})()\n//# sourceURL=${sourceUri}\n`;
+  const wrappedUserCode =
+    userCode.length === 0 ? helperPrelude : `${helperPrelude}\n${userCode}`;
 
-  if (userCode.length === 0) {
+  if (wrappedUserCode.length === 0) {
     return `${isolationStart}${isolationEnd}`;
   }
 
-  const lines = userCode.split("\n");
+  const lines = wrappedUserCode.split("\n");
 
   if (lines.length === 1) {
     const onlyLine = lines[0] ?? "";

@@ -115,6 +115,12 @@ function createFakeConnection(
   };
 }
 
+function collectUserExpressions(evaluateCalls: string[]): string[] {
+  return evaluateCalls.filter((expression) =>
+    expression.includes("//# sourceURL="),
+  );
+}
+
 test("executeCell evaluates expression and writes success output", async () => {
   const sourceUri =
     "vscode-notebook-cell://test-authority/workspaces/foundry-devil-code-sight/tests/files/test1.ipynb#ch0000000000001";
@@ -149,7 +155,10 @@ test("executeCell evaluates expression and writes success output", async () => {
     runtime,
   });
 
-  assert.deepEqual(evaluateCalls, [`2 + 2\n//# sourceURL=${sourceUri}\n`]);
+  const userExpressions = collectUserExpressions(evaluateCalls);
+  assert.deepEqual(userExpressions, [
+    `globalThis.$cell = globalThis.$cell ?? Object.freeze({ log: () => undefined });\n2 + 2\n//# sourceURL=${sourceUri}\n`,
+  ]);
   assert.equal(notebookExecution.executionOrder, 7);
   assert.equal(execution.success, true);
   assert.equal(execution.outputs.length, 1);
@@ -650,9 +659,10 @@ test("executeCell keeps sourceURL bytes stable across reruns of the same cell", 
     runtime,
   });
 
-  assert.equal(evaluateCalls.length, 2);
-  assert.equal(evaluateCalls[0], evaluateCalls[1]);
-  assert.match(String(evaluateCalls[0]), new RegExp(`${sourceUri}\\n$`));
+  const userExpressions = collectUserExpressions(evaluateCalls);
+  assert.equal(userExpressions.length, 2);
+  assert.equal(userExpressions[0], userExpressions[1]);
+  assert.match(String(userExpressions[0]), new RegExp(`${sourceUri}\\n$`));
 });
 
 test("executeCell assigns unique sourceURL bytes for distinct cell URIs", async () => {
@@ -699,10 +709,11 @@ test("executeCell assigns unique sourceURL bytes for distinct cell URIs", async 
     runtime,
   });
 
-  assert.equal(evaluateCalls.length, 2);
-  assert.notEqual(evaluateCalls[0], evaluateCalls[1]);
-  assert.match(String(evaluateCalls[0]), new RegExp(`sourceURL=${uriA}`));
-  assert.match(String(evaluateCalls[1]), new RegExp(`sourceURL=${uriB}`));
+  const userExpressions = collectUserExpressions(evaluateCalls);
+  assert.equal(userExpressions.length, 2);
+  assert.notEqual(userExpressions[0], userExpressions[1]);
+  assert.match(String(userExpressions[0]), new RegExp(`sourceURL=${uriA}`));
+  assert.match(String(userExpressions[1]), new RegExp(`sourceURL=${uriB}`));
 });
 
 test("executeCell routes metadata cases to wrapper only when isolated is boolean true", async () => {
@@ -744,12 +755,13 @@ test("executeCell routes metadata cases to wrapper only when isolated is boolean
     });
   }
 
-  assert.equal(evaluateCalls.length, 5);
-  assert.equal(evaluateCalls[0]?.startsWith("(async()=>{"), false);
-  assert.equal(evaluateCalls[1]?.startsWith("(async()=>{"), false);
-  assert.equal(evaluateCalls[2]?.startsWith("(async()=>{"), false);
-  assert.equal(evaluateCalls[3]?.startsWith("(async()=>{"), false);
-  assert.equal(evaluateCalls[4]?.startsWith("await (async()=>{"), true);
+  const userExpressions = collectUserExpressions(evaluateCalls);
+  assert.equal(userExpressions.length, 5);
+  assert.equal(userExpressions[0]?.startsWith("(async()=>{"), false);
+  assert.equal(userExpressions[1]?.startsWith("(async()=>{"), false);
+  assert.equal(userExpressions[2]?.startsWith("(async()=>{"), false);
+  assert.equal(userExpressions[3]?.startsWith("(async()=>{"), false);
+  assert.equal(userExpressions[4]?.startsWith("await (async()=>{"), true);
 });
 
 test("executeCell uses workspace default isolation when metadata is absent", async () => {
@@ -784,8 +796,9 @@ test("executeCell uses workspace default isolation when metadata is absent", asy
     runtime,
   });
 
-  assert.equal(evaluateCalls.length, 1);
-  assert.equal(evaluateCalls[0]?.startsWith("await (async()=>{"), true);
+  const userExpressions = collectUserExpressions(evaluateCalls);
+  assert.equal(userExpressions.length, 1);
+  assert.equal(userExpressions[0]?.startsWith("await (async()=>{"), true);
 });
 
 test("executeCell explicit metadata overrides workspace default isolation", async () => {
@@ -836,9 +849,184 @@ test("executeCell explicit metadata overrides workspace default isolation", asyn
     runtime,
   });
 
-  assert.equal(evaluateCalls.length, 2);
-  assert.equal(evaluateCalls[0]?.startsWith("(async()=>{"), false);
-  assert.equal(evaluateCalls[1]?.startsWith("await (async()=>{"), true);
+  const userExpressions = collectUserExpressions(evaluateCalls);
+  assert.equal(userExpressions.length, 2);
+  assert.equal(userExpressions[0]?.startsWith("(async()=>{"), false);
+  assert.equal(userExpressions[1]?.startsWith("await (async()=>{"), true);
+});
+
+test("executeCell appends intentional log section for single helper call", async () => {
+  let callIndex = 0;
+  const connection = createFakeConnection(async (_expression) => {
+    callIndex += 1;
+    if (callIndex === 1) {
+      return {
+        result: {
+          type: "string",
+          value: "__jbkRuntilmeCellBridge:test-1",
+        },
+      } as never;
+    }
+
+    if (callIndex === 3) {
+      return {
+        result: {
+          type: "object",
+          subtype: "array",
+          value: ["first log"],
+        },
+      } as never;
+    }
+
+    return {
+      result: {
+        type: "number",
+        value: 4,
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell("$cell.log('first log'); 2 + 2") as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 300,
+    runtime,
+  });
+
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 2);
+  assert.equal(execution.outputs[0]?.items[0]?.value, "4");
+  assert.equal(
+    execution.outputs[1]?.items[0]?.value,
+    "Intentional logs:\nfirst log",
+  );
+});
+
+test("executeCell preserves helper-call order in intentional log section", async () => {
+  let callIndex = 0;
+  const connection = createFakeConnection(async (_expression) => {
+    callIndex += 1;
+    if (callIndex === 1) {
+      return {
+        result: {
+          type: "string",
+          value: "__jbkRuntilmeCellBridge:test-2",
+        },
+      } as never;
+    }
+
+    if (callIndex === 3) {
+      return {
+        result: {
+          type: "object",
+          subtype: "array",
+          value: ["first", "second", "third"],
+        },
+      } as never;
+    }
+
+    return {
+      result: {
+        type: "number",
+        value: 1,
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell(
+      "$cell.log('first'); $cell.log('second'); $cell.log('third'); 1",
+    ) as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 301,
+    runtime,
+  });
+
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 2);
+  assert.equal(
+    execution.outputs[1]?.items[0]?.value,
+    "Intentional logs:\nfirst\nsecond\nthird",
+  );
+});
+
+test("executeCell keeps success output unchanged when no helper call occurs", async () => {
+  let callIndex = 0;
+  const connection = createFakeConnection(async (_expression) => {
+    callIndex += 1;
+    if (callIndex === 1) {
+      return {
+        result: {
+          type: "string",
+          value: "__jbkRuntilmeCellBridge:test-3",
+        },
+      } as never;
+    }
+
+    if (callIndex === 3) {
+      return {
+        result: {
+          type: "object",
+          subtype: "array",
+          value: [],
+        },
+      } as never;
+    }
+
+    return {
+      result: {
+        type: "number",
+        value: 8,
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell("4 + 4") as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 302,
+    runtime,
+  });
+
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 1);
+  assert.equal(execution.outputs[0]?.items[0]?.value, "8");
 });
 
 test("executeCell prepends isolated annotation as a separate rendered output", async () => {

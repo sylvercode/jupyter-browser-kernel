@@ -5,13 +5,18 @@ import { buildCellExpression } from "../../../src/kernel/build-cell-expression.j
 
 const BASE_URI =
   "vscode-notebook-cell://test-authority/workspaces/foundry-devil-code-sight/tests/files/test1.ipynb#ch0000000001234";
+const HELPER_PRELUDE =
+  "globalThis.$cell = globalThis.$cell ?? Object.freeze({ log: () => undefined });";
 
 test("buildCellExpression returns no-wrapper shape by default", () => {
   const expression = buildCellExpression("const x = 1", BASE_URI, {
     isolate: false,
   });
 
-  assert.equal(expression, `const x = 1\n//# sourceURL=${BASE_URI}\n`);
+  assert.equal(
+    expression,
+    `${HELPER_PRELUDE}\nconst x = 1\n//# sourceURL=${BASE_URI}\n`,
+  );
   assert.equal(expression.startsWith("(async()=>{"), false);
 });
 
@@ -21,7 +26,7 @@ test("buildCellExpression wraps multi-line code with same-line Pattern B boundar
     isolate: true,
   });
 
-  const expected = `await (async()=>{let x = 1;\nlet y = 2;\nx + y})()\n//# sourceURL=${BASE_URI}\n`;
+  const expected = `await (async()=>{${HELPER_PRELUDE}\nlet x = 1;\nlet y = 2;\nx + y})()\n//# sourceURL=${BASE_URI}\n`;
   assert.equal(expression, expected);
 });
 
@@ -32,7 +37,7 @@ test("buildCellExpression wraps single-line code without synthesized line breaks
 
   assert.equal(
     expression,
-    `await (async()=>{1 + 1})()\n//# sourceURL=${BASE_URI}\n`,
+    `await (async()=>{${HELPER_PRELUDE}\n1 + 1})()\n//# sourceURL=${BASE_URI}\n`,
   );
 });
 
@@ -43,7 +48,7 @@ test("buildCellExpression wraps empty code as a no-op async IIFE", () => {
 
   assert.equal(
     expression,
-    `await (async()=>{})()\n//# sourceURL=${BASE_URI}\n`,
+    `await (async()=>{${HELPER_PRELUDE}})()\n//# sourceURL=${BASE_URI}\n`,
   );
 });
 
@@ -73,4 +78,16 @@ test("buildCellExpression uses distinct sourceURL lines for distinct cells", () 
   assert.notEqual(expressionA, expressionB);
   assert.match(expressionA, new RegExp(`sourceURL=${uriA}`));
   assert.match(expressionB, new RegExp(`sourceURL=${uriB}`));
+});
+
+test("buildCellExpression always injects intentional helper prelude", () => {
+  const sharedExpression = buildCellExpression("2 + 2", BASE_URI, {
+    isolate: false,
+  });
+  const isolatedExpression = buildCellExpression("2 + 2", BASE_URI, {
+    isolate: true,
+  });
+
+  assert.equal(sharedExpression.startsWith(HELPER_PRELUDE), true);
+  assert.equal(isolatedExpression.includes(HELPER_PRELUDE), true);
 });

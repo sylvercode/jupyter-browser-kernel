@@ -79,3 +79,7 @@ export function getKernelFailureCategoryLabel(
 export function getIsolationAnnotationMessage(localize: Localize): string {
   return localize("(isolated cell)");
 }
+
+export function getIntentionalLogSectionLabel(localize: Localize): string {
+  return localize("Intentional logs:");
+}
