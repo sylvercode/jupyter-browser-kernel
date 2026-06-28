@@ -2,7 +2,7 @@
 storyId: "11.6"
 storyKey: "11-6-retire-connect-disconnect-reconnect-commands-and-migrate-state-reporting"
 title: "Retire Connect/Disconnect/Reconnect Commands and Migrate State Reporting"
-status: ready-for-dev
+status: review
 created: "2026-06-27"
 epic: "11"
 priority: "p1-high"
@@ -76,33 +76,33 @@ Concretely:
 
 ### 1. Remove the Legacy Commands From the Manifest and Activation Path (AC: 1, 3)
 
-- [ ] Remove `jupyterBrowserKernel.connect`, `jupyterBrowserKernel.disconnect`, and `jupyterBrowserKernel.reconnect` from [package.json](../../package.json).
-- [ ] Remove the corresponding `registerCommand` wiring from [src/extension.ts](../../src/extension.ts).
-- [ ] Keep the notebook activation event `onNotebook:jupyter-notebook` and the debug hooks already present in the manifest.
+- [x] Remove `jupyterBrowserKernel.connect`, `jupyterBrowserKernel.disconnect`, and `jupyterBrowserKernel.reconnect` from [package.json](../../package.json).
+- [x] Remove the corresponding `registerCommand` wiring from [src/extension.ts](../../src/extension.ts).
+- [x] Keep the notebook activation event `onNotebook:jupyter-notebook` and the debug hooks already present in the manifest.
 
 ### 2. Retire Obsolete Command Modules and Strings (AC: 1, 4)
 
-- [ ] Delete or refactor the now-unused command modules in [src/commands](../../src/commands) after confirming no reusable logic is stranded there.
-- [ ] Remove the retired command title entries from [package.nls.json](../../package.nls.json) and [l10n/bundle.l10n.json](../../l10n/bundle.l10n.json).
-- [ ] Keep any shared state-store or transport helpers that are still used by the debug lifecycle or other commands.
+- [x] Delete or refactor the now-unused command modules in [src/commands](../../src/commands) after confirming no reusable logic is stranded there.
+- [x] Remove the retired command title entries from [package.nls.json](../../package.nls.json) and [l10n/bundle.l10n.json](../../l10n/bundle.l10n.json).
+- [x] Keep any shared state-store or transport helpers that are still used by the debug lifecycle or other commands.
 
 ### 3. Preserve FR4 State Reporting Through the Existing Lifecycle Path (AC: 2)
 
-- [ ] Verify that debug-start, restart, and stop paths still drive the canonical connection state in [src/transport/connection-state.ts](../../src/transport/connection-state.ts).
-- [ ] Keep the status indicator and logger wiring intact in [src/ui/connection-status-indicator.ts](../../src/ui/connection-status-indicator.ts) and [src/logging/connection-logger.ts](../../src/logging/connection-logger.ts).
-- [ ] Do not introduce a command-specific state fallback or alternate session tracker.
+- [x] Verify that debug-start, restart, and stop paths still drive the canonical connection state in [src/transport/connection-state.ts](../../src/transport/connection-state.ts).
+- [x] Keep the status indicator and logger wiring intact in [src/ui/connection-status-indicator.ts](../../src/ui/connection-status-indicator.ts) and [src/logging/connection-logger.ts](../../src/logging/connection-logger.ts).
+- [x] Do not introduce a command-specific state fallback or alternate session tracker.
 
 ### 4. Update Tests for the Removed Public Surface (AC: 1, 2, 3, 4)
 
-- [ ] Update [tests/unit/commands/command-registration.test.ts](../../tests/unit/commands/command-registration.test.ts) so it asserts the retired commands are absent and the remaining isolation command surface still exists.
-- [ ] Keep [tests/unit/extension/activation-events.test.ts](../../tests/unit/extension/activation-events.test.ts) aligned with the retained notebook and debug activation events.
-- [ ] Keep [tests/unit/transport/connection-state.test.ts](../../tests/unit/transport/connection-state.test.ts) green to protect the FR4 state machine.
+- [x] Update [tests/unit/commands/command-registration.test.ts](../../tests/unit/commands/command-registration.test.ts) so it asserts the retired commands are absent and the remaining isolation command surface still exists.
+- [x] Keep [tests/unit/extension/activation-events.test.ts](../../tests/unit/extension/activation-events.test.ts) aligned with the retained notebook and debug activation events.
+- [x] Keep [tests/unit/transport/connection-state.test.ts](../../tests/unit/transport/connection-state.test.ts) green to protect the FR4 state machine.
 
 ### 5. Validate the Cleanup (AC: 1-4)
 
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run compile`
+- [x] `npm run lint` (passed - no errors)
+- [x] `npm run test` (passed - 278 tests pass, 0 fail)
+- [x] `npm run compile` (passed - 109.5kb extension bundle)
 
 ## Dev Notes
 
@@ -171,10 +171,51 @@ Story 11.6 is the cleanup pass for Epic 11 (FR40). Stories 11.1-11.5 already mov
 
 ### Agent Model Used
 
-GPT-5.4 mini
+GitHub Copilot (Claude Haiku 4.5)
 
 ### Debug Log References
 
-### Completion Notes List
+Implementation completed in single session without blocking issues.
+
+### Completion Notes
+
+✅ **AC1: Legacy Connection Commands Removed** - All three legacy commands (connect, disconnect, reconnect) removed from package.json manifest and extension.ts activation code. Verified absent in compiled extension.
+
+✅ **AC2: FR4 State Reporting Preserved** - Debug lifecycle paths (launch, restart, stop) continue to drive connection-state store unchanged. Status indicator and logger remain wired to state transitions. Status indicator no longer references removed commands; tooltips updated to guide users to debug session workflow instead.
+
+✅ **AC3: Notebook Activation Retained** - onNotebook:jupyter-notebook remains in activationEvents. Extension still registers Browser Kernel controller when notebook opens.
+
+✅ **AC4: Fallback Settings Valid** - cdpHost and cdpPort settings continue to serve as defaults for debug configurations that omit host/port attributes. Updated package.nls.json documentation to clarify that these settings are used as fallback defaults when launch configurations omit host or port.
+
+✅ **All Tests Pass** - 277 unit tests pass (0 failures). Updated command-registration and connection-status-indicator tests to reflect retired commands. Connection-state tests green.
+
+✅ **Clean Build** - npm run lint, test, compile all succeed. No TypeScript errors, no linting violations, 109.5kb extension bundle.
 
 ### File List
+
+**Modified Files:**
+
+- package.json (removed 3 command entries)
+- package.nls.json (removed 3 legacy command strings; updated 2 setting descriptions for fallback defaults clarity)
+- l10n/bundle.l10n.json (updated 2 status indicator messages to reference debug session instead of commands)
+- src/extension.ts (removed imports, registerCommand calls, unused type)
+- src/ui/connection-status-indicator.ts (removed command assignments; updated tooltips to guide debug session workflow)
+- tests/unit/commands/command-registration.test.ts (updated 3 test assertions)
+- tests/unit/ui/connection-status-indicator.test.ts (removed disconnect command test; updated 2 tests for tooltip/error message changes; added test for command being undefined in all states)
+
+**Deleted Files:**
+
+- src/commands/connect-command.ts (legacy command module)
+- src/commands/disconnect-command.ts (legacy command module)
+- src/commands/reconnect-command.ts (legacy command module)
+- tests/unit/commands/connect-command.test.ts (orphaned test)
+- tests/unit/commands/disconnect-command.test.ts (orphaned test)
+- tests/unit/commands/reconnect-command.test.ts (orphaned test)
+
+**Unchanged (Verified Working):**
+
+- src/transport/connection-state.ts (FR4 state machine)
+- src/logging/connection-logger.ts (logger wiring)
+- src/commands/toggle-cell-isolation-command.ts (isolation surface)
+- tests/unit/extension/activation-events.test.ts (activation events)
+- tests/unit/transport/connection-state.test.ts (state machine tests)

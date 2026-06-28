@@ -80,7 +80,7 @@ function createVscodeMock(config: { host: string; port: number }): {
   };
 }
 
-test("status indicator assigns reconnect command for disconnected and error states", () => {
+test("status indicator clears command for all states (commands removed, debug session controls connection)", () => {
   const { vscodeMock, statusBarItem } = createVscodeMock({
     host: "localhost",
     port: 9222,
@@ -88,10 +88,13 @@ test("status indicator assigns reconnect command for disconnected and error stat
   const indicator = createConnectionStatusIndicator(vscodeMock);
 
   indicator.setState("disconnected");
-  assert.equal(statusBarItem.command, "jupyterBrowserKernel.reconnect");
+  assert.equal(statusBarItem.command, undefined);
 
   indicator.setState("error");
-  assert.equal(statusBarItem.command, "jupyterBrowserKernel.reconnect");
+  assert.equal(statusBarItem.command, undefined);
+
+  indicator.setState("connected");
+  assert.equal(statusBarItem.command, undefined);
 
   indicator.dispose();
 });
@@ -109,19 +112,6 @@ test("status indicator clears command for connecting state", () => {
   indicator.dispose();
 });
 
-test("status indicator assigns disconnect command for connected state", () => {
-  const { vscodeMock, statusBarItem } = createVscodeMock({
-    host: "localhost",
-    port: 9222,
-  });
-  const indicator = createConnectionStatusIndicator(vscodeMock);
-
-  indicator.setState("connected");
-  assert.equal(statusBarItem.command, "jupyterBrowserKernel.disconnect");
-
-  indicator.dispose();
-});
-
 test("status indicator renders state-aware tooltips", () => {
   const { vscodeMock, statusBarItem } = createVscodeMock({
     host: "localhost",
@@ -130,7 +120,10 @@ test("status indicator renders state-aware tooltips", () => {
   const indicator = createConnectionStatusIndicator(vscodeMock);
 
   indicator.setState("disconnected");
-  assert.match(tooltipText(statusBarItem), /Click to reconnect/);
+  assert.match(
+    tooltipText(statusBarItem),
+    /Start a debug session to reconnect/,
+  );
 
   indicator.setState("connecting");
   assert.match(tooltipText(statusBarItem), /Connection attempt in progress/);
@@ -181,7 +174,7 @@ test("status indicator uses error context when set and falls back to generic gui
 
   assert.match(
     tooltipText(statusBarItem),
-    /Run Reconnect command or check settings/,
+    /Start a debug session to reconnect or check settings/,
   );
 
   indicator.dispose();
@@ -197,7 +190,7 @@ test("status indicator refreshes error tooltip when error context changes while 
   indicator.setState("error");
   assert.match(
     tooltipText(statusBarItem),
-    /Run Reconnect command or check settings/,
+    /Start a debug session to reconnect or check settings/,
   );
 
   indicator.setErrorContext({

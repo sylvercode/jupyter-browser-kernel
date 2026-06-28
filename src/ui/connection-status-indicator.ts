@@ -95,7 +95,8 @@ export function createConnectionStatusIndicator(
     switch (state) {
       case "disconnected":
         return localize({
-          message: "Disconnected. Click to reconnect. Endpoint: {0}.",
+          message:
+            "Disconnected. Start a debug session to reconnect. Endpoint: {0}.",
           args: [summary],
           comment: ["{0} is the redacted endpoint summary."],
         });
@@ -119,7 +120,9 @@ export function createConnectionStatusIndicator(
           });
         }
 
-        return localize("Error. Run Reconnect command or check settings.");
+        return localize(
+          "Error. Start a debug session to reconnect or check settings.",
+        );
     }
   };
 
@@ -127,12 +130,7 @@ export function createConnectionStatusIndicator(
     currentState = state;
     const label = localizedLabel(state, localize);
     statusBarItem.text = `Jupyter Browser: ${label}`;
-    statusBarItem.command =
-      state === "disconnected" || state === "error"
-        ? "jupyterBrowserKernel.reconnect"
-        : state === "connected"
-          ? "jupyterBrowserKernel.disconnect"
-          : undefined;
+    statusBarItem.command = undefined;
     statusBarItem.tooltip = tooltipForState(state);
     statusBarItem.backgroundColor =
       state === "error"
