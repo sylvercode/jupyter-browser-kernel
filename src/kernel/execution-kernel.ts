@@ -37,6 +37,7 @@ export interface KernelRuntime {
   notebookOutputApi: NotebookOutputApi;
   localize: Localize;
   getActiveConnection: GetActiveConnection;
+  getDefaultCellIsolation: () => boolean;
   reportTransportError?: ReportTransportError;
 }
 
@@ -57,12 +58,14 @@ export function createKernelRuntime(
   notebookOutputApi: NotebookOutputApi,
   localize: Localize,
   getActiveConnection: GetActiveConnection = getActiveBrowserConnection,
+  getDefaultCellIsolation: () => boolean = () => false,
   reportTransportError?: ReportTransportError,
 ): KernelRuntime {
   return {
     notebookOutputApi,
     localize,
     getActiveConnection,
+    getDefaultCellIsolation,
     reportTransportError,
   };
 }
@@ -109,7 +112,8 @@ export async function executeCell({
 
     const userCode = cell.document.getText();
     const sourceUri = cell.document.uri.toString();
-    const isolate = readIsolationMetadata(cell.metadata);
+    const explicitIsolation = readIsolationMetadata(cell.metadata);
+    const isolate = explicitIsolation ?? runtime.getDefaultCellIsolation();
     const expression = buildCellExpression(userCode, sourceUri, { isolate });
     let resolveCancellationSignal: (() => void) | undefined;
     const cancellationSignal = new Promise<void>((resolve) => {
@@ -225,13 +229,15 @@ async function evaluateCellExpression(
   }
 }
 
-function readIsolationMetadata(metadata: unknown): boolean {
+function readIsolationMetadata(metadata: unknown): boolean | undefined {
   if (!metadata || typeof metadata !== "object") {
-    return false;
+    return undefined;
   }
 
   const typedMetadata = metadata as KernelCellMetadata;
-  return typedMetadata.jupyterBrowserKernel?.isolated === true;
+  return typeof typedMetadata.jupyterBrowserKernel?.isolated === "boolean"
+    ? typedMetadata.jupyterBrowserKernel.isolated
+    : undefined;
 }
 
 async function writeSuccessOutput(

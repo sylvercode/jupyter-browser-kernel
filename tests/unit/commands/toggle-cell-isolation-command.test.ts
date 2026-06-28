@@ -1,10 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import {
-  registerToggleCellIsolationCommand,
-  toggleCellIsolationMetadata,
-} from "../../../src/commands/toggle-cell-isolation-command.js";
+import { registerToggleCellIsolationCommand } from "../../../src/commands/toggle-cell-isolation-command.js";
 
 interface FakeCellEdit {
   index: number;
@@ -39,7 +36,10 @@ function createFakeCell(metadata: unknown) {
   return cell;
 }
 
-function createHarness(activeCell?: ReturnType<typeof createFakeCell>) {
+function createHarness(
+  activeCell?: ReturnType<typeof createFakeCell>,
+  options?: { defaultCellIsolation?: boolean },
+) {
   const commandHandlers = new Map<string, (cell?: unknown) => Promise<void>>();
   const applyEditCalls: FakeWorkspaceEdit[] = [];
 
@@ -82,6 +82,7 @@ function createHarness(activeCell?: ReturnType<typeof createFakeCell>) {
       }),
     },
     WorkspaceEdit: FakeWorkspaceEdit,
+    getDefaultCellIsolation: () => options?.defaultCellIsolation ?? false,
   };
 
   registerToggleCellIsolationCommand(context as never, api as never);
@@ -91,71 +92,6 @@ function createHarness(activeCell?: ReturnType<typeof createFakeCell>) {
     applyEditCalls,
   };
 }
-
-test("toggleCellIsolationMetadata sets jupyterBrowserKernel.isolated=true and preserves unrelated keys", () => {
-  const result = toggleCellIsolationMetadata({
-    tags: ["sample"],
-    jupyterBrowserKernel: {
-      mode: "custom",
-    },
-  });
-
-  assert.deepEqual(result, {
-    tags: ["sample"],
-    jupyterBrowserKernel: {
-      mode: "custom",
-      isolated: true,
-    },
-  });
-});
-
-test("toggleCellIsolationMetadata removes isolated key when currently isolated", () => {
-  const result = toggleCellIsolationMetadata({
-    jupyterBrowserKernel: {
-      isolated: true,
-      mode: "custom",
-    },
-  });
-
-  assert.deepEqual(result, {
-    jupyterBrowserKernel: {
-      mode: "custom",
-    },
-  });
-});
-
-test("toggleCellIsolationMetadata removes jupyterBrowserKernel object when isolated is the only key", () => {
-  const result = toggleCellIsolationMetadata({
-    jupyterBrowserKernel: {
-      isolated: true,
-    },
-    tags: ["t"],
-  });
-
-  assert.deepEqual(result, {
-    tags: ["t"],
-  });
-});
-
-test("toggleCellIsolationMetadata does not mutate the original metadata object", () => {
-  const metadata = Object.freeze({
-    tags: ["frozen"],
-    jupyterBrowserKernel: Object.freeze({
-      isolated: false,
-      preserved: true,
-    }),
-  });
-
-  const result = toggleCellIsolationMetadata(metadata);
-
-  assert.deepEqual(result, {
-    tags: ["frozen"],
-    jupyterBrowserKernel: {
-      isolated: true,
-      preserved: true,
-    },
-  });
-});
 
 test("toggle command updates metadata when invoked on an unisolated cell", async () => {
   const cell = createFakeCell({ tags: ["x"] });
@@ -174,6 +110,90 @@ test("toggle command updates metadata when invoked on an unisolated cell", async
     tags: ["x"],
     jupyterBrowserKernel: {
       isolated: true,
+    },
+  });
+});
+
+test("toggle command writes explicit isolated=false when resolved mode comes from default=true", async () => {
+  const cell = createFakeCell({ tags: ["x"] });
+  const { commandHandlers, applyEditCalls } = createHarness(cell, {
+    defaultCellIsolation: true,
+  });
+
+  const handler = commandHandlers.get(
+    "jupyterBrowserKernel.toggleCellIsolation",
+  );
+  assert.ok(handler);
+  await handler?.(cell);
+
+  assert.equal(applyEditCalls.length, 1);
+  assert.deepEqual(applyEditCalls[0]?.updates[0]?.edits[0]?.metadata, {
+    tags: ["x"],
+    jupyterBrowserKernel: {
+      isolated: false,
+    },
+  });
+});
+
+test("isolate command writes explicit isolated=true metadata", async () => {
+  const cell = createFakeCell({ tags: ["x"] });
+  const { commandHandlers, applyEditCalls } = createHarness(cell);
+
+  const handler = commandHandlers.get(
+    "jupyterBrowserKernel.toggleCellIsolation.isolate",
+  );
+  assert.ok(handler);
+  await handler?.(cell);
+
+  assert.equal(applyEditCalls.length, 1);
+  assert.deepEqual(applyEditCalls[0]?.updates[0]?.edits[0]?.metadata, {
+    tags: ["x"],
+    jupyterBrowserKernel: {
+      isolated: true,
+    },
+  });
+});
+
+test("share command writes explicit isolated=false metadata", async () => {
+  const cell = createFakeCell({ tags: ["x"] });
+  const { commandHandlers, applyEditCalls } = createHarness(cell);
+
+  const handler = commandHandlers.get(
+    "jupyterBrowserKernel.toggleCellIsolation.share",
+  );
+  assert.ok(handler);
+  await handler?.(cell);
+
+  assert.equal(applyEditCalls.length, 1);
+  assert.deepEqual(applyEditCalls[0]?.updates[0]?.edits[0]?.metadata, {
+    tags: ["x"],
+    jupyterBrowserKernel: {
+      isolated: false,
+    },
+  });
+});
+
+test("use default command clears explicit isolation metadata and preserves other keys", async () => {
+  const cell = createFakeCell({
+    tags: ["x"],
+    jupyterBrowserKernel: {
+      isolated: false,
+      mode: "custom",
+    },
+  });
+  const { commandHandlers, applyEditCalls } = createHarness(cell);
+
+  const handler = commandHandlers.get(
+    "jupyterBrowserKernel.useDefaultCellIsolation",
+  );
+  assert.ok(handler);
+  await handler?.(cell);
+
+  assert.equal(applyEditCalls.length, 1);
+  assert.deepEqual(applyEditCalls[0]?.updates[0]?.edits[0]?.metadata, {
+    tags: ["x"],
+    jupyterBrowserKernel: {
+      mode: "custom",
     },
   });
 });

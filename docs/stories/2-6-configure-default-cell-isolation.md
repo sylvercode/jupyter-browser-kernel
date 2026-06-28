@@ -2,7 +2,7 @@
 storyId: "2.6"
 storyKey: "2-6-configure-default-cell-isolation"
 title: "Configure Default Cell Isolation"
-status: "backlog"
+status: "review"
 created: "2026-06-27"
 epic: "2"
 priority: "p1"
@@ -10,7 +10,7 @@ priority: "p1"
 
 # Story 2.6: Configure Default Cell Isolation
 
-**Status:** backlog
+**Status:** review
 
 ## Story
 
@@ -102,33 +102,33 @@ So that I can choose safer per-cell isolation without manually toggling every ce
 
 ### 1. Add the Settings Surface
 
-- [ ] Add `jupyterBrowserKernel.defaultCellIsolation` to the extension configuration in [package.json](../../package.json) under the existing Jupyter Browser Kernel settings section.
-- [ ] Add localized description text to [package.nls.json](../../package.nls.json) for the new setting.
-- [ ] Keep the default value `false` so the current shared-by-default experience remains the baseline.
-- [ ] Add a new command such as `jupyterBrowserKernel.useDefaultCellIsolation` with the label `Use Default Cell Isolation`, plus localized text in [package.nls.json](../../package.nls.json).
-- [ ] Update the notebook cell toolbar and context menu `when` clauses so command visibility follows the current state matrix in AC 9.
+- [x] Add `jupyterBrowserKernel.defaultCellIsolation` to the extension configuration in [package.json](../../package.json) under the existing Jupyter Browser Kernel settings section.
+- [x] Add localized description text to [package.nls.json](../../package.nls.json) for the new setting.
+- [x] Keep the default value `false` so the current shared-by-default experience remains the baseline.
+- [x] Add a new command such as `jupyterBrowserKernel.useDefaultCellIsolation` with the label `Use Default Cell Isolation`, plus localized text in [package.nls.json](../../package.nls.json).
+- [x] Update the notebook cell toolbar and context menu `when` clauses so command visibility follows the current state matrix in AC 9.
 
 ### 2. Thread the Default Into Cell Execution
 
-- [ ] Update the kernel runtime or execution path in [src/kernel/execution-kernel.ts](../../src/kernel/execution-kernel.ts) so cell isolation resolves in three states: explicit isolated, explicit shared, or missing metadata.
-- [ ] Apply `jupyterBrowserKernel.defaultCellIsolation` only when the cell metadata does not explicitly set `metadata.jupyterBrowserKernel.isolated`.
-- [ ] Keep [src/kernel/build-cell-expression.ts](../../src/kernel/build-cell-expression.ts) unchanged except for receiving the resolved boolean; the wrapper shape and `//# sourceURL` contract stay the same.
-- [ ] Read the setting in a testable way, preferably through a small runtime callback or settings accessor passed from [src/extension.ts](../../src/extension.ts), so unit tests can cover both default and overridden cases without depending on global state.
+- [x] Update the kernel runtime or execution path in [src/kernel/execution-kernel.ts](../../src/kernel/execution-kernel.ts) so cell isolation resolves in three states: explicit isolated, explicit shared, or missing metadata.
+- [x] Apply `jupyterBrowserKernel.defaultCellIsolation` only when the cell metadata does not explicitly set `metadata.jupyterBrowserKernel.isolated`.
+- [x] Keep [src/kernel/build-cell-expression.ts](../../src/kernel/build-cell-expression.ts) unchanged except for receiving the resolved boolean; the wrapper shape and `//# sourceURL` contract stay the same.
+- [x] Read the setting in a testable way, preferably through a small runtime callback or settings accessor passed from [src/extension.ts](../../src/extension.ts), so unit tests can cover both default and overridden cases without depending on global state.
 
 ### 3. Preserve Explicit Override Behavior
 
-- [ ] Ensure the existing cell isolation toggle command still writes or removes explicit notebook cell metadata.
-- [ ] Ensure the new default-mode command clears explicit notebook cell metadata without mutating any other cell fields.
-- [ ] Ensure the visibility state for `Isolate Cell`, `Share Cell State`, and `Use Default Cell Isolation` is driven only by whether explicit isolation metadata is absent, `true`, or `false`.
-- [ ] Confirm the setting never mutates notebook metadata on its own.
-- [ ] Preserve the current output annotation behavior for isolated cells.
+- [x] Ensure the existing cell isolation toggle command still writes or removes explicit notebook cell metadata.
+- [x] Ensure the new default-mode command clears explicit notebook cell metadata without mutating any other cell fields.
+- [x] Ensure the visibility state for `Isolate Cell`, `Share Cell State`, and `Use Default Cell Isolation` is driven only by whether explicit isolation metadata is absent, `true`, or `false`.
+- [x] Confirm the setting never mutates notebook metadata on its own.
+- [x] Preserve the current output annotation behavior for isolated cells.
 
 ### 4. Add Coverage
 
-- [ ] Add or extend unit tests in [tests/unit/kernel/execution-kernel.test.ts](../../tests/unit/kernel/execution-kernel.test.ts) to cover default-false behavior, default-true behavior, explicit-true override, and explicit-false override.
-- [ ] Add UI/command coverage for the new default-mode command and the AC 9 visibility matrix.
-- [ ] If helpful, add a small helper test for the isolation-resolution logic so the tri-state fallback is obvious and regression-resistant.
-- [ ] Add one integration-style test only if needed to prove the setting change takes effect on the next run without a notebook reload.
+- [x] Add or extend unit tests in [tests/unit/kernel/execution-kernel.test.ts](../../tests/unit/kernel/execution-kernel.test.ts) to cover default-false behavior, default-true behavior, explicit-true override, and explicit-false override.
+- [x] Add UI/command coverage for the new default-mode command and the AC 9 visibility matrix.
+- [x] If helpful, add a small helper test for the isolation-resolution logic so the tri-state fallback is obvious and regression-resistant.
+- [x] Add one integration-style test only if needed to prove the setting change takes effect on the next run without a notebook reload.
 
 ## Dev Notes
 
@@ -155,3 +155,40 @@ The current `readIsolationMetadata(...)` logic returns a boolean and collapses m
 - [src/extension.ts](../../src/extension.ts)
 - [src/kernel/execution-kernel.ts](../../src/kernel/execution-kernel.ts)
 - [tests/unit/kernel/execution-kernel.test.ts](../../tests/unit/kernel/execution-kernel.test.ts)
+
+## Dev Agent Record
+
+### Debug Log
+
+- 2026-06-27: Implemented tri-state isolation resolution for cell execution with workspace fallback callback and per-command metadata behaviors.
+- 2026-06-27: Updated command/menu contributions for `Use Default Cell Isolation` and state-driven visibility matrix.
+- 2026-06-27: Ran validation commands: `npm run compile`, `npm run lint`, `npm run test`.
+
+### Completion Notes
+
+- Added workspace setting `jupyterBrowserKernel.defaultCellIsolation` (default `false`) and localized description.
+- Added command `jupyterBrowserKernel.useDefaultCellIsolation` with localized label and menu/context visibility driven by active cell tri-state (`default`/`isolated`/`shared`).
+- Updated isolation command implementation so:
+  - `toggleCellIsolation` now sets explicit metadata to the opposite of the current resolved mode (explicit metadata when present, otherwise workspace default).
+  - `toggleCellIsolation.isolate` writes explicit `isolated: true`.
+  - `toggleCellIsolation.share` writes explicit `isolated: false`.
+  - `useDefaultCellIsolation` removes explicit isolation metadata.
+- Updated kernel runtime to resolve isolation as explicit metadata when present, otherwise from a runtime callback for `defaultCellIsolation`, so changes apply on subsequent runs without reload.
+- Preserved output annotation behavior for isolated execution and preserved `buildCellExpression` wrapper contract.
+- Added/updated unit coverage for kernel default fallback and explicit overrides, plus command/menu registration and command behavior for the new tri-state model.
+
+## File List
+
+- package.json
+- package.nls.json
+- src/commands/toggle-cell-isolation-command.ts
+- src/extension.ts
+- src/kernel/execution-kernel.ts
+- src/notebook/kernel-controller.ts
+- tests/unit/commands/command-registration.test.ts
+- tests/unit/commands/toggle-cell-isolation-command.test.ts
+- tests/unit/kernel/execution-kernel.test.ts
+
+## Change Log
+
+- 2026-06-27: Implemented Story 2.6 default cell isolation setting, default-mode command, tri-state visibility logic, and kernel fallback behavior with full unit validation.

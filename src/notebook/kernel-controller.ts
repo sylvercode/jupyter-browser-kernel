@@ -37,6 +37,7 @@ export interface KernelControllerOptions {
     | ((failure: ExecutionFailure) => Promise<void>)
     | ((failure: ExecutionFailure) => void);
   ensureSessionReady?: EnsureSessionReadyForExecution;
+  getDefaultCellIsolation?: () => boolean;
 }
 
 function supportsSessionPreflight(
@@ -70,6 +71,7 @@ export function registerKernelController(
     },
     api.l10n.t,
     undefined,
+    options?.getDefaultCellIsolation,
     options?.onTransportError,
   );
 

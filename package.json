@@ -84,6 +84,10 @@
       {
         "command": "jupyterBrowserKernel.toggleCellIsolation.share",
         "title": "%command.toggleCellIsolation.share.label%"
+      },
+      {
+        "command": "jupyterBrowserKernel.useDefaultCellIsolation",
+        "title": "%command.useDefaultCellIsolation.label%"
       }
     ],
     "menus": {
@@ -100,24 +104,34 @@
       "notebook/cell/title": [
         {
           "command": "jupyterBrowserKernel.toggleCellIsolation.isolate",
-          "when": "notebookType == 'jupyter-notebook' && notebookCellType == 'code' && jupyterBrowserKernel.activeNotebookUsesBrowserKernel && !jupyterBrowserKernel.activeCellIsolated",
+          "when": "notebookType == 'jupyter-notebook' && notebookCellType == 'code' && jupyterBrowserKernel.activeNotebookUsesBrowserKernel && jupyterBrowserKernel.activeCellIsolationState != 'isolated'",
           "group": "navigation@50"
         },
         {
           "command": "jupyterBrowserKernel.toggleCellIsolation.share",
-          "when": "notebookType == 'jupyter-notebook' && notebookCellType == 'code' && jupyterBrowserKernel.activeNotebookUsesBrowserKernel && jupyterBrowserKernel.activeCellIsolated",
+          "when": "notebookType == 'jupyter-notebook' && notebookCellType == 'code' && jupyterBrowserKernel.activeNotebookUsesBrowserKernel && jupyterBrowserKernel.activeCellIsolationState != 'shared'",
+          "group": "navigation@50"
+        },
+        {
+          "command": "jupyterBrowserKernel.useDefaultCellIsolation",
+          "when": "notebookType == 'jupyter-notebook' && notebookCellType == 'code' && jupyterBrowserKernel.activeNotebookUsesBrowserKernel && jupyterBrowserKernel.activeCellIsolationState != 'default'",
           "group": "navigation@50"
         }
       ],
       "notebook/cell/context": [
         {
           "command": "jupyterBrowserKernel.toggleCellIsolation.isolate",
-          "when": "notebookType == 'jupyter-notebook' && notebookCellType == 'code' && jupyterBrowserKernel.activeNotebookUsesBrowserKernel && !jupyterBrowserKernel.activeCellIsolated",
+          "when": "notebookType == 'jupyter-notebook' && notebookCellType == 'code' && jupyterBrowserKernel.activeNotebookUsesBrowserKernel && jupyterBrowserKernel.activeCellIsolationState != 'isolated'",
           "group": "z_commands@50"
         },
         {
           "command": "jupyterBrowserKernel.toggleCellIsolation.share",
-          "when": "notebookType == 'jupyter-notebook' && notebookCellType == 'code' && jupyterBrowserKernel.activeNotebookUsesBrowserKernel && jupyterBrowserKernel.activeCellIsolated",
+          "when": "notebookType == 'jupyter-notebook' && notebookCellType == 'code' && jupyterBrowserKernel.activeNotebookUsesBrowserKernel && jupyterBrowserKernel.activeCellIsolationState != 'shared'",
+          "group": "z_commands@50"
+        },
+        {
+          "command": "jupyterBrowserKernel.useDefaultCellIsolation",
+          "when": "notebookType == 'jupyter-notebook' && notebookCellType == 'code' && jupyterBrowserKernel.activeNotebookUsesBrowserKernel && jupyterBrowserKernel.activeCellIsolationState != 'default'",
           "group": "z_commands@50"
         }
       ]
@@ -144,6 +158,11 @@
           "type": "number",
           "default": 0,
           "description": "%configuration.watchAutoRefreshInterval.description%"
+        },
+        "jupyterBrowserKernel.defaultCellIsolation": {
+          "type": "boolean",
+          "default": false,
+          "description": "%configuration.defaultCellIsolation.description%"
         }
       }
     }
