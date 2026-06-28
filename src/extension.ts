@@ -1,24 +1,9 @@
 import * as vscode from "vscode";
 import {
-  createDefaultConnectCommandRuntime,
-  executeConnectCommand,
-} from "./commands/connect-command";
-import {
-  createDefaultDisconnectCommandRuntime,
-  executeDisconnectCommand,
-} from "./commands/disconnect-command";
-import {
-  createDefaultReconnectCommandRuntime,
-  executeReconnectCommand,
-} from "./commands/reconnect-command";
-import {
   readAndValidateEndpointConfig,
   summarizeEndpointForDisplay,
 } from "./config/endpoint-config";
-import {
-  ConnectionStoreHandler,
-  createConnectionStateStore,
-} from "./transport/connection-state";
+import { createConnectionStateStore } from "./transport/connection-state";
 import { createConnectionLogger } from "./logging/connection-logger";
 import { createKernelTransportFailureReporter } from "./logging/kernel-transport-failure-reporter";
 import { createConnectionStatusIndicator } from "./ui/connection-status-indicator";
@@ -29,12 +14,6 @@ import { DebugAdapterFactory, DebugConfigProvider } from "./debugger";
 
 const ACTIVE_NOTEBOOK_USES_BROWSER_KERNEL_CONTEXT_KEY =
   "jupyterBrowserKernel.activeNotebookUsesBrowserKernel";
-
-type SubscriptionInfo<T> = {
-  command: string;
-  runtimeFactory: (api: typeof vscode, handler: ConnectionStoreHandler) => T;
-  callback: (runtime: T) => Promise<void>;
-};
 
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel(
@@ -64,37 +43,6 @@ export function activate(context: vscode.ExtensionContext): void {
       statusIndicator.setErrorContext(context);
       logger.onErrorContextChanged(context);
     },
-  });
-
-  const registerCommand = <T>({
-    command,
-    runtimeFactory,
-    callback,
-  }: SubscriptionInfo<T>): void => {
-    const runtime = runtimeFactory(vscode, { connectionStateStore });
-    context.subscriptions.push(
-      vscode.commands.registerCommand(command, async () => {
-        await callback(runtime);
-      }),
-    );
-  };
-
-  registerCommand({
-    command: "jupyterBrowserKernel.connect",
-    runtimeFactory: createDefaultConnectCommandRuntime,
-    callback: executeConnectCommand,
-  });
-
-  registerCommand({
-    command: "jupyterBrowserKernel.disconnect",
-    runtimeFactory: createDefaultDisconnectCommandRuntime,
-    callback: executeDisconnectCommand,
-  });
-
-  registerCommand({
-    command: "jupyterBrowserKernel.reconnect",
-    runtimeFactory: createDefaultReconnectCommandRuntime,
-    callback: executeReconnectCommand,
   });
 
   const reportKernelTransportFailure = createKernelTransportFailureReporter({

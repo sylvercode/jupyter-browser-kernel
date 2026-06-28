@@ -1,5 +1,5 @@
 # generated: 2026-06-24
-# last_updated: 2026-06-26 (code review complete)
+# last_updated: 2026-06-27 (story 11.6 review patches applied)
 # project: jupyter-browser-kernel
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-24
-last_updated: 2026-06-26
+last_updated: 2026-06-27
 project: jupyter-browser-kernel
 project_key: NOKEY
 tracking_system: file-system
@@ -131,7 +131,7 @@ development_status:
   11-3-reconnect-on-debug-restart: done
   11-4-disconnect-on-debug-stop: done
   11-5-prompt-to-start-a-debug-session-when-running-a-cell-without-one: done
-  11-6-retire-connect-disconnect-reconnect-commands-and-migrate-state-reporting: backlog
+  11-6-retire-connect-disconnect-reconnect-commands-and-migrate-state-reporting: done
   epic-11-retrospective: optional
 
 # VALIDATION SUMMARY:
@@ -141,9 +141,9 @@ development_status:
 # Epics done: 3 (Epic 1, Epic 2, Epic 10)
 # Epics in-progress: 1 (Epic 11)
 # Epics backlog: 7 (Epic 3, 4, 5, 6, 7, 8, 9)
-# Stories done: 21 (1-1 to 1-7, 2-1 to 2-5, 2-spike, 10-1 to 10-5, 11-1, 11-2, 11-3)
-# Stories ready-for-dev: 1
+# Stories done: 24 (1-1 to 1-7, 2-1 to 2-5, 2-spike, 10-1 to 10-5, 11-1 to 11-6)
+# Stories ready-for-dev: 0
 # Stories in-progress: 0
 # Stories review: 0
-# Stories backlog: 13
+# Stories backlog: 10
 # Retrospectives completed: 3 (Epic 1, 2, 10)

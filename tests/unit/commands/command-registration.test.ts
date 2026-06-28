@@ -10,7 +10,7 @@ function readJson(filePath: string): Record<string, unknown> {
   return JSON.parse(content) as Record<string, unknown>;
 }
 
-test("package contributes connect/disconnect/reconnect/toggle commands with localized titles", () => {
+test("package contributes toggle cell isolation commands and not legacy connect/disconnect/reconnect commands", () => {
   const packageJson = readJson(path.join(repoRoot, "package.json"));
   const contributes = packageJson.contributes as
     | { commands?: Array<{ command: string; title: string }> }
@@ -22,18 +22,12 @@ test("package contributes connect/disconnect/reconnect/toggle commands with loca
     contributes?.commands?.map((command) => [command.command, command.title]),
   );
 
-  assert.equal(
-    byId.get("jupyterBrowserKernel.connect"),
-    "%command.connect.title%",
-  );
-  assert.equal(
-    byId.get("jupyterBrowserKernel.disconnect"),
-    "%command.disconnect.title%",
-  );
-  assert.equal(
-    byId.get("jupyterBrowserKernel.reconnect"),
-    "%command.reconnect.title%",
-  );
+  // Assert legacy commands are NOT present
+  assert.equal(byId.get("jupyterBrowserKernel.connect"), undefined);
+  assert.equal(byId.get("jupyterBrowserKernel.disconnect"), undefined);
+  assert.equal(byId.get("jupyterBrowserKernel.reconnect"), undefined);
+
+  // Assert toggle isolation commands ARE present
   assert.equal(
     byId.get("jupyterBrowserKernel.toggleCellIsolation"),
     "%command.toggleCellIsolation.title%",
@@ -109,18 +103,16 @@ test("package contributes isolation actions to notebook cell menus", () => {
   );
 });
 
-test("localization bundles include new command and runtime strings", () => {
+test("localization bundles include toggle cell isolation and runtime strings", () => {
   const packageNls = readJson(path.join(repoRoot, "package.nls.json"));
   const l10nBundle = readJson(path.join(repoRoot, "l10n/bundle.l10n.json"));
 
-  assert.equal(
-    packageNls["command.disconnect.title"],
-    "Jupyter Browser Kernel: Disconnect",
-  );
-  assert.equal(
-    packageNls["command.reconnect.title"],
-    "Jupyter Browser Kernel: Reconnect",
-  );
+  // Legacy command strings should be removed
+  assert.equal(packageNls["command.connect.title"], undefined);
+  assert.equal(packageNls["command.disconnect.title"], undefined);
+  assert.equal(packageNls["command.reconnect.title"], undefined);
+
+  // Toggle isolation strings should still exist
   assert.equal(
     packageNls["command.toggleCellIsolation.title"],
     "Jupyter Browser Kernel: Toggle Cell Isolation",
@@ -133,30 +125,37 @@ test("localization bundles include new command and runtime strings", () => {
     packageNls["command.toggleCellIsolation.share.label"],
     "Share Cell State",
   );
-  assert.equal(
-    l10nBundle["Jupyter Browser Kernel: Disconnected from browser target."],
-    "Jupyter Browser Kernel: Disconnected from browser target.",
-  );
-  assert.equal(
-    l10nBundle["Jupyter Browser Kernel: Reconnected to target {0} at {1}."],
-    "Jupyter Browser Kernel: Reconnected to target {0} at {1}.",
-  );
+
+  // Runtime strings should still exist
   assert.equal(l10nBundle["(isolated cell)"], "(isolated cell)");
 });
 
-test("extension activation registers connect, disconnect, reconnect, and isolation commands", () => {
+test("extension activation registers isolation commands and debug wiring, not legacy connection commands", () => {
   const extensionSource = fs.readFileSync(
     path.join(repoRoot, "src/extension.ts"),
     "utf8",
   );
 
-  assert.match(extensionSource, /"jupyterBrowserKernel\.connect"/);
-  assert.match(extensionSource, /"jupyterBrowserKernel\.disconnect"/);
-  assert.match(extensionSource, /"jupyterBrowserKernel\.reconnect"/);
+  // Legacy command registrations should NOT be present
+  assert.equal(extensionSource.includes("jupyterBrowserKernel.connect"), false);
+  assert.equal(
+    extensionSource.includes("jupyterBrowserKernel.disconnect"),
+    false,
+  );
+  assert.equal(
+    extensionSource.includes("jupyterBrowserKernel.reconnect"),
+    false,
+  );
+
+  // Toggle isolation command registration should be present
   assert.match(extensionSource, /registerToggleCellIsolationCommand/);
+
+  // Debug and notebook wiring should be present
   assert.match(extensionSource, /onDidChangeSelectedNotebooks/);
   assert.match(
     extensionSource,
     /jupyterBrowserKernel\.activeNotebookUsesBrowserKernel/,
   );
+  assert.match(extensionSource, /DebugAdapterFactory/);
+  assert.match(extensionSource, /DebugConfigProvider/);
 });

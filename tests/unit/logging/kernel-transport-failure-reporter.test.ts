@@ -52,12 +52,12 @@ test("kernel transport failure reporter logs timestamped output and shows notifi
     {
       category: "transport-failure",
       guidance:
-        "Browser transport error while running a cell. Run Reconnect and try again.",
+        "Browser transport error while running a cell. Start a new Browser Kernel debug session and try again.",
     },
   ]);
   assert.deepEqual(states, ["error"]);
   assert.deepEqual(shownMessages, [
-    "Browser transport error while running a cell. Run Reconnect and try again.",
+    "Browser transport error while running a cell. Start a new Browser Kernel debug session and try again.",
   ]);
 });
 

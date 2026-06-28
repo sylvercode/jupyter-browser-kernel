@@ -1,5 +1,11 @@
 # Deferred Work
 
+## Deferred from: code review of 11-6-retire-connect-disconnect-reconnect-commands-and-migrate-state-reporting (2026-06-27)
+
+- Error state has no interactive recovery affordance — intentional per story spec; debug lifecycle owns recovery. Users must start a new debug session to retry. [src/ui/connection-status-indicator.ts]
+- Race condition on in-flight restart/cancel — pre-existing; cancelTransitions() increments activeTransitionId while a concurrent connect may have already assigned activeBrowserConnection; state machine does not roll back the connection. [src/transport/connection-state.ts]
+- Custom keybindings to retired commands show "Command not found" — expected VS Code behavior for retired commands; no migration path provided, known design consequence. [package.json]
+
 ## Deferred from: code review of 11-5-prompt-to-start-a-debug-session-when-running-a-cell-without-one (2026-06-26)
 
 - 15-second connection-ready timeout hardcoded (`CONNECTION_READY_TIMEOUT_MS = 15000`) with no user setting. Slow or remote browser targets may need longer. [src/notebook/debug-session-preflight.ts]
