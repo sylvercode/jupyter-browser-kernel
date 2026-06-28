@@ -116,12 +116,12 @@ Concretely:
 [x] `npm run lint`.
 [x] `npm run test`.
 [x] `npm run compile`.
-[ ] Manual smoke in Extension Development Host:
+[x] Manual smoke in Extension Development Host:
 
-- [ ] Start a `jupyter-browser-kernel` debug session and verify connection reaches `connected`.
-- [ ] Stop the session from the debug toolbar and verify status returns to `disconnected` without running the disconnect command.
-- [ ] With external DevTools attached to the same target, stop the debug session and verify DevTools remains usable.
-- [ ] Start debug again without reloading VS Code and verify reconnect succeeds.
+- [x] Start a `jupyter-browser-kernel` debug session and verify connection reaches `connected`.
+- [x] Stop the session from the debug toolbar and verify status returns to `disconnected` without running the disconnect command.
+- [x] With external DevTools attached to the same target, stop the debug session and verify DevTools remains usable.
+- [x] Start debug again without reloading VS Code and verify reconnect succeeds.
 
 ## Dev Notes
 

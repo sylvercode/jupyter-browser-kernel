@@ -139,7 +139,7 @@ Concretely:
 - [x] `npm run lint`.
 - [x] `npm run test`.
 - [x] `npm run compile`.
-- [ ] Manual smoke in the Extension Development Host (requires a running CDP-enabled browser on the configured endpoint — use [scripts/Start-EdgeDebug.ps1](../../scripts/Start-EdgeDebug.ps1) or an equivalent):
+- [x] Manual smoke in the Extension Development Host (requires a running CDP-enabled browser on the configured endpoint — use [scripts/Start-EdgeDebug.ps1](../../scripts/Start-EdgeDebug.ps1) or an equivalent):
   - With no active connection, start the `jupyter-browser-kernel` debug configuration (play button) and confirm the status indicator moves `connecting` → `connected` and the session starts without a "connect first" error.
   - With the session active, run a browser-kernel notebook cell and confirm it executes against the established connection (no separate connect step needed).
   - Start a **second** `jupyter-browser-kernel` debug session and confirm it is rejected with the single-active guidance, while the first session and its connection keep working.
