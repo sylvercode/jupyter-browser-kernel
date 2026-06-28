@@ -131,7 +131,7 @@ development_status:
   11-3-reconnect-on-debug-restart: done
   11-4-disconnect-on-debug-stop: done
   11-5-prompt-to-start-a-debug-session-when-running-a-cell-without-one: done
-  11-6-retire-connect-disconnect-reconnect-commands-and-migrate-state-reporting: backlog
+  11-6-retire-connect-disconnect-reconnect-commands-and-migrate-state-reporting: ready-for-dev
   epic-11-retrospective: optional
 
 # VALIDATION SUMMARY:
