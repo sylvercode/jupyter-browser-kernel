@@ -9,13 +9,13 @@ export function getNoActiveSessionMessage(localize: Localize): string {
 
 export function getTransportCellOutputMessage(localize: Localize): string {
   return localize(
-    "Transport error while running this cell. Run Reconnect and review the Jupyter Browser Kernel output channel.",
+    "Transport error while running this cell. Start a new Browser Kernel debug session and review the Jupyter Browser Kernel output channel.",
   );
 }
 
 export function getTransportNotificationMessage(localize: Localize): string {
   return localize(
-    "Browser transport error while running a cell. Run Reconnect and try again.",
+    "Browser transport error while running a cell. Start a new Browser Kernel debug session and try again.",
   );
 }
 

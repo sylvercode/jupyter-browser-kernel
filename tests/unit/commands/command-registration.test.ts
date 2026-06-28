@@ -127,14 +127,6 @@ test("localization bundles include toggle cell isolation and runtime strings", (
   );
 
   // Runtime strings should still exist
-  assert.equal(
-    l10nBundle["Jupyter Browser Kernel: Disconnected from browser target."],
-    "Jupyter Browser Kernel: Disconnected from browser target.",
-  );
-  assert.equal(
-    l10nBundle["Jupyter Browser Kernel: Reconnected to target {0} at {1}."],
-    "Jupyter Browser Kernel: Reconnected to target {0} at {1}.",
-  );
   assert.equal(l10nBundle["(isolated cell)"], "(isolated cell)");
 });
 

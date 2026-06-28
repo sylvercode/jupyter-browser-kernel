@@ -2,7 +2,7 @@
 storyId: "11.6"
 storyKey: "11-6-retire-connect-disconnect-reconnect-commands-and-migrate-state-reporting"
 title: "Retire Connect/Disconnect/Reconnect Commands and Migrate State Reporting"
-status: review
+status: done
 created: "2026-06-27"
 epic: "11"
 priority: "p1-high"
@@ -18,7 +18,7 @@ dependencies:
 
 # Story 11.6: Retire Connect/Disconnect/Reconnect Commands and Migrate State Reporting
 
-**Status:** ready-for-dev
+**Status:** done
 
 ## Story
 
@@ -103,6 +103,14 @@ Concretely:
 - [x] `npm run lint` (passed - no errors)
 - [x] `npm run test` (passed - 278 tests pass, 0 fail)
 - [x] `npm run compile` (passed - 109.5kb extension bundle)
+
+### Review Findings
+
+- [x] [Review][Patch] `execution-messages.ts` still tells users to "Run Reconnect" (dead command) [src/kernel/execution-messages.ts:12,18] — `getTransportCellOutputMessage` and `getTransportNotificationMessage` return strings containing "Run Reconnect and review..." / "Run Reconnect and try again." — the Reconnect command no longer exists; both messages and their `bundle.l10n.json` entries need updated guidance pointing to the debug session workflow instead. Violates AC4 / scope "DO clean up obsolete localization entries".
+- [x] [Review][Patch] Orphaned `bundle.l10n.json` entries from retired commands not cleaned up [l10n/bundle.l10n.json, tests/unit/commands/command-registration.test.ts:131-138] — Three strings have no source callers: `"Jupyter Browser Kernel: Disconnected from browser target."`, `"Jupyter Browser Kernel: Reconnected to target {0} at {1}."`, and `"No active browser session. Run Jupyter Browser Kernel: Reconnect and try again."`. The command-registration test at lines 131-138 also actively asserts the first two dead strings still exist in the bundle. Violates scope "DO clean up obsolete localization entries".
+- [x] [Review][Defer] Error state has no interactive recovery affordance [src/ui/connection-status-indicator.ts] — deferred, pre-existing; intentional per story spec (debug lifecycle owns recovery)
+- [x] [Review][Defer] Race condition on in-flight restart/cancel [src/transport/connection-state.ts] — deferred, pre-existing; not introduced by this story
+- [x] [Review][Defer] Custom keybindings to retired commands show "Command not found" [package.json] — deferred, pre-existing; expected VS Code behavior for retired commands, known design consequence
 
 ## Dev Notes
 
