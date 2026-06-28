@@ -12,6 +12,12 @@ export {
 } from "./debug-session-preflight";
 
 export {
+  registerCellIsolationStatusBarProvider,
+  type CellIsolationStatusBarApi,
+  type CellIsolationStatusBarOptions,
+} from "./cell-isolation-status-bar";
+
+export {
   registerKernelController,
   resetExecutionOrderForTests,
   type KernelControllerApi,

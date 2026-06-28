@@ -321,6 +321,7 @@ test("executeCell reports debug-session guidance when no active session", async 
     },
     createLocalizeMock(),
     () => undefined,
+    undefined,
     (failure) => {
       reportedFailures.push({ kind: failure.kind, message: failure.message });
     },
@@ -369,6 +370,7 @@ test("executeCell reports transport failures to callback and avoids stack-style 
     },
     createLocalizeMock(),
     () => connection,
+    undefined,
     (failure) => {
       reportedFailures.push({ kind: failure.kind, message: failure.message });
     },
@@ -420,6 +422,7 @@ test("executeCell ends even while transport error reporting is still pending", a
     },
     createLocalizeMock(),
     () => connection,
+    undefined,
     async (failure) => {
       reportedFailureKind = failure.kind;
       await reporterStarted;
@@ -509,6 +512,7 @@ test("executeCell writes text output and reports failure for timeout", async () 
     },
     createLocalizeMock(),
     () => connection,
+    undefined,
     (failure) => {
       reportedFailures.push(failure.kind);
     },
@@ -580,6 +584,7 @@ test("executeCell classifies transport-thrown timeout error as timeout kind with
     },
     createLocalizeMock(),
     () => connection,
+    undefined,
     (failure) => {
       reportedFailures.push(failure.kind);
     },
@@ -745,6 +750,95 @@ test("executeCell routes metadata cases to wrapper only when isolated is boolean
   assert.equal(evaluateCalls[2]?.startsWith("(async()=>{"), false);
   assert.equal(evaluateCalls[3]?.startsWith("(async()=>{"), false);
   assert.equal(evaluateCalls[4]?.startsWith("await (async()=>{"), true);
+});
+
+test("executeCell uses workspace default isolation when metadata is absent", async () => {
+  const evaluateCalls: string[] = [];
+  const connection = createFakeConnection(async (expression) => {
+    evaluateCalls.push(expression);
+    return {
+      result: {
+        type: "number",
+        value: 2,
+      },
+    } as never;
+  });
+
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+    () => true,
+  );
+
+  const { notebookExecution } = createExecutionRecorder();
+  await executeCell({
+    cell: createFakeCell("1 + 1", undefined, {}) as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 200,
+    runtime,
+  });
+
+  assert.equal(evaluateCalls.length, 1);
+  assert.equal(evaluateCalls[0]?.startsWith("await (async()=>{"), true);
+});
+
+test("executeCell explicit metadata overrides workspace default isolation", async () => {
+  const evaluateCalls: string[] = [];
+  const connection = createFakeConnection(async (expression) => {
+    evaluateCalls.push(expression);
+    return {
+      result: {
+        type: "number",
+        value: 2,
+      },
+    } as never;
+  });
+
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+    () => true,
+  );
+
+  const { notebookExecution: explicitSharedExecution } =
+    createExecutionRecorder();
+  await executeCell({
+    cell: createFakeCell("1 + 1", undefined, {
+      jupyterBrowserKernel: { isolated: false },
+    }) as never,
+    controller: {
+      createNotebookCellExecution: () => explicitSharedExecution,
+    } as never,
+    executionOrder: 201,
+    runtime,
+  });
+
+  const { notebookExecution: explicitIsolatedExecution } =
+    createExecutionRecorder();
+  await executeCell({
+    cell: createFakeCell("1 + 1", undefined, {
+      jupyterBrowserKernel: { isolated: true },
+    }) as never,
+    controller: {
+      createNotebookCellExecution: () => explicitIsolatedExecution,
+    } as never,
+    executionOrder: 202,
+    runtime,
+  });
+
+  assert.equal(evaluateCalls.length, 2);
+  assert.equal(evaluateCalls[0]?.startsWith("(async()=>{"), false);
+  assert.equal(evaluateCalls[1]?.startsWith("await (async()=>{"), true);
 });
 
 test("executeCell prepends isolated annotation as a separate rendered output", async () => {

@@ -8,7 +8,10 @@ import { createConnectionLogger } from "./logging/connection-logger";
 import { createKernelTransportFailureReporter } from "./logging/kernel-transport-failure-reporter";
 import { createConnectionStatusIndicator } from "./ui/connection-status-indicator";
 import { disconnectActiveBrowserConnection } from "./transport/browser-connect";
-import { registerKernelController } from "./notebook";
+import {
+  registerCellIsolationStatusBarProvider,
+  registerKernelController,
+} from "./notebook";
 import { registerToggleCellIsolationCommand } from "./commands/toggle-cell-isolation-command";
 import { DebugAdapterFactory, DebugConfigProvider } from "./debugger";
 
@@ -55,10 +58,32 @@ export function activate(context: vscode.ExtensionContext): void {
     },
   });
 
+  const getDefaultCellIsolation = (): boolean =>
+    vscode.workspace
+      .getConfiguration("jupyterBrowserKernel")
+      .get<boolean>("defaultCellIsolation", false) === true;
+
   const kernelController = registerKernelController(vscode, {
     onTransportError: reportKernelTransportFailure,
+    getDefaultCellIsolation,
   });
   context.subscriptions.push(kernelController);
+
+  const cellIsolationStatusBarProvider = registerCellIsolationStatusBarProvider(
+    {
+      notebooks: vscode.notebooks,
+      workspace: vscode.workspace,
+      NotebookCellKind: vscode.NotebookCellKind,
+      NotebookCellStatusBarAlignment: vscode.NotebookCellStatusBarAlignment,
+      NotebookCellStatusBarItem: vscode.NotebookCellStatusBarItem,
+      EventEmitter: vscode.EventEmitter,
+      l10n: vscode.l10n,
+    },
+    {
+      getDefaultCellIsolation,
+    },
+  );
+  context.subscriptions.push(cellIsolationStatusBarProvider);
 
   const debugLogger = (message: string, error?: unknown): void => {
     outputChannel.appendLine(vscode.l10n.t(message, String(error ?? "")));
@@ -136,6 +161,7 @@ export function activate(context: vscode.ExtensionContext): void {
     window: vscode.window,
     NotebookEdit: vscode.NotebookEdit,
     WorkspaceEdit: vscode.WorkspaceEdit,
+    getDefaultCellIsolation,
   });
 }
 

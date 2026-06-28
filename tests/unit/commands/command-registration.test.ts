@@ -32,6 +32,10 @@ test("package contributes toggle cell isolation commands and not legacy connect/
     byId.get("jupyterBrowserKernel.toggleCellIsolation"),
     "%command.toggleCellIsolation.title%",
   );
+  assert.equal(
+    byId.get("jupyterBrowserKernel.useDefaultCellIsolation"),
+    "%command.useDefaultCellIsolation.label%",
+  );
 });
 
 test("package notebook isolation menu visibility requires Browser Kernel context key and code cells", () => {
@@ -60,6 +64,7 @@ test("package notebook isolation menu visibility requires Browser Kernel context
       whenClause,
       /jupyterBrowserKernel\.activeNotebookUsesBrowserKernel/,
     );
+    assert.match(whenClause, /jupyterBrowserKernel\.activeCellIsolationState/);
   }
 });
 
@@ -94,11 +99,19 @@ test("package contributes isolation actions to notebook cell menus", () => {
     true,
   );
   assert.equal(
+    titleCommands.has("jupyterBrowserKernel.useDefaultCellIsolation"),
+    true,
+  );
+  assert.equal(
     contextCommands.has("jupyterBrowserKernel.toggleCellIsolation.isolate"),
     true,
   );
   assert.equal(
     contextCommands.has("jupyterBrowserKernel.toggleCellIsolation.share"),
+    true,
+  );
+  assert.equal(
+    contextCommands.has("jupyterBrowserKernel.useDefaultCellIsolation"),
     true,
   );
 });
@@ -124,6 +137,10 @@ test("localization bundles include toggle cell isolation and runtime strings", (
   assert.equal(
     packageNls["command.toggleCellIsolation.share.label"],
     "Share Cell State",
+  );
+  assert.equal(
+    packageNls["command.useDefaultCellIsolation.label"],
+    "Use Default Cell Isolation",
   );
 
   // Runtime strings should still exist

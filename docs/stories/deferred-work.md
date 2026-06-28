@@ -1,5 +1,9 @@
 # Deferred Work
 
+## Deferred from: code review of 2-6-configure-default-cell-isolation (2026-06-27)
+
+- No test for `useDefault` command on a cell with no `jupyterBrowserKernel` metadata key — `removeExplicitIsolation` handles the absent-key case correctly; menu guard (`activeCellIsolationState != 'default'`) prevents this path in practice. [tests/unit/commands/toggle-cell-isolation-command.test.ts]
+
 ## Deferred from: code review of 11-6-retire-connect-disconnect-reconnect-commands-and-migrate-state-reporting (2026-06-27)
 
 - Error state has no interactive recovery affordance — intentional per story spec; debug lifecycle owns recovery. Users must start a new debug session to retry. [src/ui/connection-status-indicator.ts]

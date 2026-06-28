@@ -4,6 +4,7 @@
   "command.toggleCellIsolation.title": "Jupyter Browser Kernel: Toggle Cell Isolation",
   "command.toggleCellIsolation.isolate.label": "Isolate Cell",
   "command.toggleCellIsolation.share.label": "Share Cell State",
+  "command.useDefaultCellIsolation.label": "Use Default Cell Isolation",
   "debugger.jupyterBrowserKernel.label": "Jupyter Browser Kernel",
   "debugger.jupyterBrowserKernel.launch.label": "Browser Kernel Debug",
   "debugger.jupyterBrowserKernel.snippet.label": "Jupyter Browser Kernel: Browser Kernel Debug",
@@ -15,5 +16,7 @@
   "configuration.cdpHost.markdownDescription": "Host for the Browser CDP endpoint. Used as a fallback default for debug launch configurations that omit the `host` attribute. Use a resolvable hostname or IP address, for example `localhost` or `127.0.0.1`.",
   "configuration.cdpPort.description": "CDP remote debugging TCP port.",
   "configuration.cdpPort.markdownDescription": "TCP port for the Browser CDP endpoint. Used as a fallback default for debug launch configurations that omit the `port` attribute. Set a whole number from `1` to `65535`.",
-  "configuration.watchAutoRefreshInterval.description": "Auto-refresh interval in ms for the variable watcher. 0 = disabled."
+  "configuration.watchAutoRefreshInterval.description": "Auto-refresh interval in ms for the variable watcher. 0 = disabled.",
+  "configuration.defaultCellIsolation.description": "Default execution mode for JavaScript cells that do not explicitly set jupyterBrowserKernel.isolated metadata.",
+  "configuration.defaultCellIsolation.markdownDescription": "Default execution mode for JavaScript cells that do not explicitly set `jupyterBrowserKernel.isolated` metadata. When `true`, cells run isolated by default. When `false` (the default), cells share a persistent scope. Per-cell metadata always overrides this setting."
 }
