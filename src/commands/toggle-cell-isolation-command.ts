@@ -40,15 +40,6 @@ function toMetadataRecord(metadata: unknown): UnknownRecord | undefined {
   return isObjectRecord(metadata) ? metadata : undefined;
 }
 
-function isCellIsolated(metadata: unknown): boolean {
-  const metadataRecord = toMetadataRecord(metadata);
-  const kernelMetadata = toMetadataRecord(
-    metadataRecord?.jupyterBrowserKernel,
-  ) as { isolated?: unknown } | undefined;
-
-  return kernelMetadata?.isolated === true;
-}
-
 function readExplicitCellIsolation(metadata: unknown): boolean | undefined {
   const metadataRecord = toMetadataRecord(metadata);
   const kernelMetadata = toMetadataRecord(

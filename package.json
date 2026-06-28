@@ -99,6 +99,10 @@
         {
           "command": "jupyterBrowserKernel.toggleCellIsolation.share",
           "when": "false"
+        },
+        {
+          "command": "jupyterBrowserKernel.useDefaultCellIsolation",
+          "when": "false"
         }
       ],
       "notebook/cell/title": [
@@ -162,7 +166,8 @@
         "jupyterBrowserKernel.defaultCellIsolation": {
           "type": "boolean",
           "default": false,
-          "description": "%configuration.defaultCellIsolation.description%"
+          "description": "%configuration.defaultCellIsolation.description%",
+          "markdownDescription": "%configuration.defaultCellIsolation.markdownDescription%"
         }
       }
     }

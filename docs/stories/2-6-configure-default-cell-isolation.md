@@ -63,7 +63,7 @@ So that I can choose safer per-cell isolation without manually toggling every ce
 
 **Given** I use the existing cell isolation toggle command
 **When** the command runs
-**Then** it continues to write or remove explicit `metadata.jupyterBrowserKernel.isolated` values
+**Then** it writes explicit `metadata.jupyterBrowserKernel.isolated` values, flipping the current resolved value (explicit metadata when present, otherwise the workspace default) to its opposite
 **And** the command continues to override the workspace default on the next run.
 
 ### AC 7: Explicit Default-Mode Command Is Available
@@ -129,6 +129,16 @@ So that I can choose safer per-cell isolation without manually toggling every ce
 - [x] Add UI/command coverage for the new default-mode command and the AC 9 visibility matrix.
 - [x] If helpful, add a small helper test for the isolation-resolution logic so the tri-state fallback is obvious and regression-resistant.
 - [x] Add one integration-style test only if needed to prove the setting change takes effect on the next run without a notebook reload.
+
+### Review Findings
+
+- [x] [Review][Decision] Toggle semantics changed: command now always writes explicit metadata, never removes — The new `toggleIsolationForCell` calls `setExplicitIsolation` unconditionally. Toggling an isolated cell (`isolated: true`) now produces `isolated: false` (explicit shared) rather than removing the key (reverting to default state). This contradicts the Dev Notes locked boundary "Do not alter the existing explicit toggle command semantics," AC 6 ("write or remove"), and task 3.1 ("still writes or removes"). Determine whether this is an intentional design evolution (toggle as strict binary flip) or a defect requiring the old key-removal behavior to be restored. **Resolved: accepted as intentional. AC 6 updated to reflect binary-flip design.**
+- [x] [Review][Decision] `useDefaultCellIsolation` visible in command palette — The `isolate` and `share` commands are excluded from the command palette (`"when": "false"`). The new `useDefaultCellIsolation` command has no `commandPalette` exclusion entry, so it appears in the palette. When invoked with no active notebook it silently does nothing. Decide: exclude it from the palette (consistent with the other contextual isolation commands), or leave it accessible (intentional for keyboard-driven workflows). **Resolved: excluded from command palette.**
+- [x] [Review][Patch] Missing `markdownDescription` for `defaultCellIsolation` setting — All other settings contribute both `description` and `markdownDescription`. The new `jupyterBrowserKernel.defaultCellIsolation` contributes only `description`, creating a documentation inconsistency in the VS Code settings UI. [package.json, package.nls.json]
+- [x] [Review][Patch] Missing test: toggle on an explicitly-isolated cell — Tests cover toggling an unisolated cell (no metadata, default=false → writes `isolated: true`) and toggling with default=true (no metadata → writes `isolated: false`). No test covers toggling a cell with explicit `isolated: true` (with any default) → should write `isolated: false`. [tests/unit/commands/toggle-cell-isolation-command.test.ts]
+- [x] [Review][Patch] `isCellIsolated` is dead code — `isCellIsolated` is defined at line 43 of `toggle-cell-isolation-command.ts` but is not called anywhere after the refactor. `toCellIsolationState` and `readExplicitCellIsolation` replaced its usage. [src/commands/toggle-cell-isolation-command.ts]
+- [x] [Review][Patch] `getDefaultCellIsolation` lambda duplicated in `extension.ts` — The same `vscode.workspace.getConfiguration("jupyterBrowserKernel").get<boolean>("defaultCellIsolation", false) === true` expression is repeated verbatim for both `registerKernelController` and `registerToggleCellIsolationCommand`. A single local function or const in `extension.ts` would eliminate the duplicated config key string and default value. [src/extension.ts]
+- [x] [Review][Defer] No test for `useDefault` on a cell with no `jupyterBrowserKernel` key — `removeExplicitIsolation` handles the absent-key case correctly (nothing to remove), but there is no unit test for it. The menu guard (`activeCellIsolationState != 'default'`) prevents this path from being reached via the UI, making it low priority. [tests/unit/commands/toggle-cell-isolation-command.test.ts] — deferred, pre-existing gap / menu-guard prevents in practice
 
 ## Dev Notes
 

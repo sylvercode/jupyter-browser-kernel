@@ -17,5 +17,6 @@
   "configuration.cdpPort.description": "CDP remote debugging TCP port.",
   "configuration.cdpPort.markdownDescription": "TCP port for the Browser CDP endpoint. Used as a fallback default for debug launch configurations that omit the `port` attribute. Set a whole number from `1` to `65535`.",
   "configuration.watchAutoRefreshInterval.description": "Auto-refresh interval in ms for the variable watcher. 0 = disabled.",
-  "configuration.defaultCellIsolation.description": "Default execution mode for JavaScript cells that do not explicitly set jupyterBrowserKernel.isolated metadata."
+  "configuration.defaultCellIsolation.description": "Default execution mode for JavaScript cells that do not explicitly set jupyterBrowserKernel.isolated metadata.",
+  "configuration.defaultCellIsolation.markdownDescription": "Default execution mode for JavaScript cells that do not explicitly set `jupyterBrowserKernel.isolated` metadata. When `true`, cells run isolated by default. When `false` (the default), cells share a persistent scope. Per-cell metadata always overrides this setting."
 }

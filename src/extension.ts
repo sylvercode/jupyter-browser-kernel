@@ -55,12 +55,14 @@ export function activate(context: vscode.ExtensionContext): void {
     },
   });
 
+  const getDefaultCellIsolation = (): boolean =>
+    vscode.workspace
+      .getConfiguration("jupyterBrowserKernel")
+      .get<boolean>("defaultCellIsolation", false) === true;
+
   const kernelController = registerKernelController(vscode, {
     onTransportError: reportKernelTransportFailure,
-    getDefaultCellIsolation: () =>
-      vscode.workspace
-        .getConfiguration("jupyterBrowserKernel")
-        .get<boolean>("defaultCellIsolation", false) === true,
+    getDefaultCellIsolation,
   });
   context.subscriptions.push(kernelController);
 
@@ -140,10 +142,7 @@ export function activate(context: vscode.ExtensionContext): void {
     window: vscode.window,
     NotebookEdit: vscode.NotebookEdit,
     WorkspaceEdit: vscode.WorkspaceEdit,
-    getDefaultCellIsolation: () =>
-      vscode.workspace
-        .getConfiguration("jupyterBrowserKernel")
-        .get<boolean>("defaultCellIsolation", false) === true,
+    getDefaultCellIsolation,
   });
 }
 

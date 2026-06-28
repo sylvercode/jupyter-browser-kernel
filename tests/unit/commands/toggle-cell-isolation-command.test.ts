@@ -135,6 +135,28 @@ test("toggle command writes explicit isolated=false when resolved mode comes fro
   });
 });
 
+test("toggle command writes explicit isolated=false when invoked on an explicitly-isolated cell", async () => {
+  const cell = createFakeCell({
+    tags: ["x"],
+    jupyterBrowserKernel: { isolated: true },
+  });
+  const { commandHandlers, applyEditCalls } = createHarness(cell);
+
+  const handler = commandHandlers.get(
+    "jupyterBrowserKernel.toggleCellIsolation",
+  );
+  assert.ok(handler);
+  await handler?.(cell);
+
+  assert.equal(applyEditCalls.length, 1);
+  assert.deepEqual(applyEditCalls[0]?.updates[0]?.edits[0]?.metadata, {
+    tags: ["x"],
+    jupyterBrowserKernel: {
+      isolated: false,
+    },
+  });
+});
+
 test("isolate command writes explicit isolated=true metadata", async () => {
   const cell = createFakeCell({ tags: ["x"] });
   const { commandHandlers, applyEditCalls } = createHarness(cell);
