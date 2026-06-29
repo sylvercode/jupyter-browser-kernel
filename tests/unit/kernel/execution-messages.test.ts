@@ -7,6 +7,7 @@ import {
   getKernelFailureCategoryLabel,
   getTimeoutCellOutputMessage,
   getTimeoutNotificationMessage,
+  formatIntentionalOutputEntry,
 } from "../../../src/kernel/execution-messages.js";
 import { createLocalizeMock } from "../test-utils/localize-mock.js";
 
@@ -82,4 +83,14 @@ test("getKernelFailureCategoryLabel returns transport error for promise-rejectio
   const localize = createLocalizeMock();
   const label = getKernelFailureCategoryLabel(localize, "promise-rejection");
   assert.equal(label, "transport error");
+});
+
+test("formatIntentionalOutputEntry uses stable JBK prefix for non-empty values", () => {
+  const localize = createLocalizeMock();
+  assert.equal(formatIntentionalOutputEntry(localize, "first"), "JBK: first");
+});
+
+test("formatIntentionalOutputEntry keeps the same JBK prefix for empty values", () => {
+  const localize = createLocalizeMock();
+  assert.equal(formatIntentionalOutputEntry(localize, ""), "JBK:");
 });

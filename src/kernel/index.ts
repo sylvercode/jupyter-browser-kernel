@@ -4,6 +4,7 @@ export {
   type ExecuteCellRequest,
   type KernelRuntime,
   type NotebookOutputApi,
+  type WriteIntentionalOutputLine,
 } from "./execution-kernel";
 
 export {

@@ -15,6 +15,7 @@ import {
   getKernelFailureCellOutputMessage,
   getRuntimeCellBridgeUnavailableMessage,
   getIntentionalLogSectionLabel,
+  formatIntentionalOutputEntry,
   getNoActiveSessionMessage,
 } from "./execution-messages";
 import { buildCellExpression } from "./build-cell-expression";
@@ -45,12 +46,15 @@ export type ReportTransportError = (
   failure: ExecutionFailure,
 ) => Promise<void> | void;
 
+export type WriteIntentionalOutputLine = (line: string) => Promise<void> | void;
+
 export interface KernelRuntime {
   notebookOutputApi: NotebookOutputApi;
   localize: Localize;
   getActiveConnection: GetActiveConnection;
   getDefaultCellIsolation: () => boolean;
   reportTransportError?: ReportTransportError;
+  writeIntentionalOutputLine?: WriteIntentionalOutputLine;
 }
 
 export interface ExecuteCellRequest {
@@ -72,6 +76,7 @@ export function createKernelRuntime(
   getActiveConnection: GetActiveConnection = getActiveBrowserConnection,
   getDefaultCellIsolation: () => boolean = () => true,
   reportTransportError?: ReportTransportError,
+  writeIntentionalOutputLine?: WriteIntentionalOutputLine,
 ): KernelRuntime {
   return {
     notebookOutputApi,
@@ -79,6 +84,7 @@ export function createKernelRuntime(
     getActiveConnection,
     getDefaultCellIsolation,
     reportTransportError,
+    writeIntentionalOutputLine,
   };
 }
 
@@ -180,11 +186,16 @@ export async function executeCell({
     }
 
     if (completion.kind === "cancelled") {
-      await collectIntentionalLogs(connection, bridgeKey);
+      const intentionalLogs = await collectIntentionalLogs(
+        connection,
+        bridgeKey,
+      );
+      reportIntentionalOutputAsync(runtime, intentionalLogs);
       return true;
     }
 
     const intentionalLogs = await collectIntentionalLogs(connection, bridgeKey);
+    reportIntentionalOutputAsync(runtime, intentionalLogs);
     const result = completion.result;
 
     if (execution.token.isCancellationRequested) {
@@ -260,6 +271,30 @@ function reportFailureAsync(
   }
 
   void Promise.resolve(reportPromise).catch(() => undefined);
+}
+
+function reportIntentionalOutputAsync(
+  runtime: KernelRuntime,
+  intentionalLogs: readonly string[],
+): void {
+  if (intentionalLogs.length === 0 || !runtime.writeIntentionalOutputLine) {
+    return;
+  }
+
+  for (const entry of intentionalLogs) {
+    const line = formatIntentionalOutputEntry(runtime.localize, entry);
+    let writePromise: Promise<void> | void;
+
+    try {
+      writePromise = runtime.writeIntentionalOutputLine(line);
+    } catch {
+      continue;
+    }
+
+    if (writePromise) {
+      void Promise.resolve(writePromise).catch(() => undefined);
+    }
+  }
 }
 
 async function evaluateCellExpression(

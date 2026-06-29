@@ -4,6 +4,7 @@ import {
   executeCell,
   createKernelRuntime,
   type ExecutionFailure,
+  type WriteIntentionalOutputLine,
 } from "../kernel";
 import {
   createEnsureSessionReadyForExecution,
@@ -36,6 +37,7 @@ export interface KernelControllerOptions {
   onTransportError?:
     | ((failure: ExecutionFailure) => Promise<void>)
     | ((failure: ExecutionFailure) => void);
+  onIntentionalOutputLine?: WriteIntentionalOutputLine;
   ensureSessionReady?: EnsureSessionReadyForExecution;
   getDefaultCellIsolation?: () => boolean;
 }
@@ -73,6 +75,7 @@ export function registerKernelController(
     undefined,
     options?.getDefaultCellIsolation,
     options?.onTransportError,
+    options?.onIntentionalOutputLine,
   );
 
   const ensureSessionReady: EnsureSessionReadyForExecution =

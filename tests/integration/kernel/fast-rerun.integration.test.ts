@@ -171,8 +171,8 @@ test(
       createRuntilmeCellBridgeSetupExpression(firstBridgeKey),
     );
     const firstRun = await connection?.evaluate(
-      buildCellExpression("$cell.log('first'); 1 + 1", uri, {
-        isolate: false,
+      buildCellExpression("$cell.log('first'); return 1 + 1", uri, {
+        isolate: true,
         runtimeCellBridgeKey: firstBridgeKey,
       }),
     );
@@ -197,5 +197,69 @@ test(
     assert.equal(secondRun?.result?.value, 4);
     assert.deepEqual(firstLogs?.result?.value, ["first"]);
     assert.deepEqual(secondLogs?.result?.value, []);
+  },
+);
+
+test(
+  "reconnect keeps intentional logs isolated to current run and excludes ambient console activity",
+  { skip: !runIntegration },
+  async () => {
+    const firstConnect = await connectToBrowserTarget(
+      { host, port: cdpPort },
+      coreTargetProfile,
+    );
+    assert.equal(firstConnect.ok, true);
+
+    let connection = getActiveBrowserConnection();
+    assert.ok(connection);
+
+    const uri =
+      "vscode-notebook-cell://test-authority/workspaces/foundry-devil-code-sight/tests/files/test1.ipynb#ch0000000004777";
+
+    const firstBridgeKey = createRuntilmeCellBridgeKey();
+    await connection?.evaluate(
+      createRuntilmeCellBridgeSetupExpression(firstBridgeKey),
+    );
+    await connection?.evaluate(
+      buildCellExpression("$cell.log('before reconnect'); 1 + 1", uri, {
+        isolate: true,
+        runtimeCellBridgeKey: firstBridgeKey,
+      }),
+    );
+    const firstLogs = await connection?.evaluate(
+      createRuntilmeCellBridgeTeardownExpression(firstBridgeKey),
+    );
+    assert.deepEqual(firstLogs?.result?.value, ["before reconnect"]);
+
+    await disconnectActiveBrowserConnection();
+
+    const secondConnect = await connectToBrowserTarget(
+      { host, port: cdpPort },
+      coreTargetProfile,
+    );
+    assert.equal(secondConnect.ok, true);
+
+    connection = getActiveBrowserConnection();
+    assert.ok(connection);
+
+    const secondBridgeKey = createRuntilmeCellBridgeKey();
+    await connection?.evaluate(
+      createRuntilmeCellBridgeSetupExpression(secondBridgeKey),
+    );
+    await connection?.evaluate(
+      buildCellExpression(
+        "console.log('ambient page noise'); $cell.log('after reconnect'); 2 + 2",
+        uri,
+        {
+          isolate: true,
+          runtimeCellBridgeKey: secondBridgeKey,
+        },
+      ),
+    );
+    const secondLogs = await connection?.evaluate(
+      createRuntilmeCellBridgeTeardownExpression(secondBridgeKey),
+    );
+
+    assert.deepEqual(secondLogs?.result?.value, ["after reconnect"]);
   },
 );

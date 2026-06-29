@@ -2,15 +2,16 @@
 storyId: "3.3"
 storyKey: "3-3-distinguish-intentional-logs-from-ambient-console-activity"
 title: "Distinguish Intentional Logs from Ambient Console Activity"
-status: "ready-for-dev"
+status: "review"
 created: "2026-06-29"
 epic: "3"
 priority: "p1"
+baseline_commit: "bc0a3f918aaf6984e31fbb232785db43f624d142"
 ---
 
 # Story 3.3: Distinguish Intentional Logs from Ambient Console Activity
 
-**Status:** ready-for-dev
+**Status:** review
 
 ## Story
 
@@ -45,41 +46,41 @@ So that I can focus on what my cell emitted without filtering ambient activity.
 
 ### 1. Standardize Intentional Output Identity Prefix (AC: 1, 2)
 
-- [ ] Define one canonical intentional-output prefix format and keep it profile-agnostic (`JBK`-anchored, stable, testable).
-- [ ] Ensure intentional log lines rendered in notebook output are prefixed per-entry, not only section-labeled.
-- [ ] Keep label text localized and user-facing strings routed through existing localization pathways.
+- [x] Define one canonical intentional-output prefix format and keep it profile-agnostic (`JBK`-anchored, stable, testable).
+- [x] Ensure intentional log lines rendered in notebook output are prefixed per-entry, not only section-labeled.
+- [x] Keep label text localized and user-facing strings routed through existing localization pathways.
 
 ### 2. Mirror Intentional Output to the VS Code Output Channel (AC: 2)
 
-- [ ] Add a kernel-owned or kernel-invoked intentional-output mirror path that writes intentional entries to the existing extension output channel.
-- [ ] Ensure mirror writes happen only for helper-driven intentional entries, never for ambient page console traffic.
-- [ ] Keep output-channel line format deterministic so user filtering by `JBK` remains reliable.
+- [x] Add a kernel-owned or kernel-invoked intentional-output mirror path that writes intentional entries to the existing extension output channel.
+- [x] Ensure mirror writes happen only for helper-driven intentional entries, never for ambient page console traffic.
+- [x] Keep output-channel line format deterministic so user filtering by `JBK` remains reliable.
 
 ### 3. Preserve Ambient Console Exclusion Boundaries (AC: 1, 3)
 
-- [ ] Do not subscribe to or replay browser-wide `console.*` event streams for this story.
-- [ ] Keep intentional capture source-of-truth restricted to the runtime bridge teardown payload.
-- [ ] Preserve no-log path behavior (no extra intentional log output blocks or mirror lines).
+- [x] Do not subscribe to or replay browser-wide `console.*` event streams for this story.
+- [x] Keep intentional capture source-of-truth restricted to the runtime bridge teardown payload.
+- [x] Preserve no-log path behavior (no extra intentional log output blocks or mirror lines).
 
 ### 4. Preserve Reconnect Behavior and Avoid Backlog Replay (AC: 3)
 
-- [ ] Verify reconnect lifecycle does not retain stale bridge state from earlier runs.
-- [ ] Ensure post-reconnect intentional logs only include entries produced during the current run.
-- [ ] Keep cancellation and teardown ordering intact to avoid leaked logs across runs.
+- [x] Verify reconnect lifecycle does not retain stale bridge state from earlier runs.
+- [x] Ensure post-reconnect intentional logs only include entries produced during the current run.
+- [x] Keep cancellation and teardown ordering intact to avoid leaked logs across runs.
 
 ### 5. Update and Extend Tests (AC: 1, 2, 3)
 
-- [ ] Extend unit coverage in `tests/unit/kernel/execution-kernel.test.ts` for prefixed notebook log lines and output-channel mirror behavior.
-- [ ] Add or extend tests validating prefix consistency across intentional output types.
-- [ ] Add reconnect-focused integration assertions in `tests/integration/kernel/fast-rerun.integration.test.ts` (or nearest integration file) to prove no ambient/backlog leakage after reconnect-style flows.
-- [ ] Keep existing Story 3.1 and 3.2 invariants passing.
+- [x] Extend unit coverage in `tests/unit/kernel/execution-kernel.test.ts` for prefixed notebook log lines and output-channel mirror behavior.
+- [x] Add or extend tests validating prefix consistency across intentional output types.
+- [x] Add reconnect-focused integration assertions in `tests/integration/kernel/fast-rerun.integration.test.ts` (or nearest integration file) to prove no ambient/backlog leakage after reconnect-style flows.
+- [x] Keep existing Story 3.1 and 3.2 invariants passing.
 
 ### 6. Validation Run (AC: 1, 2, 3)
 
-- [ ] Run `npm run compile`.
-- [ ] Run `npm run lint`.
-- [ ] Run `npm run test:unit`.
-- [ ] Run `npm run test:integration`.
+- [x] Run `npm run compile`.
+- [x] Run `npm run lint`.
+- [x] Run `npm run test:unit`.
+- [x] Run `npm run test:integration`.
 
 ## Dev Notes
 
@@ -239,19 +240,38 @@ GPT-5.3-Codex
 
 - Story context created via bmad-create-story workflow on 2026-06-29.
 - Source analysis included sprint status, Epic 3, PRD, architecture, UX specs, prior stories, kernel source, and recent git history.
+- Added red-phase tests for JBK-prefixed intentional logs and output-channel mirroring.
+- Implemented localized intentional output formatting and runtime mirror callback wiring through kernel controller and extension output channel.
+- Added reconnect-focused integration assertion covering ambient console exclusion and no backlog replay after reconnect.
+- Validation completed: `npm run compile`, `npm run lint`, `npm run test:unit`, `npm run test:integration`.
 
 ### Completion Notes List
 
-- Comprehensive context generated with architecture, UX, and regression guardrails.
-- Previous-story and git-pattern intelligence incorporated.
-- Version snapshot validated for implementation safety.
-- Story status set to `ready-for-dev`.
+- Implemented canonical localized intentional output formatting with per-entry `JBK` prefix in notebook intentional log blocks.
+- Added kernel runtime intentional-output mirror callback and wired it to the existing extension output channel without introducing ambient console subscriptions.
+- Preserved no-log behavior and cancellation/teardown ordering while ensuring intentional output still respects runtime bridge boundaries.
+- Added unit coverage for JBK-prefixed output rendering, output-channel mirror emission, and prefix formatting helper behavior.
+- Added reconnect-focused integration test assertions proving no ambient console/backlog leakage into intentional logs.
+- All required validations passed with no unit regressions; integration suite completed with expected skipped CDP-gated tests.
 
 ### File List
 
 - docs/stories/3-3-distinguish-intentional-logs-from-ambient-console-activity.md
 - docs/stories/sprint-status.yaml
+- src/extension.ts
+- src/kernel/execution-kernel.ts
+- src/kernel/execution-messages.ts
+- src/kernel/index.ts
+- src/notebook/kernel-controller.ts
+- l10n/bundle.l10n.json
+- tests/unit/kernel/execution-kernel.test.ts
+- tests/unit/kernel/execution-messages.test.ts
+- tests/integration/kernel/fast-rerun.integration.test.ts
+
+## Change Log
+
+- 2026-06-29: Implemented Story 3.3 intentional/ambient separation updates with canonical JBK-prefixed intentional output, output-channel mirroring, reconnect leakage safeguards, and accompanying unit/integration coverage.
 
 ## Story Completion Status
 
-Ultimate context engine analysis completed - comprehensive developer guide created.
+Implementation complete. Story is in `review` status and ready for code review.
