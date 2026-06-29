@@ -479,7 +479,6 @@ Traceability highlights: FR1 through FR23 plus FR38 cover the platform execution
 - FR14: The extension can normalize success and failure outcomes across supported transports and profiles through a shared result contract while preserving transport-boundary isolation from notebook execution semantics.
 - FR15: A user can inspect execution results inline in the notebook after each run.
 - FR16: The extension can capture output generated during cell execution and surface it as notebook output, distinguishable from unrelated browser console activity.
-- FR17: The extension can preserve session-scoped execution history so a user can compare the result of each cell revision within a working session.
 
 #### Platform Testing and Validation
 

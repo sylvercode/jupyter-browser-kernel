@@ -47,7 +47,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 ### Requirements Overview
 
 **Functional Requirements:**
-The requirement set defines a clear two-layer architecture. The core layer owns browser session lifecycle, JavaScript notebook execution, normalized result contracts, intentional output handling, execution history, reconnect operations, and deterministic testing. A separate profile layer owns target-matching policies, eligibility diagnostics, runtime envelope details, and profile-specific workflows.
+The requirement set defines a clear two-layer architecture. The core layer owns browser session lifecycle, JavaScript notebook execution, normalized result contracts, intentional output handling, reconnect operations, and deterministic testing. A separate profile layer owns target-matching policies, eligibility diagnostics, runtime envelope details, and profile-specific workflows.
 
 The FR structure also enforces stability boundaries:
 
@@ -609,13 +609,13 @@ The project structure fully supports architectural decisions. `src/transport/` o
 ### Requirements Coverage Validation ✅
 
 **Epic/Feature Coverage:**
-The architecture supports all MVP platform capabilities: connection and session control, notebook execution, normalized result contract, output discrimination, execution history, manual reconnect, and deterministic fixture-based testing. Profile-specific and post-MVP capabilities are scoped to dedicated profile boundaries and capability negotiation without contaminating core kernel modules.
+The architecture supports all MVP platform capabilities: connection and session control, notebook execution, normalized result contract, output discrimination, manual reconnect, and deterministic fixture-based testing. Profile-specific and post-MVP capabilities are scoped to dedicated profile boundaries and capability negotiation without contaminating core kernel modules.
 
 **Functional Requirements Coverage:**
 
 - FR1-FR7 (Connection and Session Control) are covered by `src/transport/`, `src/config/`, and `src/ui/status-bar`.
 - FR8-FR13, FR38 (Notebook Execution including breakpoint debugging) are covered by `src/kernel/`, `src/notebook/`, and `src/transport/` debugger-domain enablement.
-- FR14-FR17 (Result and Output Contract) are covered by `src/kernel/execution-result`, `src/kernel/output-collector`, and shared error/event types.
+- FR14-FR16 (Result and Output Contract) are covered by `src/kernel/execution-result`, `src/kernel/output-collector`, and shared error/event types.
 - FR18 (Platform Testing and Validation) is covered by `tests/fixtures/`, `tests/integration/`, and `tests/contract/`.
 - FR19-FR22 (Experimentation Workflow and install path) are supported by notebook execution flow and session lifecycle design.
 - FR23 (Extension-owned output helpers) is covered by kernel envelope and profile hook strategy under architecture-scoped helper conventions.

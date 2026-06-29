@@ -61,9 +61,11 @@ Flow:
 1. Set breakpoint in notebook-cell gutter.
 2. Start notebook-cell debug session.
 3. Run cell until paused-line highlight appears.
-4. Inspect Variables, Watch, and Call Stack panes.
+4. Inspect VS Code native debugger panes: Variables, Watch, and Call Stack.
 5. Use step in/over/out or continue.
 6. Validate behavior and return to normal edit-run loop.
+
+**Note:** Watches are managed through the VS Code debugger interface; there is no separate notebook watch UI.
 
 ### Journey Patterns
 

@@ -51,7 +51,7 @@ Phase 1 (MVP core):
 
 Phase 2 (post-MVP core enhancements):
 
-- Richer watched-value rendering
+- Enhanced debugger-native watch rendering (watches are now integrated with VS Code debugger, no separate notebook watch UI)
 - Deeper drill-down interactions
 
 Phase 3 (post-MVP profile enhancements):

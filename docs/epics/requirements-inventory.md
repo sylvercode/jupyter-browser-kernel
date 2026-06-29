@@ -125,16 +125,12 @@ FR13: Epic 2 - execution isolation with explicit shared-runtime option
 FR14: Epic 2 - shared normalized result contract
 FR15: Epic 2 - inline run result inspection
 FR16: Epic 3 - intentional log capture and discrimination from ambient noise across notebook and output-channel contexts
-FR17: Epic 4 - session-scoped value-history continuity
 FR18: Epic 6 - deterministic fixture-based core validation
 FR19: Epic 6 - forward-operation experimentation pattern
 FR20: Epic 6 - rollback restoration pattern
 FR21: Epic 6 - multi-version iteration in one session
 FR22: Epic 1 - scaffold bootstrap and CI VSIX release workflow
 FR23: Epic 3 and Epic 4 - extension-owned output helpers (logging, output capture, value inspection)
-FR24: Epic 5 - watched expressions and refresh behavior
-FR25: Epic 5 - depth-limited projection and nested drill-down
-FR26: Epic 5 - resilient watch refresh when one watch fails
 FR27: Epic 7 - Foundry profile target matching
 FR28: Epic 7 - Foundry profile runtime envelope and helper injection
 FR29: Epic 7 - zero-boilerplate execution envelope for structured output
