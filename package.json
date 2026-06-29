@@ -113,7 +113,7 @@
         },
         {
           "command": "jupyterBrowserKernel.toggleCellIsolation.share",
-          "when": "notebookType == 'jupyter-notebook' && notebookCellType == 'code' && jupyterBrowserKernel.activeNotebookUsesBrowserKernel && jupyterBrowserKernel.activeCellIsolationState != 'shared'",
+          "when": "notebookType == 'jupyter-notebook' && notebookCellType == 'code' && jupyterBrowserKernel.activeNotebookUsesBrowserKernel && jupyterBrowserKernel.activeCellIsolationState != 'global'",
           "group": "navigation@50"
         },
         {
@@ -130,7 +130,7 @@
         },
         {
           "command": "jupyterBrowserKernel.toggleCellIsolation.share",
-          "when": "notebookType == 'jupyter-notebook' && notebookCellType == 'code' && jupyterBrowserKernel.activeNotebookUsesBrowserKernel && jupyterBrowserKernel.activeCellIsolationState != 'shared'",
+          "when": "notebookType == 'jupyter-notebook' && notebookCellType == 'code' && jupyterBrowserKernel.activeNotebookUsesBrowserKernel && jupyterBrowserKernel.activeCellIsolationState != 'global'",
           "group": "z_commands@50"
         },
         {
@@ -164,8 +164,20 @@
           "description": "%configuration.watchAutoRefreshInterval.description%"
         },
         "jupyterBrowserKernel.defaultCellIsolation": {
-          "type": "boolean",
-          "default": false,
+          "type": "string",
+          "default": "isolated",
+          "enum": [
+            "isolated",
+            "global"
+          ],
+          "enumItemLabels": [
+            "%configuration.defaultCellIsolation.enum.isolated.label%",
+            "%configuration.defaultCellIsolation.enum.global.label%"
+          ],
+          "markdownEnumDescriptions": [
+            "%configuration.defaultCellIsolation.enum.isolated.description%",
+            "%configuration.defaultCellIsolation.enum.global.description%"
+          ],
           "description": "%configuration.defaultCellIsolation.description%",
           "markdownDescription": "%configuration.defaultCellIsolation.markdownDescription%"
         }

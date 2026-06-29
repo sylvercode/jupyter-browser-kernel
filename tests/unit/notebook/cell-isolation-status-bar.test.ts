@@ -140,7 +140,7 @@ test("shows isolated icon-only status on the right for explicit isolated mode", 
 
   assert.ok(items);
   assert.equal(items.length, 1);
-  assert.equal(items[0]?.text, "$(bracket)");
+  assert.equal(items[0]?.text, "$(package)");
   assert.equal(items[0]?.alignment, 2);
   assert.equal(items[0]?.tooltip, "Mode: Isolated. Click to toggle.");
   assert.deepEqual(items[0]?.accessibilityInformation, {
@@ -156,7 +156,7 @@ test("shows isolated icon-only status on the right for explicit isolated mode", 
   );
 });
 
-test("shows shared icon-only status on the right for explicit shared mode", () => {
+test("shows global icon-only status on the right for explicit global mode", () => {
   const harness = createHarness();
   const cell = harness.createCell({
     jupyterBrowserKernel: { isolated: false },
@@ -168,28 +168,11 @@ test("shows shared icon-only status on the right for explicit shared mode", () =
 
   assert.ok(items);
   assert.equal(items.length, 1);
-  assert.equal(items[0]?.text, "$(broadcast)");
+  assert.equal(items[0]?.text, "$(window)");
   assert.equal(items[0]?.alignment, 2);
-  assert.equal(items[0]?.tooltip, "Mode: Shared. Click to toggle.");
+  assert.equal(items[0]?.tooltip, "Mode: Global. Click to toggle.");
   assert.deepEqual(items[0]?.accessibilityInformation, {
-    label: "Mode: Shared. Click to toggle.",
-  });
-});
-
-test("shows shared icon with default marker in tooltip when inherited from default", () => {
-  const harness = createHarness({ defaultCellIsolation: false });
-  const cell = harness.createCell({});
-
-  const items = harness.provider?.provideCellStatusBarItems(cell, undefined) as
-    | FakeNotebookCellStatusBarItem[]
-    | undefined;
-
-  assert.ok(items);
-  assert.equal(items.length, 1);
-  assert.equal(items[0]?.text, "$(broadcast)");
-  assert.equal(items[0]?.tooltip, "Mode: Shared (default). Click to toggle.");
-  assert.deepEqual(items[0]?.accessibilityInformation, {
-    label: "Mode: Shared (default). Click to toggle.",
+    label: "Mode: Global. Click to toggle.",
   });
 });
 
@@ -203,10 +186,27 @@ test("shows isolated icon with default marker in tooltip when inherited from def
 
   assert.ok(items);
   assert.equal(items.length, 1);
-  assert.equal(items[0]?.text, "$(bracket)");
+  assert.equal(items[0]?.text, "$(package)");
   assert.equal(items[0]?.tooltip, "Mode: Isolated (default). Click to toggle.");
   assert.deepEqual(items[0]?.accessibilityInformation, {
     label: "Mode: Isolated (default). Click to toggle.",
+  });
+});
+
+test("shows global icon with default marker in tooltip when inherited from default", () => {
+  const harness = createHarness({ defaultCellIsolation: false });
+  const cell = harness.createCell({});
+
+  const items = harness.provider?.provideCellStatusBarItems(cell, undefined) as
+    | FakeNotebookCellStatusBarItem[]
+    | undefined;
+
+  assert.ok(items);
+  assert.equal(items.length, 1);
+  assert.equal(items[0]?.text, "$(window)");
+  assert.equal(items[0]?.tooltip, "Mode: Global (default). Click to toggle.");
+  assert.deepEqual(items[0]?.accessibilityInformation, {
+    label: "Mode: Global (default). Click to toggle.",
   });
 });
 

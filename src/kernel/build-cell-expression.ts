@@ -19,7 +19,7 @@ export function buildCellExpression(
   options: BuildCellExpressionOptions,
 ): string {
   const runtimeCellBridgePrefix = buildRuntimeCellBridgePrefix(
-    options.runtimeCellBridgeKey,
+    options.isolate ? options.runtimeCellBridgeKey : undefined,
   );
 
   if (!options.isolate) {

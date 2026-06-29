@@ -59,9 +59,22 @@ export function activate(context: vscode.ExtensionContext): void {
   });
 
   const getDefaultCellIsolation = (): boolean =>
-    vscode.workspace
-      .getConfiguration("jupyterBrowserKernel")
-      .get<boolean>("defaultCellIsolation", false) === true;
+    (() => {
+      const setting = vscode.workspace
+        .getConfiguration("jupyterBrowserKernel")
+        .get<unknown>("defaultCellIsolation", "isolated");
+
+      if (setting === "isolated") {
+        return true;
+      }
+
+      if (setting === "global") {
+        return false;
+      }
+
+      // Backward compatibility for existing boolean user settings.
+      return setting === true;
+    })();
 
   const kernelController = registerKernelController(vscode, {
     onTransportError: reportKernelTransportFailure,

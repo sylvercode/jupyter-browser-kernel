@@ -11,7 +11,7 @@ const USE_DEFAULT_CELL_ISOLATION_COMMAND =
 const ACTIVE_CELL_ISOLATION_STATE_CONTEXT_KEY =
   "jupyterBrowserKernel.activeCellIsolationState";
 
-type CellIsolationState = "default" | "isolated" | "shared";
+type CellIsolationState = "default" | "isolated" | "global";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -58,7 +58,7 @@ function toCellIsolationState(metadata: unknown): CellIsolationState {
   }
 
   if (explicitIsolation === false) {
-    return "shared";
+    return "global";
   }
 
   return "default";

@@ -132,19 +132,23 @@ test("localization bundles include toggle cell isolation and runtime strings", (
   );
   assert.equal(
     packageNls["command.toggleCellIsolation.isolate.label"],
-    "Isolate Cell",
+    "Isolated mode",
   );
   assert.equal(
     packageNls["command.toggleCellIsolation.share.label"],
-    "Share Cell State",
+    "Global mode",
   );
   assert.equal(
     packageNls["command.useDefaultCellIsolation.label"],
     "Use Default Cell Isolation",
   );
 
-  // Runtime strings should still exist
-  assert.equal(l10nBundle["(isolated cell)"], "(isolated cell)");
+  // Runtime labels reflect the Global/Isolated naming model
+  assert.equal(l10nBundle["Mode: Global. Click to toggle."], "Mode: Global. Click to toggle.");
+  assert.equal(
+    l10nBundle["Mode: Global (default). Click to toggle."],
+    "Mode: Global (default). Click to toggle.",
+  );
 });
 
 test("extension activation registers isolation commands and debug wiring, not legacy connection commands", () => {

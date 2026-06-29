@@ -6,10 +6,10 @@ const NOTEBOOK_TYPE = "jupyter-notebook";
 const TOGGLE_CELL_ISOLATION_COMMAND =
   "jupyterBrowserKernel.toggleCellIsolation";
 
-const ISOLATED_ICON = "$(bracket)";
-const SHARED_ICON = "$(broadcast)";
+const ISOLATED_ICON = "$(package)";
+const GLOBAL_ICON = "$(window)";
 
-type IsolationMode = "isolated" | "shared";
+type IsolationMode = "isolated" | "global";
 
 interface KernelCellMetadata {
   jupyterBrowserKernel?: {
@@ -70,19 +70,19 @@ function resolveIsolationMode(
 
   if (explicitIsolation === false) {
     return {
-      mode: "shared",
+      mode: "global",
       inheritedFromDefault: false,
     };
   }
 
   return {
-    mode: getDefaultCellIsolation() ? "isolated" : "shared",
+    mode: getDefaultCellIsolation() ? "isolated" : "global",
     inheritedFromDefault: true,
   };
 }
 
 function toStatusBarText(resolvedMode: ResolvedIsolationMode): string {
-  return resolvedMode.mode === "isolated" ? ISOLATED_ICON : SHARED_ICON;
+  return resolvedMode.mode === "isolated" ? ISOLATED_ICON : GLOBAL_ICON;
 }
 
 function toStatusBarTooltip(
@@ -96,8 +96,8 @@ function toStatusBarTooltip(
   }
 
   return resolvedMode.inheritedFromDefault
-    ? localize("Mode: Shared (default). Click to toggle.")
-    : localize("Mode: Shared. Click to toggle.");
+    ? localize("Mode: Global (default). Click to toggle.")
+    : localize("Mode: Global. Click to toggle.");
 }
 
 export function registerCellIsolationStatusBarProvider(
