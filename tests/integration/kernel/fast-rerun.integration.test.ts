@@ -9,6 +9,11 @@ import {
 import { coreTargetProfile } from "../../../src/profile/core-target-profile.js";
 import { buildCellExpression } from "../../../src/kernel/build-cell-expression.js";
 import {
+  createRuntilmeCellBridgeKey,
+  createRuntilmeCellBridgeSetupExpression,
+  createRuntilmeCellBridgeTeardownExpression,
+} from "../../../src/kernel/runtilme-cell-bridge.js";
+import {
   startFoundryIntegrationLifecycle,
   type FoundryIntegrationLifecycle,
 } from "../helpers/integration-app-server.js";
@@ -142,5 +147,55 @@ test(
     const leakProbeResult = await connection?.evaluate(leakProbe);
     assert.equal(leakProbeResult?.exceptionDetails, undefined);
     assert.equal(leakProbeResult?.result?.value, "undefined");
+  },
+);
+
+test(
+  "RuntilmeCellBridge buffer is per-run and does not leak across reruns",
+  { skip: !runIntegration },
+  async () => {
+    const connected = await connectToBrowserTarget(
+      { host, port: cdpPort },
+      coreTargetProfile,
+    );
+    assert.equal(connected.ok, true);
+
+    const connection = getActiveBrowserConnection();
+    assert.ok(connection);
+
+    const uri =
+      "vscode-notebook-cell://test-authority/workspaces/foundry-devil-code-sight/tests/files/test1.ipynb#ch0000000003999";
+
+    const firstBridgeKey = createRuntilmeCellBridgeKey();
+    await connection?.evaluate(
+      createRuntilmeCellBridgeSetupExpression(firstBridgeKey),
+    );
+    const firstRun = await connection?.evaluate(
+      buildCellExpression("$cell.log('first'); 1 + 1", uri, {
+        isolate: false,
+        runtimeCellBridgeKey: firstBridgeKey,
+      }),
+    );
+    const firstLogs = await connection?.evaluate(
+      createRuntilmeCellBridgeTeardownExpression(firstBridgeKey),
+    );
+
+    const secondBridgeKey = createRuntilmeCellBridgeKey();
+    await connection?.evaluate(
+      createRuntilmeCellBridgeSetupExpression(secondBridgeKey),
+    );
+    const secondRun = await connection?.evaluate(
+      buildCellExpression("2 + 2", uri, {
+        isolate: false,
+      }),
+    );
+    const secondLogs = await connection?.evaluate(
+      createRuntilmeCellBridgeTeardownExpression(secondBridgeKey),
+    );
+
+    assert.equal(firstRun?.result?.value, 2);
+    assert.equal(secondRun?.result?.value, 4);
+    assert.deepEqual(firstLogs?.result?.value, ["first"]);
+    assert.deepEqual(secondLogs?.result?.value, []);
   },
 );

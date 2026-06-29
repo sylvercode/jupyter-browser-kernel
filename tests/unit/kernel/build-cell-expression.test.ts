@@ -74,3 +74,47 @@ test("buildCellExpression uses distinct sourceURL lines for distinct cells", () 
   assert.match(expressionA, new RegExp(`sourceURL=${uriA}`));
   assert.match(expressionB, new RegExp(`sourceURL=${uriB}`));
 });
+
+test("buildCellExpression preserves prior line mapping without helper injection", () => {
+  const sharedExpression = buildCellExpression("2 + 2", BASE_URI, {
+    isolate: false,
+  });
+  const isolatedExpression = buildCellExpression("2 + 2", BASE_URI, {
+    isolate: true,
+  });
+
+  assert.equal(sharedExpression.startsWith("globalThis.$cell"), false);
+  assert.equal(isolatedExpression.includes("globalThis.$cell"), false);
+});
+
+test("buildCellExpression injects runtime cell bridge as a local binding in shared mode", () => {
+  const expression = buildCellExpression(
+    "$cell.log('first'); 1 + 1",
+    BASE_URI,
+    {
+      isolate: false,
+      runtimeCellBridgeKey: "bridge-key-1",
+    },
+  );
+
+  assert.equal(
+    expression,
+    `const $cell = globalThis["bridge-key-1"].cellBridge; $cell.log('first'); 1 + 1\n//# sourceURL=${BASE_URI}\n`,
+  );
+});
+
+test("buildCellExpression injects runtime cell bridge as a local binding in isolated mode", () => {
+  const expression = buildCellExpression(
+    "$cell.log('first'); return 1 + 1",
+    BASE_URI,
+    {
+      isolate: true,
+      runtimeCellBridgeKey: "bridge-key-2",
+    },
+  );
+
+  assert.equal(
+    expression,
+    `await (async()=>{const $cell = globalThis["bridge-key-2"].cellBridge; $cell.log('first'); return 1 + 1})()\n//# sourceURL=${BASE_URI}\n`,
+  );
+});

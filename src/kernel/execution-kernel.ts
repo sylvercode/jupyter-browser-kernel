@@ -13,10 +13,18 @@ import {
 } from "./execution-result";
 import {
   getKernelFailureCellOutputMessage,
+  getRuntimeCellBridgeUnavailableMessage,
+  getIntentionalLogSectionLabel,
   getIsolationAnnotationMessage,
   getNoActiveSessionMessage,
 } from "./execution-messages";
 import { buildCellExpression } from "./build-cell-expression";
+import {
+  createRuntilmeCellBridgeKey,
+  createRuntilmeCellBridgeSetupExpression,
+  createRuntilmeCellBridgeTeardownExpression,
+  referencesRuntimeCellBridge,
+} from "./runtilme-cell-bridge";
 
 export interface NotebookOutputApi {
   NotebookCellOutput: typeof vscode.NotebookCellOutput;
@@ -28,6 +36,11 @@ export type GetActiveConnection = () => ActiveBrowserConnection | undefined;
 type EvaluationCompletion =
   | { kind: "result"; result: ExecutionResult }
   | { kind: "cancelled" };
+
+interface RuntilmeCellBridgeInitializationResult {
+  bridgeKey?: string;
+  bridgeAvailable: boolean;
+}
 
 export type ReportTransportError = (
   failure: ExecutionFailure,
@@ -103,8 +116,10 @@ export async function executeCell({
       await writeFailureOutput(
         execution,
         noSessionFailure,
+        [],
         runtime.notebookOutputApi,
         runtime.localize,
+        false,
       );
       endExecution(false);
       return false;
@@ -114,7 +129,7 @@ export async function executeCell({
     const sourceUri = cell.document.uri.toString();
     const explicitIsolation = readIsolationMetadata(cell.metadata);
     const isolate = explicitIsolation ?? runtime.getDefaultCellIsolation();
-    const expression = buildCellExpression(userCode, sourceUri, { isolate });
+    const usesRuntimeCellBridge = referencesRuntimeCellBridge(userCode);
     let resolveCancellationSignal: (() => void) | undefined;
     const cancellationSignal = new Promise<void>((resolve) => {
       resolveCancellationSignal = resolve;
@@ -126,21 +141,52 @@ export async function executeCell({
       resolveCancellationSignal?.();
     });
 
-    const evaluationPromise = evaluateCellExpression(connection, expression);
-    const completion: EvaluationCompletion = await Promise.race([
-      evaluationPromise.then(
-        (result): EvaluationCompletion => ({ kind: "result", result }),
-      ),
-      cancellationSignal.then(
-        (): EvaluationCompletion => ({ kind: "cancelled" }),
-      ),
-    ]);
-    cancellationListener.dispose();
+    let bridgeKey: string | undefined;
+    let completion: EvaluationCompletion;
+    try {
+      const evaluationFlow = (async (): Promise<EvaluationCompletion> => {
+        const needsRuntimeCellBridge = usesRuntimeCellBridge && isolate;
+
+        if (needsRuntimeCellBridge) {
+          const bridgeInitialization =
+            await initializeRuntilmeCellBridge(connection);
+          bridgeKey = bridgeInitialization.bridgeKey;
+
+          if (!bridgeInitialization.bridgeAvailable) {
+            return {
+              kind: "result",
+              result: getRuntimeCellBridgeUnavailableFailure(runtime.localize),
+            };
+          }
+        }
+
+        const expression = buildCellExpression(userCode, sourceUri, {
+          isolate,
+          runtimeCellBridgeKey: bridgeKey,
+        });
+
+        return {
+          kind: "result",
+          result: await evaluateCellExpression(connection, expression),
+        };
+      })();
+
+      completion = await Promise.race([
+        evaluationFlow,
+        cancellationSignal.then(
+          (): EvaluationCompletion => ({ kind: "cancelled" }),
+        ),
+      ]);
+    } finally {
+      cancellationListener.dispose();
+    }
 
     if (completion.kind === "cancelled") {
+      await collectIntentionalLogs(connection, bridgeKey);
       return true;
     }
 
+    const intentionalLogs = await collectIntentionalLogs(connection, bridgeKey);
     const result = completion.result;
 
     if (execution.token.isCancellationRequested) {
@@ -154,6 +200,7 @@ export async function executeCell({
       await writeSuccessOutput(
         execution,
         renderedValue,
+        intentionalLogs,
         runtime.notebookOutputApi,
         runtime.localize,
         isolate,
@@ -169,8 +216,10 @@ export async function executeCell({
     await writeFailureOutput(
       execution,
       result,
+      intentionalLogs,
       runtime.notebookOutputApi,
       runtime.localize,
+      isolate,
     );
     endExecution(false);
     return false;
@@ -243,27 +292,35 @@ function readIsolationMetadata(metadata: unknown): boolean | undefined {
 async function writeSuccessOutput(
   execution: vscode.NotebookCellExecution,
   value: string,
+  intentionalLogs: readonly string[],
   notebookOutputApi: NotebookOutputApi,
   localize: Localize,
   isIsolated: boolean,
 ): Promise<void> {
-  const outputs = isIsolated
-    ? [
-        new notebookOutputApi.NotebookCellOutput([
-          notebookOutputApi.NotebookCellOutputItem.text(
-            getIsolationAnnotationMessage(localize),
-            "text/plain",
-          ),
-        ]),
-        new notebookOutputApi.NotebookCellOutput([
-          notebookOutputApi.NotebookCellOutputItem.text(value, "text/plain"),
-        ]),
-      ]
-    : [
-        new notebookOutputApi.NotebookCellOutput([
-          notebookOutputApi.NotebookCellOutputItem.text(value, "text/plain"),
-        ]),
-      ];
+  const outputs: vscode.NotebookCellOutput[] = [];
+
+  if (isIsolated) {
+    outputs.push(
+      new notebookOutputApi.NotebookCellOutput([
+        notebookOutputApi.NotebookCellOutputItem.text(
+          getIsolationAnnotationMessage(localize),
+          "text/plain",
+        ),
+      ]),
+    );
+  }
+
+  outputs.push(
+    new notebookOutputApi.NotebookCellOutput([
+      notebookOutputApi.NotebookCellOutputItem.text(value, "text/plain"),
+    ]),
+  );
+
+  if (intentionalLogs.length > 0) {
+    outputs.push(
+      createIntentionalLogOutput(intentionalLogs, notebookOutputApi, localize),
+    );
+  }
 
   await execution.replaceOutput(outputs);
 }
@@ -271,27 +328,133 @@ async function writeSuccessOutput(
 async function writeFailureOutput(
   execution: vscode.NotebookCellExecution,
   failure: ExecutionFailure,
+  intentionalLogs: readonly string[],
   notebookOutputApi: NotebookOutputApi,
   localize: Localize,
+  isIsolated: boolean,
 ): Promise<void> {
+  const outputs: vscode.NotebookCellOutput[] = [];
+
+  if (isIsolated) {
+    outputs.push(
+      new notebookOutputApi.NotebookCellOutput([
+        notebookOutputApi.NotebookCellOutputItem.text(
+          getIsolationAnnotationMessage(localize),
+          "text/plain",
+        ),
+      ]),
+    );
+  }
+
   if (isInfrastructureFailure(failure.kind)) {
     const message = getKernelFailureCellOutputMessage(localize, failure.kind);
 
-    await execution.replaceOutput([
+    outputs.push(
       new notebookOutputApi.NotebookCellOutput([
         notebookOutputApi.NotebookCellOutputItem.text(message, "text/plain"),
       ]),
-    ]);
+    );
+
+    if (intentionalLogs.length > 0) {
+      outputs.push(
+        createIntentionalLogOutput(
+          intentionalLogs,
+          notebookOutputApi,
+          localize,
+        ),
+      );
+    }
+
+    await execution.replaceOutput(outputs);
     return;
   }
 
   const error = toErrorObject(failure);
 
-  await execution.replaceOutput([
+  outputs.push(
     new notebookOutputApi.NotebookCellOutput([
       notebookOutputApi.NotebookCellOutputItem.error(error),
     ]),
+  );
+
+  if (intentionalLogs.length > 0) {
+    outputs.push(
+      createIntentionalLogOutput(intentionalLogs, notebookOutputApi, localize),
+    );
+  }
+
+  await execution.replaceOutput(outputs);
+}
+
+function createIntentionalLogOutput(
+  intentionalLogs: readonly string[],
+  notebookOutputApi: NotebookOutputApi,
+  localize: Localize,
+): vscode.NotebookCellOutput {
+  const payload = [
+    getIntentionalLogSectionLabel(localize),
+    ...intentionalLogs,
+  ].join("\n");
+
+  return new notebookOutputApi.NotebookCellOutput([
+    notebookOutputApi.NotebookCellOutputItem.text(payload, "text/plain"),
   ]);
+}
+
+async function initializeRuntilmeCellBridge(
+  connection: ActiveBrowserConnection,
+): Promise<RuntilmeCellBridgeInitializationResult> {
+  const bridgeKey = createRuntilmeCellBridgeKey();
+
+  try {
+    const response = await connection.evaluate(
+      createRuntilmeCellBridgeSetupExpression(bridgeKey),
+    );
+
+    if (response.exceptionDetails) {
+      return {
+        bridgeAvailable: false,
+      };
+    }
+
+    return {
+      bridgeKey,
+      bridgeAvailable: true,
+    };
+  } catch {
+    // Continue without the runtime cell bridge when bootstrap cannot be installed.
+    return {
+      bridgeAvailable: false,
+    };
+  }
+}
+
+async function collectIntentionalLogs(
+  connection: ActiveBrowserConnection,
+  bridgeKey: string | undefined,
+): Promise<string[]> {
+  if (!bridgeKey) {
+    return [];
+  }
+
+  try {
+    const response = await connection.evaluate(
+      createRuntilmeCellBridgeTeardownExpression(bridgeKey),
+    );
+
+    if (response.exceptionDetails) {
+      return [];
+    }
+
+    const value = response.result.value;
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value.filter((entry): entry is string => typeof entry === "string");
+  } catch {
+    return [];
+  }
 }
 
 function toErrorObject(failure: ExecutionFailure): Error {
@@ -303,4 +466,15 @@ function toErrorObject(failure: ExecutionFailure): Error {
   }
 
   return error;
+}
+
+function getRuntimeCellBridgeUnavailableFailure(
+  localize: Localize,
+): ExecutionFailure {
+  return {
+    ok: false,
+    name: "RuntimeCellBridgeUnavailableError",
+    kind: "runtime-error",
+    message: getRuntimeCellBridgeUnavailableMessage(localize),
+  };
 }

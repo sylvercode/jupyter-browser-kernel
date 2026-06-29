@@ -1,5 +1,16 @@
 export interface BuildCellExpressionOptions {
   isolate: boolean;
+  runtimeCellBridgeKey?: string;
+}
+
+function buildRuntimeCellBridgePrefix(
+  runtimeCellBridgeKey: string | undefined,
+): string {
+  if (!runtimeCellBridgeKey) {
+    return "";
+  }
+
+  return `const $cell = globalThis[${JSON.stringify(runtimeCellBridgeKey)}].cellBridge; `;
 }
 
 export function buildCellExpression(
@@ -7,18 +18,23 @@ export function buildCellExpression(
   sourceUri: string,
   options: BuildCellExpressionOptions,
 ): string {
+  const runtimeCellBridgePrefix = buildRuntimeCellBridgePrefix(
+    options.runtimeCellBridgeKey,
+  );
+
   if (!options.isolate) {
-    return `${userCode}\n//# sourceURL=${sourceUri}\n`;
+    return `${runtimeCellBridgePrefix}${userCode}\n//# sourceURL=${sourceUri}\n`;
   }
 
   const isolationStart = "await (async()=>{";
   const isolationEnd = `})()\n//# sourceURL=${sourceUri}\n`;
+  const wrappedUserCode = `${runtimeCellBridgePrefix}${userCode}`;
 
-  if (userCode.length === 0) {
+  if (wrappedUserCode.length === 0) {
     return `${isolationStart}${isolationEnd}`;
   }
 
-  const lines = userCode.split("\n");
+  const lines = wrappedUserCode.split("\n");
 
   if (lines.length === 1) {
     const onlyLine = lines[0] ?? "";

@@ -115,6 +115,12 @@ function createFakeConnection(
   };
 }
 
+function collectUserExpressions(evaluateCalls: string[]): string[] {
+  return evaluateCalls.filter((expression) =>
+    expression.includes("//# sourceURL="),
+  );
+}
+
 test("executeCell evaluates expression and writes success output", async () => {
   const sourceUri =
     "vscode-notebook-cell://test-authority/workspaces/foundry-devil-code-sight/tests/files/test1.ipynb#ch0000000000001";
@@ -149,7 +155,8 @@ test("executeCell evaluates expression and writes success output", async () => {
     runtime,
   });
 
-  assert.deepEqual(evaluateCalls, [`2 + 2\n//# sourceURL=${sourceUri}\n`]);
+  const userExpressions = collectUserExpressions(evaluateCalls);
+  assert.deepEqual(userExpressions, [`2 + 2\n//# sourceURL=${sourceUri}\n`]);
   assert.equal(notebookExecution.executionOrder, 7);
   assert.equal(execution.success, true);
   assert.equal(execution.outputs.length, 1);
@@ -256,6 +263,93 @@ test("executeCell terminates runtime evaluation when cancellation is requested",
   assert.equal(terminateCalls, 1);
   assert.equal(execution.success, false);
   assert.equal(execution.outputs.length, 0);
+});
+
+test("executeCell tears down runtime cell bridge state after cancellation", async () => {
+  let releaseEvaluation: (() => void) | undefined;
+  const continueEvaluation = new Promise<void>((resolve) => {
+    releaseEvaluation = resolve;
+  });
+  let markEvaluationStarted: (() => void) | undefined;
+  const evaluationStarted = new Promise<void>((resolve) => {
+    markEvaluationStarted = resolve;
+  });
+  const evaluateCalls: string[] = [];
+
+  let terminateCalls = 0;
+  const connection = {
+    ...createFakeConnection(async (expression) => {
+      evaluateCalls.push(expression);
+      if (evaluateCalls.length === 1) {
+        return {
+          result: {
+            type: "string",
+            value: "ignored-setup-result",
+          },
+        } as never;
+      }
+
+      if (evaluateCalls.length === 2) {
+        markEvaluationStarted?.();
+        await continueEvaluation;
+        return {
+          result: {
+            type: "number",
+            value: 99,
+          },
+        } as never;
+      }
+
+      return {
+        result: {
+          type: "object",
+          subtype: "array",
+          value: [],
+        },
+      } as never;
+    }),
+    terminateExecution: async () => {
+      terminateCalls += 1;
+    },
+  } satisfies ActiveBrowserConnection;
+
+  const { execution, notebookExecution, cancel } = createExecutionRecorder();
+
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  const runPromise = executeCell({
+    cell: createFakeCell("$cell.log('first'); 1", undefined, {
+      jupyterBrowserKernel: { isolated: true },
+    }) as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 10,
+    runtime,
+  });
+
+  await evaluationStarted;
+  cancel();
+
+  const wasCancelled = await runPromise;
+  releaseEvaluation?.();
+
+  assert.equal(wasCancelled, true);
+  assert.equal(terminateCalls, 1);
+  assert.equal(execution.success, false);
+  assert.equal(execution.outputs.length, 0);
+  assert.equal(evaluateCalls.length, 3);
+  assert.equal(
+    evaluateCalls[2]?.includes("delete globalScope[bridgeKey];"),
+    true,
+  );
 });
 
 test("executeCell writes structured error output for runtime exception", async () => {
@@ -650,9 +744,10 @@ test("executeCell keeps sourceURL bytes stable across reruns of the same cell", 
     runtime,
   });
 
-  assert.equal(evaluateCalls.length, 2);
-  assert.equal(evaluateCalls[0], evaluateCalls[1]);
-  assert.match(String(evaluateCalls[0]), new RegExp(`${sourceUri}\\n$`));
+  const userExpressions = collectUserExpressions(evaluateCalls);
+  assert.equal(userExpressions.length, 2);
+  assert.equal(userExpressions[0], userExpressions[1]);
+  assert.match(String(userExpressions[0]), new RegExp(`${sourceUri}\\n$`));
 });
 
 test("executeCell assigns unique sourceURL bytes for distinct cell URIs", async () => {
@@ -699,10 +794,11 @@ test("executeCell assigns unique sourceURL bytes for distinct cell URIs", async 
     runtime,
   });
 
-  assert.equal(evaluateCalls.length, 2);
-  assert.notEqual(evaluateCalls[0], evaluateCalls[1]);
-  assert.match(String(evaluateCalls[0]), new RegExp(`sourceURL=${uriA}`));
-  assert.match(String(evaluateCalls[1]), new RegExp(`sourceURL=${uriB}`));
+  const userExpressions = collectUserExpressions(evaluateCalls);
+  assert.equal(userExpressions.length, 2);
+  assert.notEqual(userExpressions[0], userExpressions[1]);
+  assert.match(String(userExpressions[0]), new RegExp(`sourceURL=${uriA}`));
+  assert.match(String(userExpressions[1]), new RegExp(`sourceURL=${uriB}`));
 });
 
 test("executeCell routes metadata cases to wrapper only when isolated is boolean true", async () => {
@@ -744,12 +840,13 @@ test("executeCell routes metadata cases to wrapper only when isolated is boolean
     });
   }
 
-  assert.equal(evaluateCalls.length, 5);
-  assert.equal(evaluateCalls[0]?.startsWith("(async()=>{"), false);
-  assert.equal(evaluateCalls[1]?.startsWith("(async()=>{"), false);
-  assert.equal(evaluateCalls[2]?.startsWith("(async()=>{"), false);
-  assert.equal(evaluateCalls[3]?.startsWith("(async()=>{"), false);
-  assert.equal(evaluateCalls[4]?.startsWith("await (async()=>{"), true);
+  const userExpressions = collectUserExpressions(evaluateCalls);
+  assert.equal(userExpressions.length, 5);
+  assert.equal(userExpressions[0]?.startsWith("(async()=>{"), false);
+  assert.equal(userExpressions[1]?.startsWith("(async()=>{"), false);
+  assert.equal(userExpressions[2]?.startsWith("(async()=>{"), false);
+  assert.equal(userExpressions[3]?.startsWith("(async()=>{"), false);
+  assert.equal(userExpressions[4]?.startsWith("await (async()=>{"), true);
 });
 
 test("executeCell uses workspace default isolation when metadata is absent", async () => {
@@ -784,8 +881,9 @@ test("executeCell uses workspace default isolation when metadata is absent", asy
     runtime,
   });
 
-  assert.equal(evaluateCalls.length, 1);
-  assert.equal(evaluateCalls[0]?.startsWith("await (async()=>{"), true);
+  const userExpressions = collectUserExpressions(evaluateCalls);
+  assert.equal(userExpressions.length, 1);
+  assert.equal(userExpressions[0]?.startsWith("await (async()=>{"), true);
 });
 
 test("executeCell explicit metadata overrides workspace default isolation", async () => {
@@ -836,9 +934,326 @@ test("executeCell explicit metadata overrides workspace default isolation", asyn
     runtime,
   });
 
-  assert.equal(evaluateCalls.length, 2);
-  assert.equal(evaluateCalls[0]?.startsWith("(async()=>{"), false);
-  assert.equal(evaluateCalls[1]?.startsWith("await (async()=>{"), true);
+  const userExpressions = collectUserExpressions(evaluateCalls);
+  assert.equal(userExpressions.length, 2);
+  assert.equal(userExpressions[0]?.startsWith("(async()=>{"), false);
+  assert.equal(userExpressions[1]?.startsWith("await (async()=>{"), true);
+});
+
+test("executeCell appends intentional log section for single bridge call", async () => {
+  let callIndex = 0;
+  const connection = createFakeConnection(async (_expression) => {
+    callIndex += 1;
+    if (callIndex === 1) {
+      return {
+        result: {
+          type: "string",
+          value: "__jbkRuntilmeCellBridge:test-1",
+        },
+      } as never;
+    }
+
+    if (callIndex === 3) {
+      return {
+        result: {
+          type: "object",
+          subtype: "array",
+          value: ["first log"],
+        },
+      } as never;
+    }
+
+    return {
+      result: {
+        type: "number",
+        value: 4,
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell("$cell.log('first log'); 2 + 2", undefined, {
+      jupyterBrowserKernel: { isolated: true },
+    }) as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 300,
+    runtime,
+  });
+
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 3);
+  assert.equal(execution.outputs[1]?.items[0]?.value, "4");
+  assert.equal(
+    execution.outputs[2]?.items[0]?.value,
+    "Intentional logs:\nfirst log",
+  );
+});
+
+test("executeCell preserves bridge-call order in intentional log section", async () => {
+  let callIndex = 0;
+  const connection = createFakeConnection(async (_expression) => {
+    callIndex += 1;
+    if (callIndex === 1) {
+      return {
+        result: {
+          type: "string",
+          value: "__jbkRuntilmeCellBridge:test-2",
+        },
+      } as never;
+    }
+
+    if (callIndex === 3) {
+      return {
+        result: {
+          type: "object",
+          subtype: "array",
+          value: ["first", "second", "third"],
+        },
+      } as never;
+    }
+
+    return {
+      result: {
+        type: "number",
+        value: 1,
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell(
+      "$cell.log('first'); $cell.log('second'); $cell.log('third'); 1",
+      undefined,
+      {
+        jupyterBrowserKernel: { isolated: true },
+      },
+    ) as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 301,
+    runtime,
+  });
+
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 3);
+  assert.equal(execution.outputs[1]?.items[0]?.value, "1");
+  assert.equal(
+    execution.outputs[2]?.items[0]?.value,
+    "Intentional logs:\nfirst\nsecond\nthird",
+  );
+});
+
+test("executeCell keeps success output unchanged when no bridge call occurs", async () => {
+  const connection = createFakeConnection(async () => {
+    return {
+      result: {
+        type: "number",
+        value: 8,
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell("4 + 4") as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 302,
+    runtime,
+  });
+
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 1);
+  assert.equal(execution.outputs[0]?.items[0]?.value, "8");
+});
+
+test("executeCell returns runtime error when $cell is used outside isolated mode", async () => {
+  const connection = createFakeConnection(async () => {
+    return {
+      result: {
+        type: "undefined",
+      },
+      exceptionDetails: {
+        text: "Uncaught ReferenceError: $cell is not defined",
+        exception: {
+          className: "ReferenceError",
+          description:
+            "ReferenceError: $cell is not defined\n    at <anonymous>:1:1",
+        },
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell("$cell.log('first log'); 2 + 2", undefined, {
+      jupyterBrowserKernel: { isolated: false },
+    }) as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 302,
+    runtime,
+  });
+
+  assert.equal(execution.success, false);
+  assert.equal(execution.outputs.length, 1);
+  assert.equal(execution.outputs[0]?.items[0]?.kind, "error");
+
+  const renderedError = execution.outputs[0]?.items[0]?.value;
+  assert.ok(renderedError instanceof Error);
+  assert.equal(renderedError.name, "ReferenceError");
+  assert.equal(renderedError.message, "$cell is not defined");
+});
+
+test("executeCell reports bridge-unavailable failure when isolated $cell setup throws", async () => {
+  let callIndex = 0;
+  const connection = createFakeConnection(async () => {
+    callIndex += 1;
+    if (callIndex === 1) {
+      throw new Error("setup failed");
+    }
+
+    return {
+      result: {
+        type: "number",
+        value: 4,
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell("$cell.log('first log'); 2 + 2", undefined, {
+      jupyterBrowserKernel: { isolated: true },
+    }) as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 303,
+    runtime,
+  });
+
+  assert.equal(execution.success, false);
+  assert.equal(callIndex, 1);
+  assert.equal(execution.outputs.length, 2);
+  assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
+  assert.equal(execution.outputs[0]?.items[0]?.value, "(isolated cell)");
+  assert.equal(execution.outputs[1]?.items[0]?.kind, "error");
+
+  const renderedError = execution.outputs[1]?.items[0]?.value;
+  assert.ok(renderedError instanceof Error);
+  assert.equal(
+    renderedError.message,
+    "Runtime cell bridge is unavailable for this cell run. Start a new Browser Kernel debug session and run the cell again.",
+  );
+});
+
+test("executeCell treats isolated setup exceptionDetails as bridge-unavailable failure when $cell is requested", async () => {
+  let callIndex = 0;
+  const connection = createFakeConnection(async () => {
+    callIndex += 1;
+    if (callIndex === 1) {
+      return {
+        result: {
+          type: "undefined",
+        },
+        exceptionDetails: {
+          text: "Uncaught Error: setup exploded",
+          exception: {
+            className: "Error",
+            description: "Error: setup exploded\n    at <anonymous>:1:1",
+          },
+        },
+      } as never;
+    }
+
+    return {
+      result: {
+        type: "number",
+        value: 4,
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell("$cell.log('first log'); 2 + 2", undefined, {
+      jupyterBrowserKernel: { isolated: true },
+    }) as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 304,
+    runtime,
+  });
+
+  assert.equal(execution.success, false);
+  assert.equal(callIndex, 1);
+  assert.equal(execution.outputs.length, 2);
+  assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
+  assert.equal(execution.outputs[0]?.items[0]?.value, "(isolated cell)");
+  assert.equal(execution.outputs[1]?.items[0]?.kind, "error");
 });
 
 test("executeCell prepends isolated annotation as a separate rendered output", async () => {
@@ -882,7 +1297,7 @@ test("executeCell prepends isolated annotation as a separate rendered output", a
   assert.equal(execution.outputs[1]?.items[0]?.value, "7");
 });
 
-test("executeCell does not prepend isolated annotation for failure outputs", async () => {
+test("executeCell prepends isolated annotation for failure outputs", async () => {
   const connection = createFakeConnection(async () => {
     return {
       result: {
@@ -920,9 +1335,86 @@ test("executeCell does not prepend isolated annotation for failure outputs", asy
   });
 
   assert.equal(execution.success, false);
-  assert.equal(execution.outputs.length, 1);
+  assert.equal(execution.outputs.length, 2);
   assert.equal(execution.outputs[0]?.items.length, 1);
-  assert.equal(execution.outputs[0]?.items[0]?.kind, "error");
+  assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
+  assert.equal(execution.outputs[0]?.items[0]?.value, "(isolated cell)");
+  assert.equal(execution.outputs[1]?.items.length, 1);
+  assert.equal(execution.outputs[1]?.items[0]?.kind, "error");
+});
+
+test("executeCell keeps logs after error output for isolated failures", async () => {
+  let callIndex = 0;
+  const connection = createFakeConnection(async () => {
+    callIndex += 1;
+    if (callIndex === 1) {
+      return {
+        result: {
+          type: "string",
+          value: "__jbkRuntilmeCellBridge:test-logs-after-error",
+        },
+      } as never;
+    }
+
+    if (callIndex === 3) {
+      return {
+        result: {
+          type: "object",
+          subtype: "array",
+          value: ["before boom"],
+        },
+      } as never;
+    }
+
+    return {
+      result: {
+        type: "undefined",
+      },
+      exceptionDetails: {
+        text: "Uncaught TypeError: boom",
+        exception: {
+          className: "TypeError",
+          description: "TypeError: boom\n    at <anonymous>:1:1",
+        },
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell(
+      "$cell.log('before boom'); throw new TypeError('boom')",
+      DEFAULT_FAKE_CELL_URI,
+      {
+        jupyterBrowserKernel: { isolated: true },
+      },
+    ) as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 32,
+    runtime,
+  });
+
+  assert.equal(execution.success, false);
+  assert.equal(execution.outputs.length, 3);
+  assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
+  assert.equal(execution.outputs[0]?.items[0]?.value, "(isolated cell)");
+  assert.equal(execution.outputs[1]?.items[0]?.kind, "error");
+  assert.equal(execution.outputs[2]?.items[0]?.kind, "text");
+  assert.equal(
+    execution.outputs[2]?.items[0]?.value,
+    "Intentional logs:\nbefore boom",
+  );
 });
 
 test("executeCell kernel path never invokes Debugger APIs (passive provider)", async () => {
