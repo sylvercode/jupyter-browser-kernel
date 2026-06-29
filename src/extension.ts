@@ -80,6 +80,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const kernelController = registerKernelController(vscode, {
     onTransportError: reportKernelTransportFailure,
+    onIntentionalOutputLine: (line) => {
+      outputChannel.appendLine(line);
+    },
     getDefaultCellIsolation,
   });
   context.subscriptions.push(kernelController);

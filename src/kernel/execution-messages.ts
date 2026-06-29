@@ -77,7 +77,18 @@ export function getKernelFailureCategoryLabel(
 }
 
 export function getIntentionalLogSectionLabel(localize: Localize): string {
-  return localize("Intentional logs:");
+  return localize("Cell logs:");
+}
+
+export function formatIntentionalOutputEntry(
+  localize: Localize,
+  entry: string,
+): string {
+  if (entry.length === 0) {
+    return localize("JBK:");
+  }
+
+  return localize("JBK: {0}", entry);
 }
 
 export function getRuntimeCellBridgeUnavailableMessage(

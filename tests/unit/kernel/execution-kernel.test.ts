@@ -1040,10 +1040,7 @@ test("executeCell appends intentional log section for single bridge call", async
   assert.equal(execution.success, true);
   assert.equal(execution.outputs.length, 2);
   assert.equal(execution.outputs[0]?.items[0]?.value, "4");
-  assert.equal(
-    execution.outputs[1]?.items[0]?.value,
-    "Intentional logs:\nfirst log",
-  );
+  assert.equal(execution.outputs[1]?.items[0]?.value, "Cell logs:\nfirst log");
 });
 
 test("executeCell preserves bridge-call order in intentional log section", async () => {
@@ -1107,8 +1104,119 @@ test("executeCell preserves bridge-call order in intentional log section", async
   assert.equal(execution.outputs[0]?.items[0]?.value, "1");
   assert.equal(
     execution.outputs[1]?.items[0]?.value,
-    "Intentional logs:\nfirst\nsecond\nthird",
+    "Cell logs:\nfirst\nsecond\nthird",
   );
+});
+
+test("executeCell keeps notebook intentional logs plain and mirrors intentional entries with JBK prefix", async () => {
+  let callIndex = 0;
+  const connection = createFakeConnection(async (_expression) => {
+    callIndex += 1;
+    if (callIndex === 1) {
+      return {
+        result: {
+          type: "string",
+          value: "__jbkRuntilmeCellBridge:test-prefixed-logs",
+        },
+      } as never;
+    }
+
+    if (callIndex === 3) {
+      return {
+        result: {
+          type: "object",
+          subtype: "array",
+          value: ["first", "second"],
+        },
+      } as never;
+    }
+
+    return {
+      result: {
+        type: "number",
+        value: 11,
+      },
+    } as never;
+  });
+
+  const mirroredIntentionalLines: string[] = [];
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+    undefined,
+    undefined,
+    (line) => {
+      mirroredIntentionalLines.push(line);
+    },
+  );
+
+  await executeCell({
+    cell: createFakeCell(
+      "$cell.log('first'); $cell.log('second'); 5 + 6",
+      undefined,
+      {
+        jupyterBrowserKernel: { isolated: true },
+      },
+    ) as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 301,
+    runtime,
+  });
+
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 2);
+  assert.equal(
+    execution.outputs[1]?.items[0]?.value,
+    "Cell logs:\nfirst\nsecond",
+  );
+  assert.deepEqual(mirroredIntentionalLines, ["JBK: first", "JBK: second"]);
+});
+
+test("executeCell does not mirror output-channel lines when no intentional logs were emitted", async () => {
+  const connection = createFakeConnection(async () => {
+    return {
+      result: {
+        type: "number",
+        value: 8,
+      },
+    } as never;
+  });
+
+  const mirroredIntentionalLines: string[] = [];
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+    undefined,
+    undefined,
+    (line) => {
+      mirroredIntentionalLines.push(line);
+    },
+  );
+
+  await executeCell({
+    cell: createFakeCell("4 + 4") as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 302,
+    runtime,
+  });
+
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 1);
+  assert.deepEqual(mirroredIntentionalLines, []);
 });
 
 test("executeCell keeps success output unchanged when no bridge call occurs", async () => {
@@ -1446,7 +1554,7 @@ test("executeCell keeps logs after error output for isolated failures", async ()
   assert.equal(execution.outputs[1]?.items[0]?.kind, "text");
   assert.equal(
     execution.outputs[1]?.items[0]?.value,
-    "Intentional logs:\nbefore boom",
+    "Cell logs:\nbefore boom",
   );
 });
 
