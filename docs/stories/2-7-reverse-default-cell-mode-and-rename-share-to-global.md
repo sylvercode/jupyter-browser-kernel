@@ -2,7 +2,7 @@
 storyId: "2.7"
 storyKey: "2-7-reverse-default-cell-mode-and-rename-share-to-global"
 title: "Reverse Default Cell Mode and Rename Shared Mode to Global"
-status: "draft"
+status: "ready-for-dev"
 created: "2026-06-29"
 epic: "2"
 priority: "p0"
@@ -10,27 +10,38 @@ priority: "p0"
 
 # Story 2.7: Reverse Default Cell Mode and Rename Shared Mode to Global
 
-This story supersedes [Story 2.6: Configure Default Cell Isolation](./2-6-configure-default-cell-isolation.md) and replaces its shared-by-default model with the new global-by-default model.
+This story supersedes [Story 2.6: Configure Default Cell Isolation](./2-6-configure-default-cell-isolation.md) and retires its shared-by-default framing in favor of an isolated-by-default model when a cell has no explicit isolation metadata.
 
 ## Story
 
 As a developer,
-I want the default JavaScript cell execution mode to be global instead of isolated,
-and I want the shared mode renamed to Global mode,
-So that the execution model matches the new product direction and the UI makes the mode boundary obvious.
+I want JavaScript cells with no explicit `jupyterBrowserKernel.isolated` metadata to run in isolated mode by default,
+and I want the UI label for the shared mode to be Global mode,
+So that the execution contract and the user-facing naming match the new product direction.
+
+I also want the default-mode setting to remain available as a documented choice list, framed around Global mode, so users can explicitly choose whether isolated mode or Global mode is the default and read the explanation for each choice.
 
 ## Acceptance Criteria
 
-### AC 1: Global Mode Becomes the Default Execution Mode
+### AC 1: Isolated Mode Becomes the Default Execution Mode
 
-**Given** a JavaScript notebook cell with no explicit isolation metadata
+**Given** a JavaScript notebook cell with no explicit `jupyterBrowserKernel.isolated` metadata
 **When** the cell runs
-**Then** the cell executes in the global context of the browser by default
-**And** the default behavior does not isolate the cell unless the user explicitly opts in.
+**Then** the cell executes in isolated mode by default
+**And** the default behavior does not share cell state unless the user explicitly opts in.
+
+### AC 1b: The Default-Mode Setting Remains as a Documented Choice List
+
+**Given** the extension settings are displayed
+**When** I inspect the default-mode setting
+**Then** the setting still exists as a documented choice list for the cell default mode
+**And** the available choices are Isolated mode and Global mode
+**And** each choice includes a short description that explains its execution behavior
+**And** the selected choice determines the default mode for cells without explicit isolation metadata.
 
 ### AC 2: Global Mode Uses the New Label and Icon
 
-**Given** a cell that is running in the non-isolated default mode
+**Given** a cell that is running in the shared Global-mode variant
 **When** the toolbar or context menu renders
 **Then** the mode is labeled `Global mode`
 **And** the mode uses the `window` icon.
@@ -47,8 +58,7 @@ So that the execution model matches the new product direction and the UI makes t
 **Given** an isolated cell runs successfully
 **When** its output renders
 **Then** the previous `(isolated cell)` annotation does not appear
-**And** no replacement annotation is added for Global mode
-**And** the status icon is the source of truth for the current mode.
+**And** no replacement annotation is added for Global mode.
 
 ### AC 5: Global Mode Does Not Expose the `$cell` Bridge
 
@@ -92,7 +102,8 @@ So that the execution model matches the new product direction and the UI makes t
 
 **Given** the product-direction change is approved
 **When** the story is implemented
-**Then** the docs explain that Global mode is the default
+**Then** the docs explain that isolated mode is the default
+**And** the docs explain that the default-mode setting remains available and is framed around Global mode
 **And** the docs explain the `$cell` availability rules and return behavior for both modes
 **And** the affected tests are updated to cover the renamed mode, icon changes, removed annotation, and default-mode reversal.
 
@@ -100,7 +111,7 @@ So that the execution model matches the new product direction and the UI makes t
 
 ### 1. Update the Cell-Mode UI Contract
 
-- [ ] Rename the current shared mode label to `Global mode` in all user-facing surfaces.
+- [ ] Rename the current shared mode label to `Global mode` in the cell toolbar, context menu, and any other user-facing isolation surface.
 - [ ] Set the Global mode icon to `window`.
 - [ ] Set the isolated mode icon to `package`.
 - [ ] Remove the `(isolated cell)` annotation from isolated execution output.
@@ -108,7 +119,7 @@ So that the execution model matches the new product direction and the UI makes t
 
 ### 2. Reverse the Default Execution Mode
 
-- [ ] Change the default isolation resolution so cells run in Global mode unless explicitly isolated.
+- [ ] Change the default isolation resolution so cells run in isolated mode unless explicitly switched to Global mode.
 - [ ] Keep the explicit isolated state available as an opt-in mode.
 - [ ] Update the execution path so Global mode does not expose `$cell`.
 - [ ] Update the execution path so Global mode does not synthesize a final `return`.
@@ -124,6 +135,7 @@ So that the execution model matches the new product direction and the UI makes t
 ### 4. Update Documentation
 
 - [ ] Update story or reference docs that describe the default execution model.
+- [ ] Update the setting copy so the default-mode preference is presented as a documented choice list with explicit Global and isolated mode descriptions.
 - [ ] Document that Global mode is default, has no `$cell` bridge, and does not synthesize a final return.
 - [ ] Document that isolated mode keeps `$cell` and requires an explicit `return` to produce a value.
 
@@ -143,7 +155,8 @@ This story is a product-direction reversal of the current cell-mode model. It su
 
 ### Locked Direction
 
-- Global mode is the default execution mode.
+- Isolated mode is the default execution mode when a cell has no explicit `jupyterBrowserKernel.isolated` metadata.
+- The default-mode setting remains available as a documented choice list with Global and isolated mode descriptions.
 - The shared-mode label is renamed to Global mode.
 - Global mode uses the `window` icon.
 - Isolated mode uses the `package` icon.
