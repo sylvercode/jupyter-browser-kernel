@@ -82,8 +82,8 @@
         "title": "%command.toggleCellIsolation.isolate.label%"
       },
       {
-        "command": "jupyterBrowserKernel.toggleCellIsolation.share",
-        "title": "%command.toggleCellIsolation.share.label%"
+        "command": "jupyterBrowserKernel.toggleCellIsolation.global",
+        "title": "%command.toggleCellIsolation.global.label%"
       },
       {
         "command": "jupyterBrowserKernel.useDefaultCellIsolation",
@@ -97,7 +97,7 @@
           "when": "false"
         },
         {
-          "command": "jupyterBrowserKernel.toggleCellIsolation.share",
+          "command": "jupyterBrowserKernel.toggleCellIsolation.global",
           "when": "false"
         },
         {
@@ -112,8 +112,8 @@
           "group": "navigation@50"
         },
         {
-          "command": "jupyterBrowserKernel.toggleCellIsolation.share",
-          "when": "notebookType == 'jupyter-notebook' && notebookCellType == 'code' && jupyterBrowserKernel.activeNotebookUsesBrowserKernel && jupyterBrowserKernel.activeCellIsolationState != 'shared'",
+          "command": "jupyterBrowserKernel.toggleCellIsolation.global",
+          "when": "notebookType == 'jupyter-notebook' && notebookCellType == 'code' && jupyterBrowserKernel.activeNotebookUsesBrowserKernel && jupyterBrowserKernel.activeCellIsolationState != 'global'",
           "group": "navigation@50"
         },
         {
@@ -129,8 +129,8 @@
           "group": "z_commands@50"
         },
         {
-          "command": "jupyterBrowserKernel.toggleCellIsolation.share",
-          "when": "notebookType == 'jupyter-notebook' && notebookCellType == 'code' && jupyterBrowserKernel.activeNotebookUsesBrowserKernel && jupyterBrowserKernel.activeCellIsolationState != 'shared'",
+          "command": "jupyterBrowserKernel.toggleCellIsolation.global",
+          "when": "notebookType == 'jupyter-notebook' && notebookCellType == 'code' && jupyterBrowserKernel.activeNotebookUsesBrowserKernel && jupyterBrowserKernel.activeCellIsolationState != 'global'",
           "group": "z_commands@50"
         },
         {
@@ -164,8 +164,20 @@
           "description": "%configuration.watchAutoRefreshInterval.description%"
         },
         "jupyterBrowserKernel.defaultCellIsolation": {
-          "type": "boolean",
-          "default": false,
+          "type": "string",
+          "default": "isolated",
+          "enum": [
+            "isolated",
+            "global"
+          ],
+          "enumItemLabels": [
+            "%configuration.defaultCellIsolation.enum.isolated.label%",
+            "%configuration.defaultCellIsolation.enum.global.label%"
+          ],
+          "markdownEnumDescriptions": [
+            "%configuration.defaultCellIsolation.enum.isolated.description%",
+            "%configuration.defaultCellIsolation.enum.global.description%"
+          ],
           "description": "%configuration.defaultCellIsolation.description%",
           "markdownDescription": "%configuration.defaultCellIsolation.markdownDescription%"
         }

@@ -15,7 +15,6 @@ import {
   getKernelFailureCellOutputMessage,
   getRuntimeCellBridgeUnavailableMessage,
   getIntentionalLogSectionLabel,
-  getIsolationAnnotationMessage,
   getNoActiveSessionMessage,
 } from "./execution-messages";
 import { buildCellExpression } from "./build-cell-expression";
@@ -71,7 +70,7 @@ export function createKernelRuntime(
   notebookOutputApi: NotebookOutputApi,
   localize: Localize,
   getActiveConnection: GetActiveConnection = getActiveBrowserConnection,
-  getDefaultCellIsolation: () => boolean = () => false,
+  getDefaultCellIsolation: () => boolean = () => true,
   reportTransportError?: ReportTransportError,
 ): KernelRuntime {
   return {
@@ -119,7 +118,6 @@ export async function executeCell({
         [],
         runtime.notebookOutputApi,
         runtime.localize,
-        false,
       );
       endExecution(false);
       return false;
@@ -203,7 +201,6 @@ export async function executeCell({
         intentionalLogs,
         runtime.notebookOutputApi,
         runtime.localize,
-        isolate,
       );
       endExecution(true);
       return false;
@@ -219,7 +216,6 @@ export async function executeCell({
       intentionalLogs,
       runtime.notebookOutputApi,
       runtime.localize,
-      isolate,
     );
     endExecution(false);
     return false;
@@ -295,20 +291,8 @@ async function writeSuccessOutput(
   intentionalLogs: readonly string[],
   notebookOutputApi: NotebookOutputApi,
   localize: Localize,
-  isIsolated: boolean,
 ): Promise<void> {
   const outputs: vscode.NotebookCellOutput[] = [];
-
-  if (isIsolated) {
-    outputs.push(
-      new notebookOutputApi.NotebookCellOutput([
-        notebookOutputApi.NotebookCellOutputItem.text(
-          getIsolationAnnotationMessage(localize),
-          "text/plain",
-        ),
-      ]),
-    );
-  }
 
   outputs.push(
     new notebookOutputApi.NotebookCellOutput([
@@ -331,20 +315,8 @@ async function writeFailureOutput(
   intentionalLogs: readonly string[],
   notebookOutputApi: NotebookOutputApi,
   localize: Localize,
-  isIsolated: boolean,
 ): Promise<void> {
   const outputs: vscode.NotebookCellOutput[] = [];
-
-  if (isIsolated) {
-    outputs.push(
-      new notebookOutputApi.NotebookCellOutput([
-        notebookOutputApi.NotebookCellOutputItem.text(
-          getIsolationAnnotationMessage(localize),
-          "text/plain",
-        ),
-      ]),
-    );
-  }
 
   if (isInfrastructureFailure(failure.kind)) {
     const message = getKernelFailureCellOutputMessage(localize, failure.kind);

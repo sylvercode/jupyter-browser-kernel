@@ -2,8 +2,8 @@
   "extension.displayName": "Jupyter Browser Kernel",
   "extension.description": "Connect to a running Browser instance via CDP for variable watching, JS scratchpad execution, and log streaming.",
   "command.toggleCellIsolation.title": "Jupyter Browser Kernel: Toggle Cell Isolation",
-  "command.toggleCellIsolation.isolate.label": "Isolate Cell",
-  "command.toggleCellIsolation.share.label": "Share Cell State",
+  "command.toggleCellIsolation.isolate.label": "Isolated mode",
+  "command.toggleCellIsolation.global.label": "Global mode",
   "command.useDefaultCellIsolation.label": "Use Default Cell Isolation",
   "debugger.jupyterBrowserKernel.label": "Jupyter Browser Kernel",
   "debugger.jupyterBrowserKernel.launch.label": "Browser Kernel Debug",
@@ -18,5 +18,9 @@
   "configuration.cdpPort.markdownDescription": "TCP port for the Browser CDP endpoint. Used as a fallback default for debug launch configurations that omit the `port` attribute. Set a whole number from `1` to `65535`.",
   "configuration.watchAutoRefreshInterval.description": "Auto-refresh interval in ms for the variable watcher. 0 = disabled.",
   "configuration.defaultCellIsolation.description": "Default execution mode for JavaScript cells that do not explicitly set jupyterBrowserKernel.isolated metadata.",
-  "configuration.defaultCellIsolation.markdownDescription": "Default execution mode for JavaScript cells that do not explicitly set `jupyterBrowserKernel.isolated` metadata. When `true`, cells run isolated by default. When `false` (the default), cells share a persistent scope. Per-cell metadata always overrides this setting."
+  "configuration.defaultCellIsolation.markdownDescription": "Choose the default execution mode for JavaScript cells that do not explicitly set `jupyterBrowserKernel.isolated` metadata. **Isolated mode** (default) runs each cell in an isolated wrapper and supports the `$cell` bridge. **Global mode** runs in the page's shared global scope, does not expose `$cell`, and does not synthesize a final return value. Per-cell metadata always overrides this setting.",
+  "configuration.defaultCellIsolation.enum.isolated.label": "Isolated mode",
+  "configuration.defaultCellIsolation.enum.global.label": "Global mode",
+  "configuration.defaultCellIsolation.enum.isolated.description": "Run cells in isolated mode by default. The cell bridge is available and values require explicit return.",
+  "configuration.defaultCellIsolation.enum.global.description": "Run cells in global mode by default. No $cell bridge is injected and normal global execution semantics apply."
 }

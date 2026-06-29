@@ -156,7 +156,9 @@ test("executeCell evaluates expression and writes success output", async () => {
   });
 
   const userExpressions = collectUserExpressions(evaluateCalls);
-  assert.deepEqual(userExpressions, [`2 + 2\n//# sourceURL=${sourceUri}\n`]);
+  assert.deepEqual(userExpressions, [
+    `await (async()=>{2 + 2})()\n//# sourceURL=${sourceUri}\n`,
+  ]);
   assert.equal(notebookExecution.executionOrder, 7);
   assert.equal(execution.success, true);
   assert.equal(execution.outputs.length, 1);
@@ -164,6 +166,49 @@ test("executeCell evaluates expression and writes success output", async () => {
   assert.equal(execution.outputs[0]?.items[0]?.value, "4");
   // Success output remains plain text with text/plain MIME.
   assert.equal(execution.outputs[0]?.items[0]?.mime, "text/plain");
+});
+
+test("executeCell uses global mode when getDefaultCellIsolation returns false (backward-compat boolean false path)", async () => {
+  const sourceUri =
+    "vscode-notebook-cell://test-authority/workspaces/foundry-devil-code-sight/tests/files/test1.ipynb#ch0000000000001";
+  const evaluateCalls: string[] = [];
+  const connection = createFakeConnection(async (expression) => {
+    evaluateCalls.push(expression);
+    return {
+      result: {
+        type: "number",
+        value: 9,
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+    () => false, // simulate old boolean false setting → global mode
+  );
+
+  await executeCell({
+    cell: createFakeCell("3 + 3", sourceUri) as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 8,
+    runtime,
+  });
+
+  const userExpressions = collectUserExpressions(evaluateCalls);
+  // Global mode must not wrap the expression in an isolated async IIFE.
+  assert.deepEqual(userExpressions, [`3 + 3\n//# sourceURL=${sourceUri}\n`]);
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 1);
+  assert.equal(execution.outputs[0]?.items[0]?.value, "9");
 });
 
 test("executeCell exits before evaluation when cancellation was already requested", async () => {
@@ -842,10 +887,10 @@ test("executeCell routes metadata cases to wrapper only when isolated is boolean
 
   const userExpressions = collectUserExpressions(evaluateCalls);
   assert.equal(userExpressions.length, 5);
-  assert.equal(userExpressions[0]?.startsWith("(async()=>{"), false);
-  assert.equal(userExpressions[1]?.startsWith("(async()=>{"), false);
+  assert.equal(userExpressions[0]?.startsWith("await (async()=>{"), true);
+  assert.equal(userExpressions[1]?.startsWith("await (async()=>{"), true);
   assert.equal(userExpressions[2]?.startsWith("(async()=>{"), false);
-  assert.equal(userExpressions[3]?.startsWith("(async()=>{"), false);
+  assert.equal(userExpressions[3]?.startsWith("await (async()=>{"), true);
   assert.equal(userExpressions[4]?.startsWith("await (async()=>{"), true);
 });
 
@@ -993,10 +1038,10 @@ test("executeCell appends intentional log section for single bridge call", async
   });
 
   assert.equal(execution.success, true);
-  assert.equal(execution.outputs.length, 3);
-  assert.equal(execution.outputs[1]?.items[0]?.value, "4");
+  assert.equal(execution.outputs.length, 2);
+  assert.equal(execution.outputs[0]?.items[0]?.value, "4");
   assert.equal(
-    execution.outputs[2]?.items[0]?.value,
+    execution.outputs[1]?.items[0]?.value,
     "Intentional logs:\nfirst log",
   );
 });
@@ -1058,10 +1103,10 @@ test("executeCell preserves bridge-call order in intentional log section", async
   });
 
   assert.equal(execution.success, true);
-  assert.equal(execution.outputs.length, 3);
-  assert.equal(execution.outputs[1]?.items[0]?.value, "1");
+  assert.equal(execution.outputs.length, 2);
+  assert.equal(execution.outputs[0]?.items[0]?.value, "1");
   assert.equal(
-    execution.outputs[2]?.items[0]?.value,
+    execution.outputs[1]?.items[0]?.value,
     "Intentional logs:\nfirst\nsecond\nthird",
   );
 });
@@ -1187,12 +1232,10 @@ test("executeCell reports bridge-unavailable failure when isolated $cell setup t
 
   assert.equal(execution.success, false);
   assert.equal(callIndex, 1);
-  assert.equal(execution.outputs.length, 2);
-  assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
-  assert.equal(execution.outputs[0]?.items[0]?.value, "(isolated cell)");
-  assert.equal(execution.outputs[1]?.items[0]?.kind, "error");
+  assert.equal(execution.outputs.length, 1);
+  assert.equal(execution.outputs[0]?.items[0]?.kind, "error");
 
-  const renderedError = execution.outputs[1]?.items[0]?.value;
+  const renderedError = execution.outputs[0]?.items[0]?.value;
   assert.ok(renderedError instanceof Error);
   assert.equal(
     renderedError.message,
@@ -1250,13 +1293,11 @@ test("executeCell treats isolated setup exceptionDetails as bridge-unavailable f
 
   assert.equal(execution.success, false);
   assert.equal(callIndex, 1);
-  assert.equal(execution.outputs.length, 2);
-  assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
-  assert.equal(execution.outputs[0]?.items[0]?.value, "(isolated cell)");
-  assert.equal(execution.outputs[1]?.items[0]?.kind, "error");
+  assert.equal(execution.outputs.length, 1);
+  assert.equal(execution.outputs[0]?.items[0]?.kind, "error");
 });
 
-test("executeCell prepends isolated annotation as a separate rendered output", async () => {
+test("executeCell writes only value output for isolated success", async () => {
   const connection = createFakeConnection(async () => {
     return {
       result: {
@@ -1288,16 +1329,13 @@ test("executeCell prepends isolated annotation as a separate rendered output", a
   });
 
   assert.equal(execution.success, true);
-  assert.equal(execution.outputs.length, 2);
+  assert.equal(execution.outputs.length, 1);
   assert.equal(execution.outputs[0]?.items.length, 1);
   assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
-  assert.equal(execution.outputs[0]?.items[0]?.value, "(isolated cell)");
-  assert.equal(execution.outputs[1]?.items.length, 1);
-  assert.equal(execution.outputs[1]?.items[0]?.kind, "text");
-  assert.equal(execution.outputs[1]?.items[0]?.value, "7");
+  assert.equal(execution.outputs[0]?.items[0]?.value, "7");
 });
 
-test("executeCell prepends isolated annotation for failure outputs", async () => {
+test("executeCell writes only error output for isolated failures", async () => {
   const connection = createFakeConnection(async () => {
     return {
       result: {
@@ -1335,12 +1373,9 @@ test("executeCell prepends isolated annotation for failure outputs", async () =>
   });
 
   assert.equal(execution.success, false);
-  assert.equal(execution.outputs.length, 2);
+  assert.equal(execution.outputs.length, 1);
   assert.equal(execution.outputs[0]?.items.length, 1);
-  assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
-  assert.equal(execution.outputs[0]?.items[0]?.value, "(isolated cell)");
-  assert.equal(execution.outputs[1]?.items.length, 1);
-  assert.equal(execution.outputs[1]?.items[0]?.kind, "error");
+  assert.equal(execution.outputs[0]?.items[0]?.kind, "error");
 });
 
 test("executeCell keeps logs after error output for isolated failures", async () => {
@@ -1406,13 +1441,11 @@ test("executeCell keeps logs after error output for isolated failures", async ()
   });
 
   assert.equal(execution.success, false);
-  assert.equal(execution.outputs.length, 3);
-  assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
-  assert.equal(execution.outputs[0]?.items[0]?.value, "(isolated cell)");
-  assert.equal(execution.outputs[1]?.items[0]?.kind, "error");
-  assert.equal(execution.outputs[2]?.items[0]?.kind, "text");
+  assert.equal(execution.outputs.length, 2);
+  assert.equal(execution.outputs[0]?.items[0]?.kind, "error");
+  assert.equal(execution.outputs[1]?.items[0]?.kind, "text");
   assert.equal(
-    execution.outputs[2]?.items[0]?.value,
+    execution.outputs[1]?.items[0]?.value,
     "Intentional logs:\nbefore boom",
   );
 });

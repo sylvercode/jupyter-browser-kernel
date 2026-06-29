@@ -184,4 +184,58 @@ So that I get a single authoring surface for cell breakpoints (the VS Code gutte
 
 **Traceability Note:** Implements the CDP-side mirror portion of FR38, validates NFR8 (DevTools coexistence) under active debugger usage, and supersedes the Passive Provider AC adjustments listed in [spike/cdp-sourceurl-debugger-findings.md](../../spike/cdp-sourceurl-debugger-findings.md). The full VS Code-side debug experience portion of FR38 is split out to the deferred adapter epic.
 
----
+## Story 2.6: Configure Default Cell Isolation
+
+As a developer,
+I want a workspace setting that controls whether JavaScript notebook cells run isolated by default,
+and a command to explicitly use the default isolation mode for a cell,
+So that I can choose safer per-cell isolation without manually toggling every cell.
+
+**Acceptance Criteria:**
+
+**Given** the extension is installed
+**When** I open the Jupyter Browser Kernel settings
+**Then** I can configure `jupyterBrowserKernel.defaultCellIsolation`
+**And** the setting is described as controlling the default execution mode for cells that do not declare explicit isolation metadata
+**And** the setting defaults to `false` so current shared-by-default behavior remains unchanged.
+
+**Given** a JavaScript notebook cell with no `metadata.jupyterBrowserKernel.isolated` value
+**When** the cell runs
+**Then** the kernel uses `jupyterBrowserKernel.defaultCellIsolation` to decide whether to isolate the cell
+**And** the resulting execution path matches the existing explicit isolated or shared behavior.
+
+**Given** a cell whose metadata explicitly sets `jupyterBrowserKernel.isolated = true`
+**When** the cell runs
+**Then** the cell runs isolated even if the workspace setting is `false`.
+
+**Given** a cell whose metadata explicitly sets `jupyterBrowserKernel.isolated = false`
+**When** the cell runs
+**Then** the cell runs shared even if the workspace setting is `true`.
+
+**Given** I change `jupyterBrowserKernel.defaultCellIsolation`
+**When** I run another cell
+**Then** the new default applies immediately without reloading the extension host or reopening the notebook.
+
+## Story 2.7: Reverse Default Cell Mode and Rename Shared Mode to Global
+
+As a developer,
+I want the default JavaScript cell execution mode to be global instead of isolated,
+and I want the shared mode renamed to Global mode,
+So that the execution model matches the new product direction and the UI makes the mode boundary obvious.
+
+**Acceptance Criteria:**
+
+**Given** a JavaScript notebook cell with no explicit isolation metadata
+**When** the cell runs
+**Then** the cell executes in the global context of the browser by default
+**And** the default behavior does not isolate the cell unless the user explicitly opts in.
+
+**Given** a cell that is running in the non-isolated default mode
+**When** the toolbar or context menu renders
+**Then** the mode is labeled `Global mode`
+**And** the mode uses the `window` icon.
+
+**Given** an isolated cell runs successfully
+**When** its output renders
+**Then** the previous `(isolated cell)` annotation does not appear
+**And** no replacement annotation is added for Global mode.

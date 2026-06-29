@@ -87,7 +87,7 @@ test("buildCellExpression preserves prior line mapping without helper injection"
   assert.equal(isolatedExpression.includes("globalThis.$cell"), false);
 });
 
-test("buildCellExpression injects runtime cell bridge as a local binding in shared mode", () => {
+test("buildCellExpression does not inject runtime cell bridge in global mode", () => {
   const expression = buildCellExpression(
     "$cell.log('first'); 1 + 1",
     BASE_URI,
@@ -99,7 +99,7 @@ test("buildCellExpression injects runtime cell bridge as a local binding in shar
 
   assert.equal(
     expression,
-    `const $cell = globalThis["bridge-key-1"].cellBridge; $cell.log('first'); 1 + 1\n//# sourceURL=${BASE_URI}\n`,
+    `$cell.log('first'); 1 + 1\n//# sourceURL=${BASE_URI}\n`,
   );
 });
 

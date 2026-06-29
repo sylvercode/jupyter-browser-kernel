@@ -5,13 +5,13 @@ const TOGGLE_CELL_ISOLATION_COMMAND =
 const TOGGLE_CELL_ISOLATION_ISOLATE_COMMAND =
   "jupyterBrowserKernel.toggleCellIsolation.isolate";
 const TOGGLE_CELL_ISOLATION_SHARE_COMMAND =
-  "jupyterBrowserKernel.toggleCellIsolation.share";
+  "jupyterBrowserKernel.toggleCellIsolation.global";
 const USE_DEFAULT_CELL_ISOLATION_COMMAND =
   "jupyterBrowserKernel.useDefaultCellIsolation";
 const ACTIVE_CELL_ISOLATION_STATE_CONTEXT_KEY =
   "jupyterBrowserKernel.activeCellIsolationState";
 
-type CellIsolationState = "default" | "isolated" | "shared";
+type CellIsolationState = "default" | "isolated" | "global";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -58,7 +58,7 @@ function toCellIsolationState(metadata: unknown): CellIsolationState {
   }
 
   if (explicitIsolation === false) {
-    return "shared";
+    return "global";
   }
 
   return "default";

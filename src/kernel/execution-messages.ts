@@ -76,10 +76,6 @@ export function getKernelFailureCategoryLabel(
   return localize("transport error");
 }
 
-export function getIsolationAnnotationMessage(localize: Localize): string {
-  return localize("(isolated cell)");
-}
-
 export function getIntentionalLogSectionLabel(localize: Localize): string {
   return localize("Intentional logs:");
 }
