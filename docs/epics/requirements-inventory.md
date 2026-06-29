@@ -18,16 +18,12 @@ FR13: The extension can support execution isolation per cell while allowing expl
 FR14: The extension can normalize success and failure outcomes across supported transports and profiles through a shared result contract while preserving transport-boundary isolation from notebook execution semantics.
 FR15: A user can inspect execution results inline in the notebook after each run.
 FR16: The extension can capture output generated during cell execution and surface it as notebook output, distinguishable from unrelated browser console activity.
-FR17: The extension can preserve session-scoped execution history so a user can compare the result of each cell revision within a working session.
 FR18: A developer can verify the notebook execution pipeline and shared result contract against deterministic browser-test fixtures without any profile-specific runtime.
 FR19: A user can maintain forward-operation and reversal-operation cells in the same notebook.
 FR20: A user can execute reversal cells to restore state after experiments.
 FR21: A user can iterate through at least two successive snippet versions in a single notebook session.
 FR22: A user can install and use the extension through a manual VS Code workflow without requiring Marketplace distribution.
 FR23: The extension can expose intentional script output through extension-owned runtime helpers providing intentional output capture, structured logging, and value inspection. Helper naming and calling conventions are architecture-scoped.
-FR24 [Post-MVP Core]: A user can define watched expressions and refresh them manually or after execution events.
-FR25 [Post-MVP Core]: A user can configure depth-limited property projections and expand nested references for watched values.
-FR26 [Post-MVP Core]: A user can continue refreshing other watched values when one watcher evaluation fails.
 FR27 [Post-MVP Foundry Profile]: The Foundry profile can identify valid execution targets using profile-owned matching rules.
 FR28 [Post-MVP Foundry Profile]: The Foundry profile execution path can rely on extension-owned runtime envelope and helper injection.
 FR29 [Post-MVP Foundry Profile]: The extension can inject a zero-boilerplate execution envelope that carries structured value and log output for each cell run.
@@ -125,12 +121,14 @@ FR13: Epic 2 - execution isolation with explicit shared-runtime option
 FR14: Epic 2 - shared normalized result contract
 FR15: Epic 2 - inline run result inspection
 FR16: Epic 3 - intentional log capture and discrimination from ambient noise across notebook and output-channel contexts
+FR17: (Removed - no longer in scope after sprint change decision on 2026-06-29)
 FR18: Epic 6 - deterministic fixture-based core validation
 FR19: Epic 6 - forward-operation experimentation pattern
 FR20: Epic 6 - rollback restoration pattern
 FR21: Epic 6 - multi-version iteration in one session
 FR22: Epic 1 - scaffold bootstrap and CI VSIX release workflow
 FR23: Epic 3 and Epic 4 - extension-owned output helpers (logging, output capture, value inspection)
+FR24-FR26: (Removed - Epic 5 cut on 2026-06-29; watches are now debugger-native in Epic 10)
 FR27: Epic 7 - Foundry profile target matching
 FR28: Epic 7 - Foundry profile runtime envelope and helper injection
 FR29: Epic 7 - zero-boilerplate execution envelope for structured output

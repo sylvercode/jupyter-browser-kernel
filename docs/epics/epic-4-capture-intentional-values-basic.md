@@ -1,6 +1,6 @@
 # Epic 4: Capture Intentional Values (Basic)
 
-**Goal:** Surface intentional execution values in structured notebook output and preserve session-scoped history for comparison during iterative notebook workflows.
+**Goal:** Surface intentional execution values in structured notebook output.
 
 **Dependencies:** Epic 1, Epic 2
 
@@ -53,28 +53,5 @@ So that ambiguous outcomes like null, undefined, and empty string are easy to di
 **When** output is displayed
 **Then** nested content uses progressive disclosure defaults
 **And** users can expand detail on demand without overwhelming the default view.
-
-## Story 4.3: Preserve Session-Scoped Execution History
-
-As a developer,
-I want ordered session-scoped run history for notebook executions,
-So that I can compare successive revisions and outcomes during experimentation.
-
-**Acceptance Criteria:**
-
-**Given** multiple cell runs in one session
-**When** each run completes
-**Then** its output record is preserved in chronological order
-**And** each record remains attributable to the originating cell run.
-
-**Given** iterative edits of the same cell
-**When** runs are repeated
-**Then** prior outcomes remain visible for comparison
-**And** the latest run is clearly identifiable.
-
-**Given** the working session ends or resets
-**When** a new session starts
-**Then** execution history scope resets by default
-**And** no prior session history is carried forward unless explicitly saved in future features.
 
 ---

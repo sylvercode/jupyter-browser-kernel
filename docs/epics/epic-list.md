@@ -21,14 +21,8 @@ Users can emit and review intentional runtime logs that are clearly separated fr
 ## Epic 4: Capture Intentional Values (Basic)
 
 Users can emit and inspect intentional value outputs inline and preserve useful session-scoped comparison continuity.
-**FRs covered:** FR10, FR17, FR23 (output capture and value inspection facets)
+**FRs covered:** FR10, FR23 (output capture and value inspection facets)
 **Depends on:** Epic 1, Epic 2
-
-## Epic 5: Present Complex Variables and Watches (Post-MVP Core)
-
-Users can define watched expressions, refresh them, and inspect depth-limited complex structures for advanced observation workflows.
-**FRs covered:** FR24, FR25, FR26
-**Depends on:** Epic 1, Epic 2, Epic 4
 
 ## Epic 6: Safe Experimentation and Core Reliability
 
