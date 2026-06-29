@@ -1,5 +1,5 @@
 # generated: 2026-06-24
-# last_updated: 2026-06-29 (story 3.3 review completed)
+# last_updated: 2026-06-29 (epic 3 retrospective completed)
 # project: jupyter-browser-kernel
 # project_key: NOKEY
 # tracking_system: file-system
@@ -66,11 +66,11 @@ development_status:
   epic-2-retrospective: done
 
   # ── Epic 3: Capture Intentional Logs ─────────────────────────────────────
-  epic-3: in-progress
+  epic-3: done
   3-1-define-intentional-log-capture-runtime-helper: done
   3-2-route-captured-logs-to-notebook-cell-output: done
   3-3-distinguish-intentional-logs-from-ambient-console-activity: done
-  epic-3-retrospective: optional
+  epic-3-retrospective: done
 
   # ── Epic 4: Capture Intentional Values (Basic) ───────────────────────────
   epic-4: backlog
