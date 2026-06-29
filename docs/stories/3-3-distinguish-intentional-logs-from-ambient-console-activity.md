@@ -2,7 +2,7 @@
 storyId: "3.3"
 storyKey: "3-3-distinguish-intentional-logs-from-ambient-console-activity"
 title: "Distinguish Intentional Logs from Ambient Console Activity"
-status: "review"
+status: "done"
 created: "2026-06-29"
 epic: "3"
 priority: "p1"
@@ -11,7 +11,7 @@ baseline_commit: "bc0a3f918aaf6984e31fbb232785db43f624d142"
 
 # Story 3.3: Distinguish Intentional Logs from Ambient Console Activity
 
-**Status:** review
+**Status:** done
 
 ## Story
 
@@ -81,6 +81,10 @@ So that I can focus on what my cell emitted without filtering ambient activity.
 - [x] Run `npm run lint`.
 - [x] Run `npm run test:unit`.
 - [x] Run `npm run test:integration`.
+
+### Review Findings
+
+- [x] [Review][Dismissed] Notebook intentional log lines remain plain by design; JBK prefixing is intentionally limited to mirrored output-channel entries for filtering. Story wording drift acknowledged and accepted by author. [src/kernel/execution-kernel.ts:396]
 
 ## Dev Notes
 
