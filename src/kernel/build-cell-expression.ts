@@ -1,7 +1,16 @@
-import { getRuntilmeCellBridgeHelperPrelude } from "./runtilme-cell-bridge";
-
 export interface BuildCellExpressionOptions {
   isolate: boolean;
+  runtimeCellBridgeKey?: string;
+}
+
+function buildRuntimeCellBridgePrefix(
+  runtimeCellBridgeKey: string | undefined,
+): string {
+  if (!runtimeCellBridgeKey) {
+    return "";
+  }
+
+  return `const $cell = globalThis[${JSON.stringify(runtimeCellBridgeKey)}].cellBridge; `;
 }
 
 export function buildCellExpression(
@@ -9,16 +18,17 @@ export function buildCellExpression(
   sourceUri: string,
   options: BuildCellExpressionOptions,
 ): string {
-  const helperPrelude = getRuntilmeCellBridgeHelperPrelude();
+  const runtimeCellBridgePrefix = buildRuntimeCellBridgePrefix(
+    options.runtimeCellBridgeKey,
+  );
 
   if (!options.isolate) {
-    return `${helperPrelude}\n${userCode}\n//# sourceURL=${sourceUri}\n`;
+    return `${runtimeCellBridgePrefix}${userCode}\n//# sourceURL=${sourceUri}\n`;
   }
 
   const isolationStart = "await (async()=>{";
   const isolationEnd = `})()\n//# sourceURL=${sourceUri}\n`;
-  const wrappedUserCode =
-    userCode.length === 0 ? helperPrelude : `${helperPrelude}\n${userCode}`;
+  const wrappedUserCode = `${runtimeCellBridgePrefix}${userCode}`;
 
   if (wrappedUserCode.length === 0) {
     return `${isolationStart}${isolationEnd}`;

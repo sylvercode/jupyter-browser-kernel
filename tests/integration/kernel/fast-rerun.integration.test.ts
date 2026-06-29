@@ -173,6 +173,7 @@ test(
     const firstRun = await connection?.evaluate(
       buildCellExpression("$cell.log('first'); 1 + 1", uri, {
         isolate: false,
+        runtimeCellBridgeKey: firstBridgeKey,
       }),
     );
     const firstLogs = await connection?.evaluate(

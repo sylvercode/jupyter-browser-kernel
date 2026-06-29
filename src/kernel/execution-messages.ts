@@ -83,3 +83,11 @@ export function getIsolationAnnotationMessage(localize: Localize): string {
 export function getIntentionalLogSectionLabel(localize: Localize): string {
   return localize("Intentional logs:");
 }
+
+export function getRuntimeCellBridgeUnavailableMessage(
+  localize: Localize,
+): string {
+  return localize(
+    "Runtime cell bridge is unavailable for this cell run. Start a new Browser Kernel debug session and run the cell again.",
+  );
+}

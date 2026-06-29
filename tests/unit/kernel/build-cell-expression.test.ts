@@ -5,18 +5,13 @@ import { buildCellExpression } from "../../../src/kernel/build-cell-expression.j
 
 const BASE_URI =
   "vscode-notebook-cell://test-authority/workspaces/foundry-devil-code-sight/tests/files/test1.ipynb#ch0000000001234";
-const HELPER_PRELUDE =
-  "globalThis.$cell = globalThis.$cell ?? Object.freeze({ log: () => undefined });";
 
 test("buildCellExpression returns no-wrapper shape by default", () => {
   const expression = buildCellExpression("const x = 1", BASE_URI, {
     isolate: false,
   });
 
-  assert.equal(
-    expression,
-    `${HELPER_PRELUDE}\nconst x = 1\n//# sourceURL=${BASE_URI}\n`,
-  );
+  assert.equal(expression, `const x = 1\n//# sourceURL=${BASE_URI}\n`);
   assert.equal(expression.startsWith("(async()=>{"), false);
 });
 
@@ -26,7 +21,7 @@ test("buildCellExpression wraps multi-line code with same-line Pattern B boundar
     isolate: true,
   });
 
-  const expected = `await (async()=>{${HELPER_PRELUDE}\nlet x = 1;\nlet y = 2;\nx + y})()\n//# sourceURL=${BASE_URI}\n`;
+  const expected = `await (async()=>{let x = 1;\nlet y = 2;\nx + y})()\n//# sourceURL=${BASE_URI}\n`;
   assert.equal(expression, expected);
 });
 
@@ -37,7 +32,7 @@ test("buildCellExpression wraps single-line code without synthesized line breaks
 
   assert.equal(
     expression,
-    `await (async()=>{${HELPER_PRELUDE}\n1 + 1})()\n//# sourceURL=${BASE_URI}\n`,
+    `await (async()=>{1 + 1})()\n//# sourceURL=${BASE_URI}\n`,
   );
 });
 
@@ -48,7 +43,7 @@ test("buildCellExpression wraps empty code as a no-op async IIFE", () => {
 
   assert.equal(
     expression,
-    `await (async()=>{${HELPER_PRELUDE}})()\n//# sourceURL=${BASE_URI}\n`,
+    `await (async()=>{})()\n//# sourceURL=${BASE_URI}\n`,
   );
 });
 
@@ -80,7 +75,7 @@ test("buildCellExpression uses distinct sourceURL lines for distinct cells", () 
   assert.match(expressionB, new RegExp(`sourceURL=${uriB}`));
 });
 
-test("buildCellExpression always injects intentional helper prelude", () => {
+test("buildCellExpression preserves prior line mapping without helper injection", () => {
   const sharedExpression = buildCellExpression("2 + 2", BASE_URI, {
     isolate: false,
   });
@@ -88,6 +83,38 @@ test("buildCellExpression always injects intentional helper prelude", () => {
     isolate: true,
   });
 
-  assert.equal(sharedExpression.startsWith(HELPER_PRELUDE), true);
-  assert.equal(isolatedExpression.includes(HELPER_PRELUDE), true);
+  assert.equal(sharedExpression.startsWith("globalThis.$cell"), false);
+  assert.equal(isolatedExpression.includes("globalThis.$cell"), false);
+});
+
+test("buildCellExpression injects runtime cell bridge as a local binding in shared mode", () => {
+  const expression = buildCellExpression(
+    "$cell.log('first'); 1 + 1",
+    BASE_URI,
+    {
+      isolate: false,
+      runtimeCellBridgeKey: "bridge-key-1",
+    },
+  );
+
+  assert.equal(
+    expression,
+    `const $cell = globalThis["bridge-key-1"].cellBridge; $cell.log('first'); 1 + 1\n//# sourceURL=${BASE_URI}\n`,
+  );
+});
+
+test("buildCellExpression injects runtime cell bridge as a local binding in isolated mode", () => {
+  const expression = buildCellExpression(
+    "$cell.log('first'); return 1 + 1",
+    BASE_URI,
+    {
+      isolate: true,
+      runtimeCellBridgeKey: "bridge-key-2",
+    },
+  );
+
+  assert.equal(
+    expression,
+    `await (async()=>{const $cell = globalThis["bridge-key-2"].cellBridge; $cell.log('first'); return 1 + 1})()\n//# sourceURL=${BASE_URI}\n`,
+  );
 });

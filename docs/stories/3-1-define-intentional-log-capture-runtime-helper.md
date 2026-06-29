@@ -148,6 +148,12 @@ GPT-5.3-Codex
 - Added localized section label in [src/kernel/execution-messages.ts](../../src/kernel/execution-messages.ts).
 - Added/updated tests in [tests/unit/kernel/build-cell-expression.test.ts](../../tests/unit/kernel/build-cell-expression.test.ts), [tests/unit/kernel/execution-kernel.test.ts](../../tests/unit/kernel/execution-kernel.test.ts), [tests/unit/kernel/runtilme-cell-bridge.test.ts](../../tests/unit/kernel/runtilme-cell-bridge.test.ts), and [tests/integration/kernel/fast-rerun.integration.test.ts](../../tests/integration/kernel/fast-rerun.integration.test.ts).
 
+## Story Conclusion
+
+`$cell` is now intentionally available only in isolated mode. Shared/global mode does not expose the runtime cell bridge, because the bridge depends on a scoped per-run binding and would be unsafe in the shared execution path where parallel cells can overlap and interfere with one another.
+
+This is a deliberate product-direction change rather than a temporary implementation detail. It keeps the intentional-log contract deterministic, preserves parallel execution in shared mode, and avoids the race conditions that appeared when the same `$cell` binding had to be reused across concurrent runs.
+
 ### File List
 
 - docs/stories/3-1-define-intentional-log-capture-runtime-helper.md

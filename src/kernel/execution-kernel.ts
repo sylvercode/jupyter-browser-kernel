@@ -13,6 +13,7 @@ import {
 } from "./execution-result";
 import {
   getKernelFailureCellOutputMessage,
+  getRuntimeCellBridgeUnavailableMessage,
   getIntentionalLogSectionLabel,
   getIsolationAnnotationMessage,
   getNoActiveSessionMessage,
@@ -22,6 +23,7 @@ import {
   createRuntilmeCellBridgeKey,
   createRuntilmeCellBridgeSetupExpression,
   createRuntilmeCellBridgeTeardownExpression,
+  referencesRuntimeCellBridge,
 } from "./runtilme-cell-bridge";
 
 export interface NotebookOutputApi {
@@ -32,12 +34,13 @@ export interface NotebookOutputApi {
 export type GetActiveConnection = () => ActiveBrowserConnection | undefined;
 
 type EvaluationCompletion =
-  | {
-      kind: "result";
-      result: ExecutionResult;
-      bridgeKey: string | undefined;
-    }
+  | { kind: "result"; result: ExecutionResult }
   | { kind: "cancelled" };
+
+interface RuntilmeCellBridgeInitializationResult {
+  bridgeKey?: string;
+  bridgeAvailable: boolean;
+}
 
 export type ReportTransportError = (
   failure: ExecutionFailure,
@@ -125,7 +128,7 @@ export async function executeCell({
     const sourceUri = cell.document.uri.toString();
     const explicitIsolation = readIsolationMetadata(cell.metadata);
     const isolate = explicitIsolation ?? runtime.getDefaultCellIsolation();
-    const expression = buildCellExpression(userCode, sourceUri, { isolate });
+    const usesRuntimeCellBridge = referencesRuntimeCellBridge(userCode);
     let resolveCancellationSignal: (() => void) | undefined;
     const cancellationSignal = new Promise<void>((resolve) => {
       resolveCancellationSignal = resolve;
@@ -137,21 +140,35 @@ export async function executeCell({
       resolveCancellationSignal?.();
     });
 
+    let bridgeKey: string | undefined;
     let completion: EvaluationCompletion;
     try {
-      const evaluationFlow = evaluateCellExpressionWithLogSetup(
-        connection,
-        expression,
-      ).then(
-        async ({
-          bridgeKey,
-          evaluationPromise,
-        }): Promise<EvaluationCompletion> => ({
+      const evaluationFlow = (async (): Promise<EvaluationCompletion> => {
+        const needsRuntimeCellBridge = usesRuntimeCellBridge && isolate;
+
+        if (needsRuntimeCellBridge) {
+          const bridgeInitialization =
+            await initializeRuntilmeCellBridge(connection);
+          bridgeKey = bridgeInitialization.bridgeKey;
+
+          if (!bridgeInitialization.bridgeAvailable) {
+            return {
+              kind: "result",
+              result: getRuntimeCellBridgeUnavailableFailure(runtime.localize),
+            };
+          }
+        }
+
+        const expression = buildCellExpression(userCode, sourceUri, {
+          isolate,
+          runtimeCellBridgeKey: bridgeKey,
+        });
+
+        return {
           kind: "result",
-          bridgeKey,
-          result: await evaluationPromise,
-        }),
-      );
+          result: await evaluateCellExpression(connection, expression),
+        };
+      })();
 
       completion = await Promise.race([
         evaluationFlow,
@@ -164,13 +181,11 @@ export async function executeCell({
     }
 
     if (completion.kind === "cancelled") {
+      await collectIntentionalLogs(connection, bridgeKey);
       return true;
     }
 
-    const intentionalLogs = await collectIntentionalLogs(
-      connection,
-      completion.bridgeKey,
-    );
+    const intentionalLogs = await collectIntentionalLogs(connection, bridgeKey);
     const result = completion.result;
 
     if (execution.token.isCancellationRequested) {
@@ -259,20 +274,6 @@ async function evaluateCellExpression(
   } catch (error) {
     return normalizeTransportError(error);
   }
-}
-
-async function evaluateCellExpressionWithLogSetup(
-  connection: ActiveBrowserConnection,
-  expression: string,
-): Promise<{
-  bridgeKey: string | undefined;
-  evaluationPromise: Promise<ExecutionResult>;
-}> {
-  const bridgeKey = await initializeRuntilmeCellBridge(connection);
-  return {
-    bridgeKey,
-    evaluationPromise: evaluateCellExpression(connection, expression),
-  };
 }
 
 function readIsolationMetadata(metadata: unknown): boolean | undefined {
@@ -378,17 +379,29 @@ function createIntentionalLogOutput(
 
 async function initializeRuntilmeCellBridge(
   connection: ActiveBrowserConnection,
-): Promise<string | undefined> {
+): Promise<RuntilmeCellBridgeInitializationResult> {
   const bridgeKey = createRuntilmeCellBridgeKey();
 
   try {
-    await connection.evaluate(
+    const response = await connection.evaluate(
       createRuntilmeCellBridgeSetupExpression(bridgeKey),
     );
-    return bridgeKey;
+
+    if (response.exceptionDetails) {
+      return {
+        bridgeAvailable: false,
+      };
+    }
+
+    return {
+      bridgeKey,
+      bridgeAvailable: true,
+    };
   } catch {
-    // Fall back to regular cell execution when helper bootstrap cannot be installed.
-    return undefined;
+    // Continue without the runtime cell bridge when bootstrap cannot be installed.
+    return {
+      bridgeAvailable: false,
+    };
   }
 }
 
@@ -429,4 +442,15 @@ function toErrorObject(failure: ExecutionFailure): Error {
   }
 
   return error;
+}
+
+function getRuntimeCellBridgeUnavailableFailure(
+  localize: Localize,
+): ExecutionFailure {
+  return {
+    ok: false,
+    name: "RuntimeCellBridgeUnavailableError",
+    kind: "runtime-error",
+    message: getRuntimeCellBridgeUnavailableMessage(localize),
+  };
 }

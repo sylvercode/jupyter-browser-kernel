@@ -26,6 +26,8 @@
   "Cell execution timed out. The async operation did not complete within the allowed time. Simplify the expression or check for unresolved Promises.": "Cell execution timed out. The async operation did not complete within the allowed time. Simplify the expression or check for unresolved Promises.",
   "Cell execution timed out. Check for unresolved Promises and try again.": "Cell execution timed out. Check for unresolved Promises and try again.",
   "(isolated cell)": "(isolated cell)",
+  "Intentional logs:": "Intentional logs:",
+  "Runtime cell bridge is unavailable for this cell run. Start a new Browser Kernel debug session and run the cell again.": "Runtime cell bridge is unavailable for this cell run. Start a new Browser Kernel debug session and run the cell again.",
   "Toggle Cell Isolation": "Toggle Cell Isolation",
   "Mode: Isolated. Click to toggle.": "Mode: Isolated. Click to toggle.",
   "Mode: Isolated (default). Click to toggle.": "Mode: Isolated (default). Click to toggle.",

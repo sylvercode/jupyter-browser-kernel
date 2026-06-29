@@ -17,15 +17,24 @@ function setupBridge(): string {
   return bridgeKey;
 }
 
-test("RuntilmeCellBridge captures helper calls in order", () => {
-  const bridgeKey = setupBridge();
+function getCellBridge(
+  bridgeKey: string,
+): { log: (...values: unknown[]) => void } | undefined {
+  return (
+    globalThis as unknown as {
+      [key: string]: {
+        cellBridge?: { log: (...values: unknown[]) => void };
+      };
+    }
+  )[bridgeKey]?.cellBridge;
+}
 
-  (
-    globalThis as { $cell?: { log: (...values: unknown[]) => void } }
-  ).$cell?.log("first");
-  (
-    globalThis as { $cell?: { log: (...values: unknown[]) => void } }
-  ).$cell?.log("second");
+test("RuntilmeCellBridge captures bridge calls in order", () => {
+  const bridgeKey = setupBridge();
+  const cellBridge = getCellBridge(bridgeKey);
+
+  cellBridge?.log("first");
+  cellBridge?.log("second");
 
   const logs = evaluateExpression(
     createRuntilmeCellBridgeTeardownExpression(bridgeKey),
@@ -35,10 +44,9 @@ test("RuntilmeCellBridge captures helper calls in order", () => {
 
 test("RuntilmeCellBridge coerces non-string values deterministically", () => {
   const bridgeKey = setupBridge();
+  const cellBridge = getCellBridge(bridgeKey);
 
-  (
-    globalThis as { $cell?: { log: (...values: unknown[]) => void } }
-  ).$cell?.log("count", 3, true, { alpha: 1 }, null, undefined);
+  cellBridge?.log("count", 3, true, { alpha: 1 }, null, undefined);
 
   const logs = evaluateExpression(
     createRuntilmeCellBridgeTeardownExpression(bridgeKey),
@@ -48,9 +56,8 @@ test("RuntilmeCellBridge coerces non-string values deterministically", () => {
 
 test("RuntilmeCellBridge keeps buffers isolated per setup/teardown run", () => {
   const firstBridgeKey = setupBridge();
-  (
-    globalThis as { $cell?: { log: (...values: unknown[]) => void } }
-  ).$cell?.log("run-a");
+  const firstCellBridge = getCellBridge(firstBridgeKey);
+  firstCellBridge?.log("run-a");
   const first = evaluateExpression(
     createRuntilmeCellBridgeTeardownExpression(firstBridgeKey),
   );
@@ -64,13 +71,13 @@ test("RuntilmeCellBridge keeps buffers isolated per setup/teardown run", () => {
   assert.deepEqual(second, []);
 });
 
-test("RuntilmeCellBridge restores prior global $cell binding", () => {
+test("RuntilmeCellBridge does not overwrite a pre-existing global $cell binding", () => {
   const previousCell = { log: () => undefined };
   (globalThis as { $cell?: unknown }).$cell = previousCell;
 
   const bridgeKey = setupBridge();
   const duringRun = (globalThis as { $cell?: unknown }).$cell;
-  assert.notEqual(duringRun, previousCell);
+  assert.equal(duringRun, previousCell);
 
   evaluateExpression(createRuntilmeCellBridgeTeardownExpression(bridgeKey));
   const restored = (globalThis as { $cell?: unknown }).$cell;

@@ -1,5 +1,12 @@
 # Deferred Work
 
+## Requested product-direction change (2026-06-28)
+
+- Reverse the cell-isolation paradigm so the default execution mode becomes isolated instead of shared.
+- Rename the current "Share Cell State" mode/labeling to "Global Mode" to match the new default-isolated mental model.
+- Keep the runtime cell bridge available only in isolated mode; global mode should not expose or use `$cell`.
+- Update the affected commands, menu visibility, docs, and tests after the new default-mode behavior is formally approved.
+
 ## Deferred from: code review of 2-6-configure-default-cell-isolation (2026-06-27)
 
 - No test for `useDefault` command on a cell with no `jupyterBrowserKernel` metadata key — `removeExplicitIsolation` handles the absent-key case correctly; menu guard (`activeCellIsolationState != 'default'`) prevents this path in practice. [tests/unit/commands/toggle-cell-isolation-command.test.ts]
