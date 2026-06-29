@@ -1100,6 +1100,54 @@ test("executeCell keeps success output unchanged when no bridge call occurs", as
   assert.equal(execution.outputs[0]?.items[0]?.value, "8");
 });
 
+test("executeCell returns runtime error when $cell is used outside isolated mode", async () => {
+  const connection = createFakeConnection(async () => {
+    return {
+      result: {
+        type: "undefined",
+      },
+      exceptionDetails: {
+        text: "Uncaught ReferenceError: $cell is not defined",
+        exception: {
+          className: "ReferenceError",
+          description:
+            "ReferenceError: $cell is not defined\n    at <anonymous>:1:1",
+        },
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell("$cell.log('first log'); 2 + 2", undefined, {
+      jupyterBrowserKernel: { isolated: false },
+    }) as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 302,
+    runtime,
+  });
+
+  assert.equal(execution.success, false);
+  assert.equal(execution.outputs.length, 1);
+  assert.equal(execution.outputs[0]?.items[0]?.kind, "error");
+
+  const renderedError = execution.outputs[0]?.items[0]?.value;
+  assert.ok(renderedError instanceof Error);
+  assert.equal(renderedError.name, "ReferenceError");
+  assert.equal(renderedError.message, "$cell is not defined");
+});
+
 test("executeCell reports bridge-unavailable failure when isolated $cell setup throws", async () => {
   let callIndex = 0;
   const connection = createFakeConnection(async () => {

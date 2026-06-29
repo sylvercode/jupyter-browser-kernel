@@ -2,7 +2,7 @@
 storyId: "3.1"
 storyKey: "3-1-define-intentional-log-capture-runtime-helper"
 title: "Define Intentional Log Capture Runtime Helper"
-status: "review"
+status: "done"
 created: "2026-06-28"
 epic: "3"
 priority: "p1"
@@ -10,7 +10,7 @@ priority: "p1"
 
 # Story 3.1: Define Intentional Log Capture Runtime Helper
 
-**Status:** review
+**Status:** done
 
 ## Story
 

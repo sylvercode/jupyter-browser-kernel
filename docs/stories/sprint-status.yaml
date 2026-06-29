@@ -66,7 +66,7 @@ development_status:
 
   # ── Epic 3: Capture Intentional Logs ─────────────────────────────────────
   epic-3: in-progress
-  3-1-define-intentional-log-capture-runtime-helper: ready-for-dev
+  3-1-define-intentional-log-capture-runtime-helper: done
   3-2-route-captured-logs-to-notebook-cell-output: backlog
   3-3-distinguish-intentional-logs-from-ambient-console-activity: backlog
   epic-3-retrospective: optional
