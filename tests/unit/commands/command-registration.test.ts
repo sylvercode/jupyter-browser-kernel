@@ -95,7 +95,7 @@ test("package contributes isolation actions to notebook cell menus", () => {
     true,
   );
   assert.equal(
-    titleCommands.has("jupyterBrowserKernel.toggleCellIsolation.share"),
+    titleCommands.has("jupyterBrowserKernel.toggleCellIsolation.global"),
     true,
   );
   assert.equal(
@@ -107,7 +107,7 @@ test("package contributes isolation actions to notebook cell menus", () => {
     true,
   );
   assert.equal(
-    contextCommands.has("jupyterBrowserKernel.toggleCellIsolation.share"),
+    contextCommands.has("jupyterBrowserKernel.toggleCellIsolation.global"),
     true,
   );
   assert.equal(
@@ -135,7 +135,7 @@ test("localization bundles include toggle cell isolation and runtime strings", (
     "Isolated mode",
   );
   assert.equal(
-    packageNls["command.toggleCellIsolation.share.label"],
+    packageNls["command.toggleCellIsolation.global.label"],
     "Global mode",
   );
   assert.equal(
@@ -144,7 +144,10 @@ test("localization bundles include toggle cell isolation and runtime strings", (
   );
 
   // Runtime labels reflect the Global/Isolated naming model
-  assert.equal(l10nBundle["Mode: Global. Click to toggle."], "Mode: Global. Click to toggle.");
+  assert.equal(
+    l10nBundle["Mode: Global. Click to toggle."],
+    "Mode: Global. Click to toggle.",
+  );
   assert.equal(
     l10nBundle["Mode: Global (default). Click to toggle."],
     "Mode: Global (default). Click to toggle.",

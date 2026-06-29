@@ -2,7 +2,7 @@
 storyId: "2.7"
 storyKey: "2-7-reverse-default-cell-mode-and-rename-share-to-global"
 title: "Reverse Default Cell Mode and Rename Shared Mode to Global"
-status: "review"
+status: "done"
 baseline_commit: "fc4e3b9ba867710fd8621ea74e85eb6437b1caea"
 created: "2026-06-29"
 epic: "2"
@@ -147,6 +147,16 @@ I also want the default-mode setting to remain available as a documented choice 
 - [x] Add or update tests asserting the `(isolated cell)` annotation is removed.
 - [x] Add or update tests covering the default reversal to Global mode.
 - [x] Add or update tests covering `$cell` availability and return behavior in both modes.
+
+### Review Findings
+
+- [x] [Review][Patch] Unrecognized/invalid setting values fall back to global mode instead of new isolated default — the IIFE fallthrough `return setting === true` returns `false` (global) for any value that is not `"isolated"`, `"global"`, or boolean `true` (e.g., a stale `"shared"` string, `null`). Fix: change fallthrough to `return setting !== false` to honour the isolated-by-default direction for unrecognised values. [src/extension.ts]
+- [x] [Review][Patch] No unit test for backward-compat `boolean false` / global-as-default execution path — the path where a user had `defaultCellIsolation: false` in settings.json is exercised only by the implicit fallthrough and is not covered by an explicit test case. Add a test exercising `getDefaultCellIsolation()` when the raw setting value is `false`. [tests/unit/kernel/execution-kernel.test.ts]
+- [x] [Review][Defer] VS Code settings UI validation warning for users with old boolean `false` in settings.json — runtime handles the value correctly but VS Code will show a schema-mismatch warning in the Settings UI; track for changelog/migration documentation. — deferred, pre-existing user experience gap
+- [x] [Review][Patch] Command ID `toggleCellIsolation.share` retains "share" — renamed to `toggleCellIsolation.global` across package.json, package.nls.json, src/commands/toggle-cell-isolation-command.ts, and tests. [package.json / src/commands/toggle-cell-isolation-command.ts]
+- [x] [Review][Defer] Both mode buttons simultaneously visible when `activeCellIsolationState == "default"` — pre-existing UX behaviour, not introduced by this story. — deferred, pre-existing
+- [x] [Review][Defer] `enumItemLabels` — verify minimum VS Code engine version supports this contribution field. — deferred, low-risk compatibility concern
+- [x] [Review][Defer] `syncContext` silently swallows context-key update errors — pre-existing, unrelated to this story. — deferred, pre-existing
 
 ## Dev Notes
 

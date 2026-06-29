@@ -168,6 +168,49 @@ test("executeCell evaluates expression and writes success output", async () => {
   assert.equal(execution.outputs[0]?.items[0]?.mime, "text/plain");
 });
 
+test("executeCell uses global mode when getDefaultCellIsolation returns false (backward-compat boolean false path)", async () => {
+  const sourceUri =
+    "vscode-notebook-cell://test-authority/workspaces/foundry-devil-code-sight/tests/files/test1.ipynb#ch0000000000001";
+  const evaluateCalls: string[] = [];
+  const connection = createFakeConnection(async (expression) => {
+    evaluateCalls.push(expression);
+    return {
+      result: {
+        type: "number",
+        value: 9,
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+    () => false, // simulate old boolean false setting → global mode
+  );
+
+  await executeCell({
+    cell: createFakeCell("3 + 3", sourceUri) as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 8,
+    runtime,
+  });
+
+  const userExpressions = collectUserExpressions(evaluateCalls);
+  // Global mode must not wrap the expression in an isolated async IIFE.
+  assert.deepEqual(userExpressions, [`3 + 3\n//# sourceURL=${sourceUri}\n`]);
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 1);
+  assert.equal(execution.outputs[0]?.items[0]?.value, "9");
+});
+
 test("executeCell exits before evaluation when cancellation was already requested", async () => {
   const evaluateCalls: string[] = [];
   const connection = createFakeConnection(async (expression) => {

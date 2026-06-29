@@ -176,12 +176,12 @@ test("isolate command writes explicit isolated=true metadata", async () => {
   });
 });
 
-test("share command writes explicit isolated=false metadata", async () => {
+test("global command writes explicit isolated=false metadata", async () => {
   const cell = createFakeCell({ tags: ["x"] });
   const { commandHandlers, applyEditCalls } = createHarness(cell);
 
   const handler = commandHandlers.get(
-    "jupyterBrowserKernel.toggleCellIsolation.share",
+    "jupyterBrowserKernel.toggleCellIsolation.global",
   );
   assert.ok(handler);
   await handler?.(cell);

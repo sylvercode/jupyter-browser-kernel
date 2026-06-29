@@ -73,7 +73,9 @@ export function activate(context: vscode.ExtensionContext): void {
       }
 
       // Backward compatibility for existing boolean user settings.
-      return setting === true;
+      // boolean false → global; any other unrecognised value falls back to
+      // the new isolated default rather than silently producing global mode.
+      return setting !== false;
     })();
 
   const kernelController = registerKernelController(vscode, {

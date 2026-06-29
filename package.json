@@ -82,8 +82,8 @@
         "title": "%command.toggleCellIsolation.isolate.label%"
       },
       {
-        "command": "jupyterBrowserKernel.toggleCellIsolation.share",
-        "title": "%command.toggleCellIsolation.share.label%"
+        "command": "jupyterBrowserKernel.toggleCellIsolation.global",
+        "title": "%command.toggleCellIsolation.global.label%"
       },
       {
         "command": "jupyterBrowserKernel.useDefaultCellIsolation",
@@ -97,7 +97,7 @@
           "when": "false"
         },
         {
-          "command": "jupyterBrowserKernel.toggleCellIsolation.share",
+          "command": "jupyterBrowserKernel.toggleCellIsolation.global",
           "when": "false"
         },
         {
@@ -112,7 +112,7 @@
           "group": "navigation@50"
         },
         {
-          "command": "jupyterBrowserKernel.toggleCellIsolation.share",
+          "command": "jupyterBrowserKernel.toggleCellIsolation.global",
           "when": "notebookType == 'jupyter-notebook' && notebookCellType == 'code' && jupyterBrowserKernel.activeNotebookUsesBrowserKernel && jupyterBrowserKernel.activeCellIsolationState != 'global'",
           "group": "navigation@50"
         },
@@ -129,7 +129,7 @@
           "group": "z_commands@50"
         },
         {
-          "command": "jupyterBrowserKernel.toggleCellIsolation.share",
+          "command": "jupyterBrowserKernel.toggleCellIsolation.global",
           "when": "notebookType == 'jupyter-notebook' && notebookCellType == 'code' && jupyterBrowserKernel.activeNotebookUsesBrowserKernel && jupyterBrowserKernel.activeCellIsolationState != 'global'",
           "group": "z_commands@50"
         },

@@ -7,6 +7,13 @@
 - Keep the runtime cell bridge available only in isolated mode; global mode should not expose or use `$cell`.
 - Update the affected commands, menu visibility, docs, and tests after the new default-mode behavior is formally approved.
 
+## Deferred from: code review of 2-7-reverse-default-cell-mode-and-rename-share-to-global (2026-06-29)
+
+- VS Code settings UI validation warning for users with old boolean `false` in `settings.json` — runtime handles the value correctly but VS Code will show a schema-mismatch warning in the Settings UI; track for changelog/migration documentation. [package.json]
+- Both mode buttons simultaneously visible when `activeCellIsolationState == "default"` — pre-existing UX behaviour; both Isolated and Global buttons show when cell uses inherited default mode. [package.json `when` clauses]
+- `enumItemLabels` — verify minimum VS Code engine version supports this contribution-point field. [package.json]
+- `syncContext` silently swallows context-key update errors — pre-existing, unrelated to this story. [src/commands/toggle-cell-isolation-command.ts]
+
 ## Deferred from: code review of 2-6-configure-default-cell-isolation (2026-06-27)
 
 - No test for `useDefault` command on a cell with no `jupyterBrowserKernel` metadata key — `removeExplicitIsolation` handles the absent-key case correctly; menu guard (`activeCellIsolationState != 'default'`) prevents this path in practice. [tests/unit/commands/toggle-cell-isolation-command.test.ts]
