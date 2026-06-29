@@ -119,6 +119,7 @@ export async function executeCell({
         [],
         runtime.notebookOutputApi,
         runtime.localize,
+        false,
       );
       endExecution(false);
       return false;
@@ -218,6 +219,7 @@ export async function executeCell({
       intentionalLogs,
       runtime.notebookOutputApi,
       runtime.localize,
+      isolate,
     );
     endExecution(false);
     return false;
@@ -329,12 +331,18 @@ async function writeFailureOutput(
   intentionalLogs: readonly string[],
   notebookOutputApi: NotebookOutputApi,
   localize: Localize,
+  isIsolated: boolean,
 ): Promise<void> {
   const outputs: vscode.NotebookCellOutput[] = [];
 
-  if (intentionalLogs.length > 0) {
+  if (isIsolated) {
     outputs.push(
-      createIntentionalLogOutput(intentionalLogs, notebookOutputApi, localize),
+      new notebookOutputApi.NotebookCellOutput([
+        notebookOutputApi.NotebookCellOutputItem.text(
+          getIsolationAnnotationMessage(localize),
+          "text/plain",
+        ),
+      ]),
     );
   }
 
@@ -347,6 +355,16 @@ async function writeFailureOutput(
       ]),
     );
 
+    if (intentionalLogs.length > 0) {
+      outputs.push(
+        createIntentionalLogOutput(
+          intentionalLogs,
+          notebookOutputApi,
+          localize,
+        ),
+      );
+    }
+
     await execution.replaceOutput(outputs);
     return;
   }
@@ -358,6 +376,12 @@ async function writeFailureOutput(
       notebookOutputApi.NotebookCellOutputItem.error(error),
     ]),
   );
+
+  if (intentionalLogs.length > 0) {
+    outputs.push(
+      createIntentionalLogOutput(intentionalLogs, notebookOutputApi, localize),
+    );
+  }
 
   await execution.replaceOutput(outputs);
 }

@@ -1139,10 +1139,12 @@ test("executeCell reports bridge-unavailable failure when isolated $cell setup t
 
   assert.equal(execution.success, false);
   assert.equal(callIndex, 1);
-  assert.equal(execution.outputs.length, 1);
-  assert.equal(execution.outputs[0]?.items[0]?.kind, "error");
+  assert.equal(execution.outputs.length, 2);
+  assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
+  assert.equal(execution.outputs[0]?.items[0]?.value, "(isolated cell)");
+  assert.equal(execution.outputs[1]?.items[0]?.kind, "error");
 
-  const renderedError = execution.outputs[0]?.items[0]?.value;
+  const renderedError = execution.outputs[1]?.items[0]?.value;
   assert.ok(renderedError instanceof Error);
   assert.equal(
     renderedError.message,
@@ -1200,8 +1202,10 @@ test("executeCell treats isolated setup exceptionDetails as bridge-unavailable f
 
   assert.equal(execution.success, false);
   assert.equal(callIndex, 1);
-  assert.equal(execution.outputs.length, 1);
-  assert.equal(execution.outputs[0]?.items[0]?.kind, "error");
+  assert.equal(execution.outputs.length, 2);
+  assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
+  assert.equal(execution.outputs[0]?.items[0]?.value, "(isolated cell)");
+  assert.equal(execution.outputs[1]?.items[0]?.kind, "error");
 });
 
 test("executeCell prepends isolated annotation as a separate rendered output", async () => {
@@ -1245,7 +1249,7 @@ test("executeCell prepends isolated annotation as a separate rendered output", a
   assert.equal(execution.outputs[1]?.items[0]?.value, "7");
 });
 
-test("executeCell does not prepend isolated annotation for failure outputs", async () => {
+test("executeCell prepends isolated annotation for failure outputs", async () => {
   const connection = createFakeConnection(async () => {
     return {
       result: {
@@ -1283,9 +1287,86 @@ test("executeCell does not prepend isolated annotation for failure outputs", asy
   });
 
   assert.equal(execution.success, false);
-  assert.equal(execution.outputs.length, 1);
+  assert.equal(execution.outputs.length, 2);
   assert.equal(execution.outputs[0]?.items.length, 1);
-  assert.equal(execution.outputs[0]?.items[0]?.kind, "error");
+  assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
+  assert.equal(execution.outputs[0]?.items[0]?.value, "(isolated cell)");
+  assert.equal(execution.outputs[1]?.items.length, 1);
+  assert.equal(execution.outputs[1]?.items[0]?.kind, "error");
+});
+
+test("executeCell keeps logs after error output for isolated failures", async () => {
+  let callIndex = 0;
+  const connection = createFakeConnection(async () => {
+    callIndex += 1;
+    if (callIndex === 1) {
+      return {
+        result: {
+          type: "string",
+          value: "__jbkRuntilmeCellBridge:test-logs-after-error",
+        },
+      } as never;
+    }
+
+    if (callIndex === 3) {
+      return {
+        result: {
+          type: "object",
+          subtype: "array",
+          value: ["before boom"],
+        },
+      } as never;
+    }
+
+    return {
+      result: {
+        type: "undefined",
+      },
+      exceptionDetails: {
+        text: "Uncaught TypeError: boom",
+        exception: {
+          className: "TypeError",
+          description: "TypeError: boom\n    at <anonymous>:1:1",
+        },
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell(
+      "$cell.log('before boom'); throw new TypeError('boom')",
+      DEFAULT_FAKE_CELL_URI,
+      {
+        jupyterBrowserKernel: { isolated: true },
+      },
+    ) as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 32,
+    runtime,
+  });
+
+  assert.equal(execution.success, false);
+  assert.equal(execution.outputs.length, 3);
+  assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
+  assert.equal(execution.outputs[0]?.items[0]?.value, "(isolated cell)");
+  assert.equal(execution.outputs[1]?.items[0]?.kind, "error");
+  assert.equal(execution.outputs[2]?.items[0]?.kind, "text");
+  assert.equal(
+    execution.outputs[2]?.items[0]?.value,
+    "Intentional logs:\nbefore boom",
+  );
 });
 
 test("executeCell kernel path never invokes Debugger APIs (passive provider)", async () => {
