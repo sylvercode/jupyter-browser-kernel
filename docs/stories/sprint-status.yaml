@@ -79,11 +79,11 @@ development_status:
   epic-4-retrospective: done
 
   # ── Epic 6: Safe Experimentation and Core Reliability ─────────────────────
-  epic-6: in-progress
+  epic-6: done
   6-1-validate-core-pipeline-with-deterministic-fixtures: done
   6-2-support-forward-and-rollback-cell-patterns: done
   6-3-preserve-multi-version-iteration-in-one-session: done
-  epic-6-retrospective: optional
+  epic-6-retrospective: done
 
   # ── Epic 7: Enable Foundry Profile Eligibility and Runtime (Post-MVP Profile)
   epic-7: backlog
@@ -148,4 +148,24 @@ action_items:
   - epic: 4
     action: "Preserve no-blame, evidence-linked review notes in story closeout artifacts"
     owner: "Amelia"
+    status: open
+  - epic: 6
+    action: "Add a reusable assertion pattern for exact contract-key and classification diagnostics in reliability stories"
+    owner: "Amelia"
+    status: open
+  - epic: 6
+    action: "Add a story-authoring guardrail for history-adjacent wording in notebook iteration requirements"
+    owner: "John"
+    status: open
+  - epic: 6
+    action: "Document a traceability-first check for overlap-prone reliability stories"
+    owner: "Winston"
+    status: open
+  - epic: 6
+    action: "Add epic-closeout reconciliation to the retrospective completion routine"
+    owner: "Amelia"
+    status: open
+  - epic: 6
+    action: "Capture Epic 6 reliability patterns in project docs for future profile work"
+    owner: "Paige"
     status: open
