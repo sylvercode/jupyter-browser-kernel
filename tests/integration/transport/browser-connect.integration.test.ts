@@ -14,6 +14,8 @@ import {
   normalizeEvaluationResult,
   normalizeTransportError,
 } from "../../../src/kernel/execution-result.js";
+import { getKernelFailureCellOutputMessage } from "../../../src/kernel/execution-messages.js";
+import { createLocalizeMock } from "../../unit/test-utils/localize-mock.js";
 import {
   startFoundryIntegrationLifecycle,
   type FoundryIntegrationLifecycle,
@@ -598,6 +600,16 @@ test(
       if (rerunProbe.ok) {
         assert.equal(rerunProbe.value, "0");
       }
+
+      const ambientLogProbe = normalizeEvaluationResult(
+        await activeConnection.evaluate(
+          "(() => { console.log('ambient-forward-rollback'); return globalThis.__jbkRollbackCounter; })()",
+        ),
+      );
+      assert.equal(ambientLogProbe.ok, true);
+      if (ambientLogProbe.ok) {
+        assert.equal(ambientLogProbe.value, "0");
+      }
     } finally {
       await disconnectActiveBrowserConnection();
     }
@@ -624,16 +636,20 @@ test(
 
       const rollbackFailure = normalizeEvaluationResult(
         await activeConnection.evaluate(
-          "(() => { throw new Error('rollback failed: restore baseline and retry rollback'); })()",
+          "(() => { throw new Error('rollback failed: manual cleanup required'); })()",
         ),
       );
 
       assert.equal(rollbackFailure.ok, false);
       if (!rollbackFailure.ok) {
         assert.equal(rollbackFailure.kind, "runtime-error");
+        assert.match(rollbackFailure.message, /rollback failed/i);
         assert.match(
-          rollbackFailure.message,
-          /restore baseline and retry rollback/i,
+          getKernelFailureCellOutputMessage(
+            createLocalizeMock(),
+            "transport-error",
+          ),
+          /Start a new Browser Kernel debug session/i,
         );
       }
     } finally {

@@ -3,7 +3,7 @@ epic: 6
 story: 2
 story_key: 6-2-support-forward-and-rollback-cell-patterns
 title: Support Forward and Rollback Cell Patterns
-status: review
+status: done
 created: 2026-06-30
 updated: 2026-06-30
 completion_note: Implemented deterministic forward/rollback coverage and cancellation recovery checks; validation suites passed and story moved to review.
@@ -25,7 +25,7 @@ dependencies:
 
 ## Status
 
-review
+done
 
 ## Story
 
@@ -95,6 +95,15 @@ so that I can experiment safely and restore state predictably.
   - [x] Run `npm run compile`.
   - [x] Run `npm run test`.
   - [x] Run `npm run test:integration:cdp` in Chromium-enabled environment.
+
+### Review Findings
+
+- [x] [Review][Patch] Rollback failure guidance assertion is test-injected instead of notebook-rendered recovery guidance [tests/integration/transport/browser-connect.integration.test.ts:627]
+- [x] [Review][Patch] Missing regression for failed rollback edited and rerun successfully in same session [tests/integration/notebook/stop-button.integration.test.ts:258]
+- [x] [Review][Patch] Missing explicit intentional-vs-ambient log separation verification in forward/rollback flows [tests/integration/transport/browser-connect.integration.test.ts:564]
+- [x] [Review][Patch] Cancel-then-rollback unit path does not assert remote termination call, leaving cancellation enforcement unverified [tests/unit/kernel/execution-kernel.test.ts:691]
+- [x] [Review][Patch] Forward/rollback sequencing assertion is too weak to catch duplicate evaluations [tests/unit/kernel/execution-kernel.test.ts:657]
+- [x] [Review][Patch] Stop-button forward/rollback integration test uses timing-fragile busy-loop and short hard timeouts [tests/integration/notebook/stop-button.integration.test.ts:263]
 
 ## Developer Context
 
