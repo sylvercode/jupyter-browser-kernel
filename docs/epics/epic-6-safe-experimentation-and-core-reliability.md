@@ -69,7 +69,7 @@ So that I can compare behavior quickly without reconnecting.
 
 **Given** at least two snippet revisions run in sequence
 **When** both runs complete
-**Then** outcomes are preserved for side-by-side comparison in session history
+**Then** outcomes are preserved for side-by-side comparison in notebook-native outputs
 **And** each run remains attributable to execution order and revision context.
 
 **Given** iterative edits and reruns
@@ -78,7 +78,7 @@ So that I can compare behavior quickly without reconnecting.
 **And** the run-edit-rerun loop remains uninterrupted.
 
 **Given** revision outcomes diverge
-**When** the user inspects output history
+**When** the user inspects prior notebook outputs
 **Then** differences are traceable to specific runs
 **And** no prior revision outcomes are overwritten by later runs.
 
