@@ -76,15 +76,7 @@ development_status:
   epic-4: in-progress
   4-1-return-execution-values-to-notebook-output: done
   4-2-display-structured-value-output-with-type-context: backlog
-  4-3-preserve-session-scoped-execution-history: backlog
   epic-4-retrospective: optional
-
-  # ── Epic 5: Present Complex Variables and Watches (Post-MVP Core) ─────────
-  epic-5: backlog
-  5-1-create-and-refresh-watched-expressions: backlog
-  5-2-add-depth-limited-projection-and-nested-expansion: backlog
-  5-3-isolate-watch-evaluation-failures: backlog
-  epic-5-retrospective: optional
 
   # ── Epic 6: Safe Experimentation and Core Reliability ─────────────────────
   epic-6: backlog
