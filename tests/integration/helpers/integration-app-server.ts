@@ -3,6 +3,16 @@ import CDP from "chrome-remote-interface";
 
 import { startHeadlessChromium } from "./headless-chromium.js";
 
+export interface StaticPageRoute {
+  path: string;
+  body: string;
+}
+
+export interface StaticAppServerOptions {
+  routes?: StaticPageRoute[];
+  defaultBody?: string;
+}
+
 export interface FoundryAppServerSession {
   stop: () => Promise<void>;
 }
@@ -11,19 +21,28 @@ export interface FoundryIntegrationLifecycle {
   stop: () => Promise<void>;
 }
 
-export async function startFoundryAppServer(
+export type StaticAppServerSession = FoundryAppServerSession;
+export type StaticIntegrationLifecycle = FoundryIntegrationLifecycle;
+
+export async function startStaticAppServer(
   host: string,
   port: number,
-): Promise<FoundryAppServerSession> {
+  options?: StaticAppServerOptions,
+): Promise<StaticAppServerSession> {
+  const routeMap = new Map(
+    (options?.routes ?? []).map((route) => [route.path, route.body]),
+  );
+  const defaultBody =
+    options?.defaultBody ?? "<html><body>generic-target</body></html>";
+
   const server = http.createServer((request, response) => {
-    if (request.url === "/game") {
-      response.writeHead(200, { "content-type": "text/html" });
-      response.end("<html><body>foundry-target</body></html>");
-      return;
-    }
+    const requestPath = request.url
+      ? (request.url.split("?")[0] ?? request.url)
+      : undefined;
+    const routeBody = requestPath ? routeMap.get(requestPath) : undefined;
 
     response.writeHead(200, { "content-type": "text/html" });
-    response.end("<html><body>generic-target</body></html>");
+    response.end(routeBody ?? defaultBody);
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -44,18 +63,26 @@ export async function startFoundryAppServer(
   };
 }
 
-export async function startFoundryIntegrationLifecycle(
+export async function startStaticIntegrationLifecycle(
   host: string,
   cdpPort: number,
   appPort: number,
-): Promise<FoundryIntegrationLifecycle> {
+  targetPath: string = "/game",
+): Promise<StaticIntegrationLifecycle> {
   const chromium = await startHeadlessChromium(host, cdpPort);
-  const appServer = await startFoundryAppServer(host, appPort);
+  const appServer = await startStaticAppServer(host, appPort, {
+    routes: [
+      {
+        path: targetPath,
+        body: "<html><body>static-target</body></html>",
+      },
+    ],
+  });
 
   const browser = await CDP({ host, port: cdpPort });
   try {
     await browser.Target.createTarget({
-      url: `http://${host}:${appPort}/game`,
+      url: `http://${host}:${appPort}${targetPath}`,
     });
   } finally {
     await browser.close();
@@ -64,8 +91,29 @@ export async function startFoundryIntegrationLifecycle(
   return {
     stop: async () => {
       await chromium.stop();
-      // Stop the app server after stopping Chromium to ensure that any open connections are closed first.
       await appServer.stop();
     },
   };
+}
+
+export async function startFoundryAppServer(
+  host: string,
+  port: number,
+): Promise<FoundryAppServerSession> {
+  return startStaticAppServer(host, port, {
+    routes: [
+      {
+        path: "/game",
+        body: "<html><body>foundry-target</body></html>",
+      },
+    ],
+  });
+}
+
+export async function startFoundryIntegrationLifecycle(
+  host: string,
+  cdpPort: number,
+  appPort: number,
+): Promise<FoundryIntegrationLifecycle> {
+  return startStaticIntegrationLifecycle(host, cdpPort, appPort, "/game");
 }

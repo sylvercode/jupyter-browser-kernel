@@ -164,6 +164,22 @@ test(
       const launchResponse = await request("launch", {});
       assert.equal(launchResponse.success, true);
 
+      const debuggerEnabledProbe = await activeConnection.debugger.evaluate({
+        expression: "41 + 1",
+        awaitPromise: true,
+        returnByValue: true,
+      });
+      assert.equal(debuggerEnabledProbe.result?.value, 42);
+
+      const parsedUrls = new Set<string>();
+      const parsedSubscription = activeConnection.debugger.onScriptParsed(
+        (event) => {
+          if (event.url.length > 0) {
+            parsedUrls.add(event.url);
+          }
+        },
+      );
+
       const pauseSubscription = activeConnection.debugger.onPaused(() => {
         void activeConnection.debugger.resume();
       });
@@ -196,7 +212,14 @@ test(
       await activeConnection.evaluate(expression);
       await activeConnection.evaluate(expression);
 
+      await delay(100);
+
+      assert.ok(parsedUrls.has(cellUrl));
+      const matchingCellUrls = [...parsedUrls].filter((url) => url === cellUrl);
+      assert.equal(matchingCellUrls.length, 1);
+
       pauseSubscription.dispose();
+      parsedSubscription.dispose();
 
       const disconnectResponse = await request("disconnect", {});
       assert.equal(disconnectResponse.success, true);

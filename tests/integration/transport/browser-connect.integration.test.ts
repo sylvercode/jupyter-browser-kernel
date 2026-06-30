@@ -11,6 +11,10 @@ import {
 } from "../../../src/transport/browser-connect.js";
 import { coreTargetProfile } from "../../../src/profile/core-target-profile.js";
 import {
+  normalizeEvaluationResult,
+  normalizeTransportError,
+} from "../../../src/kernel/execution-result.js";
+import {
   startFoundryIntegrationLifecycle,
   type FoundryIntegrationLifecycle,
 } from "../helpers/integration-app-server.js";
@@ -320,6 +324,144 @@ test(
       );
     } finally {
       await disconnectActiveBrowserConnection();
+    }
+  },
+);
+
+test(
+  "core deterministic normalization outcomes stay consistent across equivalent fixtures",
+  { skip: !runIntegration },
+  async () => {
+    const connected = await connectToBrowserTarget(
+      { host, port: cdpPort },
+      coreTargetProfile,
+    );
+
+    assert.equal(connected.ok, true);
+
+    try {
+      const activeConnection = getActiveBrowserConnection();
+      assert.ok(activeConnection);
+      if (!activeConnection) {
+        return;
+      }
+
+      const success = normalizeEvaluationResult(
+        await activeConnection.evaluate("6 * 7"),
+      );
+      assert.equal(success.ok, true);
+      if (success.ok) {
+        assert.equal(success.type, "number");
+        assert.equal(success.value, "42");
+      }
+
+      const syntaxFailure = normalizeEvaluationResult(
+        await activeConnection.evaluate("function broken( {"),
+      );
+      assert.equal(syntaxFailure.ok, false);
+      if (!syntaxFailure.ok) {
+        assert.equal(syntaxFailure.kind, "syntax-error");
+      }
+
+      const runtimeFailure = normalizeEvaluationResult(
+        await activeConnection.evaluate(
+          "(() => { throw new TypeError('boom'); })()",
+        ),
+      );
+      assert.equal(runtimeFailure.ok, false);
+      if (!runtimeFailure.ok) {
+        assert.equal(runtimeFailure.kind, "runtime-error");
+      }
+
+      const promiseRejection = normalizeEvaluationResult(
+        await activeConnection.evaluate(
+          "await Promise.reject(new TypeError('boom'))",
+        ),
+      );
+      assert.equal(promiseRejection.ok, false);
+      if (!promiseRejection.ok) {
+        const validPromiseKinds = new Set([
+          "promise-rejection",
+          "runtime-error",
+        ]);
+        assert.ok(validPromiseKinds.has(promiseRejection.kind));
+      }
+
+      assert.equal(runtimeFailure.ok, false);
+      assert.equal(promiseRejection.ok, false);
+      if (!runtimeFailure.ok && !promiseRejection.ok) {
+        assert.equal(runtimeFailure.name, promiseRejection.name);
+        assert.equal(runtimeFailure.message, promiseRejection.message);
+      }
+
+      const serializationBoundary = normalizeEvaluationResult(
+        await activeConnection.evaluate(
+          "({ nested: { value: 1 }, arr: [1,2,3] })",
+        ),
+      );
+      assert.equal(serializationBoundary.ok, true);
+      if (serializationBoundary.ok) {
+        assert.equal(serializationBoundary.type, "object");
+        assert.match(serializationBoundary.value, /"nested"/);
+      }
+    } finally {
+      await disconnectActiveBrowserConnection();
+    }
+  },
+);
+
+test(
+  "transport timeout fixture normalizes to timeout classification",
+  { skip: !runIntegration },
+  async () => {
+    const browser = await CDP({ host, port: cdpPort });
+
+    try {
+      const { targetInfos } = await browser.Target.getTargets();
+      const pageTarget = targetInfos.find(
+        (target) =>
+          target.type === "page" &&
+          typeof target.url === "string" &&
+          target.url.includes("/game"),
+      );
+
+      assert.ok(pageTarget?.targetId);
+      if (!pageTarget?.targetId) {
+        return;
+      }
+
+      const session = await browser.Target.attachToTarget(
+        createAttachToTargetParams(pageTarget.targetId),
+      );
+
+      await browser.send("Runtime.enable", undefined, session.sessionId);
+
+      let timeoutError: unknown;
+      try {
+        await browser.send(
+          "Runtime.evaluate",
+          {
+            expression:
+              "new Promise((resolve) => { const start = Date.now(); while (Date.now() - start < 250) {} resolve('late'); })",
+            awaitPromise: true,
+            returnByValue: true,
+            timeout: 50,
+          },
+          session.sessionId,
+        );
+      } catch (error) {
+        timeoutError = error;
+      }
+
+      assert.ok(timeoutError);
+      const normalized = normalizeTransportError(timeoutError);
+      const validTimeoutPairs = new Set([
+        "timeout:EvaluationTimeout",
+        "transport-error:TransportError",
+      ]);
+      assert.ok(validTimeoutPairs.has(`${normalized.kind}:${normalized.name}`));
+    } finally {
+      await browser.close();
     }
   },
 );

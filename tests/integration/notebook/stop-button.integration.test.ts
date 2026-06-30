@@ -131,6 +131,9 @@ test(
           replaceOutput: async (outputs: FakeNotebookCellOutput[]) => {
             record.outputs = outputs;
           },
+          clearOutput: async () => {
+            record.outputs = [];
+          },
         };
       },
     };
