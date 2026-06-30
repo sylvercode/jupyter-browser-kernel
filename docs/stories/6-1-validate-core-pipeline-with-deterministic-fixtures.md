@@ -3,10 +3,11 @@ epic: 6
 story: 1
 story_key: 6-1-validate-core-pipeline-with-deterministic-fixtures
 title: Validate Core Pipeline with Deterministic Fixtures
-status: ready-for-dev
+status: review
 created: 2026-06-30
 updated: 2026-06-30
 completion_note: Ultimate context engine analysis completed - comprehensive developer guide created.
+baseline_commit: 7ad442f08b8d405b26586b9b5ecaca50237f761d
 dependencies:
   - story: 2.3
     title: Normalize Success and Failure Output Contracts
@@ -23,7 +24,7 @@ dependencies:
 
 ## Status
 
-ready-for-dev
+review
 
 ## Story
 
@@ -67,34 +68,34 @@ so that core runtime behavior remains stable and profile-agnostic.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add deterministic fixture matrix for core result normalization (AC: 1, 2)
-  - [ ] Extend unit coverage in `tests/unit/kernel/execution-result.test.ts` with explicit fixture-driven table tests for success, syntax failure, runtime failure, promise rejection, timeout, and serialization boundaries.
-  - [ ] Include edge serialization fixtures for circular-like cases, null/undefined, and large payload stringification expectations already supported by core normalization behavior.
-  - [ ] Ensure each case asserts both classification (`kind`) and exact contract keys.
+- [x] Task 1: Add deterministic fixture matrix for core result normalization (AC: 1, 2)
+  - [x] Extend unit coverage in `tests/unit/kernel/execution-result.test.ts` with explicit fixture-driven table tests for success, syntax failure, runtime failure, promise rejection, timeout, and serialization boundaries.
+  - [x] Include edge serialization fixtures for circular-like cases, null/undefined, and large payload stringification expectations already supported by core normalization behavior.
+  - [x] Ensure each case asserts both classification (`kind`) and exact contract keys.
 
-- [ ] Task 2: Add contract-shape mismatch diagnostics (AC: 2)
-  - [ ] Add helper assertions in kernel unit tests that compare expected vs actual keys and include case labels in assertion messages.
-  - [ ] Verify failure output in tests is actionable (which fixture failed, expected kind, actual kind, expected keys, actual keys).
+- [x] Task 2: Add contract-shape mismatch diagnostics (AC: 2)
+  - [x] Add helper assertions in kernel unit tests that compare expected vs actual keys and include case labels in assertion messages.
+  - [x] Verify failure output in tests is actionable (which fixture failed, expected kind, actual kind, expected keys, actual keys).
 
-- [ ] Task 3: Create profile-agnostic integration fixture harness (AC: 1, 3)
-  - [ ] Add or refactor integration helpers so core fixture tests can target a static page without importing Foundry-specific runtime behavior.
-  - [ ] Keep `RUN_CDP_INTEGRATION=1` gating and deterministic ports/host defaults.
-  - [ ] Ensure fixtures are reusable across transport and debugger integration suites.
+- [x] Task 3: Create profile-agnostic integration fixture harness (AC: 1, 3)
+  - [x] Add or refactor integration helpers so core fixture tests can target a static page without importing Foundry-specific runtime behavior.
+  - [x] Keep `RUN_CDP_INTEGRATION=1` gating and deterministic ports/host defaults.
+  - [x] Ensure fixtures are reusable across transport and debugger integration suites.
 
-- [ ] Task 4: Add static-page breakpoint-binding deterministic test (AC: 4)
-  - [ ] Add integration coverage proving per-cell `//# sourceURL` emitted by kernel evaluation is visible in the parsed script stream for the attached session.
-  - [ ] Assert Debugger domain enablement on the active session before breakpoint operations.
-  - [ ] Validate deterministic behavior on rerun (same cell URL stable across reruns).
+- [x] Task 4: Add static-page breakpoint-binding deterministic test (AC: 4)
+  - [x] Add integration coverage proving per-cell `//# sourceURL` emitted by kernel evaluation is visible in the parsed script stream for the attached session.
+  - [x] Assert Debugger domain enablement on the active session before breakpoint operations.
+  - [x] Validate deterministic behavior on rerun (same cell URL stable across reruns).
 
-- [ ] Task 5: Keep core suite profile-independent in CI (AC: 3)
-  - [ ] Ensure new core fixture tests do not import profile runtime modules.
-  - [ ] Confirm `npm run test` and `npm run test:integration:cdp` continue to run from repository root with current scripts.
-  - [ ] Document any environment assumptions in test headers/comments only when required.
+- [x] Task 5: Keep core suite profile-independent in CI (AC: 3)
+  - [x] Ensure new core fixture tests do not import profile runtime modules.
+  - [x] Confirm `npm run test` and `npm run test:integration:cdp` continue to run from repository root with current scripts.
+  - [x] Document any environment assumptions in test headers/comments only when required.
 
-- [ ] Task 6: Validate and record results (AC: 1-4)
-  - [ ] Run `npm run compile`.
-  - [ ] Run `npm run test`.
-  - [ ] Run `npm run test:integration:cdp` in an environment with Chromium available.
+- [x] Task 6: Validate and record results (AC: 1-4)
+  - [x] Run `npm run compile`.
+  - [x] Run `npm run test`.
+  - [x] Run `npm run test:integration:cdp` in an environment with Chromium available.
 
 ## Developer Context
 
@@ -236,8 +237,9 @@ so that core runtime behavior remains stable and profile-agnostic.
 
 ## Completion Status
 
-- Story context generated with comprehensive artifact analysis, architecture guardrails, test strategy, git intelligence, and latest-technology checks.
-- Story status set to `ready-for-dev` for implementation handoff.
+- Deterministic fixture matrix and contract-shape diagnostics implemented in unit tests.
+- Profile-agnostic static integration harness and deterministic breakpoint/sourceURL assertions implemented in integration tests.
+- Compile, unit, and targeted CDP integration suites passed; story moved to `review`.
 
 ## Dev Agent Record
 
@@ -248,12 +250,37 @@ GPT-5.3-Codex
 ### Debug Log References
 
 - /home/node/.vscode-server/data/User/workspaceStorage/2e9ad2f61a53a3e3bc350795b9312ec0/GitHub.copilot-chat/debug-logs/65a8a50b-ab4b-422c-865e-0d2b96db9026
+- /home/node/.vscode-server/data/User/workspaceStorage/2e9ad2f61a53a3e3bc350795b9312ec0/GitHub.copilot-chat/debug-logs/69130bfa-d931-4484-b56a-687b268a31d6
+
+### Implementation Plan
+
+- Extend kernel normalization unit coverage with deterministic fixture-table assertions for classifications and exact contract key sets.
+- Add reusable profile-agnostic static integration lifecycle helpers while preserving existing Foundry-oriented call sites.
+- Add deterministic integration coverage for normalized outcomes and breakpoint/sourceURL observability with debugger-domain readiness checks.
+- Validate via compile, full unit suite, and targeted CDP integration suite.
 
 ### Completion Notes List
 
-- Exhaustive planning artifacts reviewed (epic, PRD, architecture, prior story context, current implementation surfaces, and tests).
-- Sprint status will be updated to mark story readiness.
+- Implemented deterministic fixture matrix in `tests/unit/kernel/execution-result.test.ts` for success/failure/serialization boundaries.
+- Added actionable diagnostics for classification and contract-key mismatches with fixture labels and expected-vs-actual details.
+- Refactored integration static server lifecycle into profile-agnostic helper APIs and retained compatibility wrappers.
+- Added deterministic transport integration assertions for normalized outcome consistency and timeout normalization.
+- Added breakpoint integration assertions to verify debugger readiness and observed per-cell sourceURL stability across reruns.
+- Updated notebook stop-button integration execution stub with `clearOutput` to align with current kernel execution contract.
+- Validation executed: `npm run compile`, `npm run test`, and `npm run test:integration:cdp` (targeted suites), all passing.
 
 ### File List
 
 - docs/stories/6-1-validate-core-pipeline-with-deterministic-fixtures.md
+- docs/stories/sprint-status.yaml
+- tests/unit/kernel/execution-result.test.ts
+- tests/integration/helpers/integration-app-server.ts
+- tests/integration/transport/browser-connect.integration.test.ts
+- tests/integration/debugger/breakpoint-binding.integration.test.ts
+- tests/integration/notebook/stop-button.integration.test.ts
+
+## Change Log
+
+- 2026-06-30: Added deterministic fixture-table unit coverage and actionable contract-shape diagnostics for core normalization outcomes.
+- 2026-06-30: Added profile-agnostic static integration harness and deterministic integration assertions for normalized outcomes, sourceURL visibility, and debugger readiness.
+- 2026-06-30: Executed compile/unit/integration validation runs and updated story status to `review`.

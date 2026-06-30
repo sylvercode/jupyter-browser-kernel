@@ -7,10 +7,58 @@ import {
 } from "../../../src/kernel/execution-result.js";
 import type { BrowserRuntimeEvaluateResult } from "../../../src/transport/browser-connect.js";
 
+type NormalizedResult = ReturnType<typeof normalizeEvaluationResult>;
+
 function createResponse(
   input: Partial<BrowserRuntimeEvaluateResult>,
 ): BrowserRuntimeEvaluateResult {
   return input as BrowserRuntimeEvaluateResult;
+}
+
+function sortedKeys(value: object): string[] {
+  return Object.keys(value).sort();
+}
+
+function assertResultKeys(
+  label: string,
+  result: NormalizedResult,
+  expectedKeys: string[],
+): void {
+  const actualKeys = sortedKeys(result);
+  assert.deepEqual(
+    actualKeys,
+    expectedKeys,
+    [
+      `[fixture:${label}] contract key mismatch`,
+      `expected keys: ${expectedKeys.join(", ")}`,
+      `actual keys: ${actualKeys.join(", ")}`,
+      `expected kind: ${result.ok ? "<success>" : result.kind}`,
+      `actual kind: ${result.ok ? "<success>" : result.kind}`,
+    ].join(" | "),
+  );
+}
+
+function assertFailureKind(
+  label: string,
+  result: NormalizedResult,
+  expectedKind: Exclude<NormalizedResult, { ok: true }>["kind"],
+): void {
+  assert.equal(result.ok, false, `[fixture:${label}] expected failure result`);
+  if (result.ok) {
+    return;
+  }
+
+  assert.equal(
+    result.kind,
+    expectedKind,
+    [
+      `[fixture:${label}] classification mismatch`,
+      `expected kind: ${expectedKind}`,
+      `actual kind: ${result.kind}`,
+      `expected keys: kind, message, name, ok, stack`,
+      `actual keys: ${sortedKeys(result).join(", ")}`,
+    ].join(" | "),
+  );
 }
 
 test("normalizeEvaluationResult maps number success", () => {
@@ -700,4 +748,211 @@ test("normalizeEvaluationResult classification parity: sync throw vs async rejec
   // The ONLY difference should be kind
   assert.equal(syncResult.kind, "runtime-error");
   assert.equal(asyncResult.kind, "promise-rejection");
+});
+
+test("normalizeEvaluationResult deterministic fixture matrix validates classifications and exact contract keys", () => {
+  const largePayloadValue = "x".repeat(2048);
+
+  const fixtures: Array<{
+    label: string;
+    response: BrowserRuntimeEvaluateResult;
+    expected:
+      | { ok: true; type: string; value: string }
+      | {
+          ok: false;
+          kind: Exclude<NormalizedResult, { ok: true }>["kind"];
+          name: string;
+        };
+  }> = [
+    {
+      label: "success-number",
+      response: createResponse({ result: { type: "number", value: 42 } }),
+      expected: { ok: true, type: "number", value: "42" },
+    },
+    {
+      label: "syntax-failure",
+      response: createResponse({
+        result: { type: "undefined" },
+        exceptionDetails: {
+          exceptionId: 101,
+          text: "Uncaught SyntaxError: Unexpected token ';'",
+          lineNumber: 0,
+          columnNumber: 0,
+          exception: {
+            type: "object",
+            className: "SyntaxError",
+            description:
+              "SyntaxError: Unexpected token ';'\\n    at <anonymous>:1:1",
+          },
+        },
+      }),
+      expected: { ok: false, kind: "syntax-error", name: "SyntaxError" },
+    },
+    {
+      label: "runtime-failure",
+      response: createResponse({
+        result: { type: "undefined" },
+        exceptionDetails: {
+          exceptionId: 102,
+          text: "Uncaught TypeError: boom",
+          lineNumber: 0,
+          columnNumber: 0,
+          exception: {
+            type: "object",
+            className: "TypeError",
+            description: "TypeError: boom\\n    at run (<anonymous>:1:1)",
+          },
+        },
+      }),
+      expected: { ok: false, kind: "runtime-error", name: "TypeError" },
+    },
+    {
+      label: "promise-rejection",
+      response: createResponse({
+        result: { type: "undefined" },
+        exceptionDetails: {
+          exceptionId: 103,
+          text: "Uncaught (in promise) TypeError: async boom",
+          lineNumber: 0,
+          columnNumber: 0,
+          exception: {
+            type: "object",
+            className: "TypeError",
+            description: "TypeError: async boom\\n    at <anonymous>:1:1",
+          },
+        },
+      }),
+      expected: { ok: false, kind: "promise-rejection", name: "TypeError" },
+    },
+    {
+      label: "timeout",
+      response: createResponse({
+        result: { type: "undefined" },
+        exceptionDetails: {
+          exceptionId: 104,
+          text: "Script execution timed out.",
+          lineNumber: 0,
+          columnNumber: 0,
+        },
+      }),
+      expected: { ok: false, kind: "timeout", name: "EvaluationTimeout" },
+    },
+    {
+      label: "serialization-null",
+      response: createResponse({
+        result: { type: "object", subtype: "null", value: null },
+      }),
+      expected: { ok: true, type: "null", value: "null" },
+    },
+    {
+      label: "serialization-undefined",
+      response: createResponse({ result: { type: "undefined" } }),
+      expected: { ok: true, type: "undefined", value: "undefined" },
+    },
+    {
+      label: "serialization-circular-like",
+      response: createResponse({
+        result: { type: "object", description: "[Circular *1]" },
+      }),
+      expected: { ok: true, type: "object", value: "[Circular *1]" },
+    },
+    {
+      label: "serialization-large-payload",
+      response: createResponse({
+        result: { type: "object", value: { payload: largePayloadValue } },
+      }),
+      expected: {
+        ok: true,
+        type: "object",
+        value: JSON.stringify({ payload: largePayloadValue }),
+      },
+    },
+  ];
+
+  for (const fixture of fixtures) {
+    const result = normalizeEvaluationResult(fixture.response);
+
+    if (fixture.expected.ok) {
+      assert.equal(
+        result.ok,
+        true,
+        `[fixture:${fixture.label}] expected success result`,
+      );
+      if (!result.ok) {
+        continue;
+      }
+
+      assertResultKeys(fixture.label, result, ["ok", "type", "value"]);
+      assert.equal(result.type, fixture.expected.type, fixture.label);
+      assert.equal(result.value, fixture.expected.value, fixture.label);
+      continue;
+    }
+
+    assertFailureKind(fixture.label, result, fixture.expected.kind);
+    if (!result.ok) {
+      assertResultKeys(fixture.label, result, [
+        "kind",
+        "message",
+        "name",
+        "ok",
+        "stack",
+      ]);
+      assert.equal(result.name, fixture.expected.name, fixture.label);
+    }
+  }
+});
+
+test("normalizeTransportError deterministic fixture matrix validates timeout and transport-error keys", () => {
+  const fixtures: Array<{
+    label: string;
+    input: unknown;
+    expectedKind: "timeout" | "transport-error";
+    expectedName: string;
+  }> = [
+    {
+      label: "transport-timeout-message",
+      input: new Error("CDP evaluation timed out"),
+      expectedKind: "timeout",
+      expectedName: "EvaluationTimeout",
+    },
+    {
+      label: "transport-runtime-message",
+      input: new Error("Session closed unexpectedly"),
+      expectedKind: "transport-error",
+      expectedName: "TransportError",
+    },
+  ];
+
+  for (const fixture of fixtures) {
+    const result = normalizeTransportError(fixture.input);
+    assert.equal(
+      result.ok,
+      false,
+      `[fixture:${fixture.label}] expected failure`,
+    );
+    assert.equal(
+      result.kind,
+      fixture.expectedKind,
+      `[fixture:${fixture.label}] kind`,
+    );
+    assert.equal(
+      result.name,
+      fixture.expectedName,
+      `[fixture:${fixture.label}] name`,
+    );
+
+    const actualKeys = sortedKeys(result);
+    const expectedKeys = ["kind", "message", "name", "ok", "stack"];
+    assert.deepEqual(
+      actualKeys,
+      expectedKeys,
+      [
+        `[fixture:${fixture.label}] contract key mismatch`,
+        `expected kind: ${fixture.expectedKind}`,
+        `actual kind: ${result.kind}`,
+        `expected keys: ${expectedKeys.join(", ")}`,
+        `actual keys: ${actualKeys.join(", ")}`,
+      ].join(" | "),
+    );
+  }
 });
