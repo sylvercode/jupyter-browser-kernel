@@ -586,6 +586,397 @@ test("executeCell keeps success value output first when intentional logs are app
   );
 });
 
+test("executeCell supports forward and rollback cell runs in the same active session", async () => {
+  const evaluateCalls: string[] = [];
+  const connection = createFakeConnection(async (expression) => {
+    evaluateCalls.push(expression);
+
+    if (expression.includes("ROLLBACK_MARKER")) {
+      return {
+        result: {
+          type: "string",
+          value: "state-restored",
+        },
+      } as never;
+    }
+
+    return {
+      result: {
+        type: "string",
+        value: "state-mutated",
+      },
+    } as never;
+  });
+
+  const first = createExecutionRecorder();
+  const second = createExecutionRecorder();
+  let callCount = 0;
+
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  const controller = {
+    createNotebookCellExecution: () => {
+      callCount += 1;
+      return callCount === 1
+        ? first.notebookExecution
+        : second.notebookExecution;
+    },
+  };
+
+  const forwardCancelled = await executeCell({
+    cell: createFakeCell(
+      "globalThis.state = 'mutated'; 'FORWARD_MARKER state-mutated'",
+    ) as never,
+    controller: controller as never,
+    executionOrder: 200,
+    runtime,
+  });
+
+  const rollbackCancelled = await executeCell({
+    cell: createFakeCell(
+      "globalThis.state = 'baseline'; 'ROLLBACK_MARKER state-restored'",
+    ) as never,
+    controller: controller as never,
+    executionOrder: 201,
+    runtime,
+  });
+
+  assert.equal(forwardCancelled, false);
+  assert.equal(rollbackCancelled, false);
+  assert.equal(first.execution.success, true);
+  assert.equal(second.execution.success, true);
+  assert.equal(first.execution.outputs[0]?.items[0]?.value, "state-mutated");
+  assert.equal(second.execution.outputs[0]?.items[0]?.value, "state-restored");
+  const userExpressions = collectUserExpressions(evaluateCalls);
+  assert.equal(userExpressions.length, 2);
+  assert.match(userExpressions[0] ?? "", /FORWARD_MARKER/);
+  assert.match(userExpressions[1] ?? "", /ROLLBACK_MARKER/);
+});
+
+test("executeCell allows rollback rerun after a cancelled forward run in same session", async () => {
+  let forwardRelease: (() => void) | undefined;
+  const forwardBarrier = new Promise<void>((resolve) => {
+    forwardRelease = resolve;
+  });
+  let forwardStarted: (() => void) | undefined;
+  const forwardStartedPromise = new Promise<void>((resolve) => {
+    forwardStarted = resolve;
+  });
+
+  let phase: "forward" | "rollback" = "forward";
+  let terminateCalls = 0;
+  const connection = {
+    ...createFakeConnection(async () => {
+      if (phase === "forward") {
+        forwardStarted?.();
+        await forwardBarrier;
+        return {
+          result: {
+            type: "string",
+            value: "unreached",
+          },
+        } as never;
+      }
+
+      return {
+        result: {
+          type: "string",
+          value: "rollback-ok",
+        },
+      } as never;
+    }),
+    terminateExecution: async () => {
+      terminateCalls += 1;
+    },
+  } satisfies ActiveBrowserConnection;
+
+  const forwardRecorder = createExecutionRecorder();
+  const rollbackRecorder = createExecutionRecorder();
+
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  const forwardRun = executeCell({
+    cell: createFakeCell("forward();") as never,
+    controller: {
+      createNotebookCellExecution: () => forwardRecorder.notebookExecution,
+    } as never,
+    executionOrder: 203,
+    runtime,
+  });
+
+  await forwardStartedPromise;
+  forwardRecorder.cancel();
+  forwardRelease?.();
+  const forwardCancelled = await forwardRun;
+
+  phase = "rollback";
+
+  const rollbackCancelled = await executeCell({
+    cell: createFakeCell("rollback();") as never,
+    controller: {
+      createNotebookCellExecution: () => rollbackRecorder.notebookExecution,
+    } as never,
+    executionOrder: 204,
+    runtime,
+  });
+
+  assert.equal(forwardCancelled, true);
+  assert.equal(terminateCalls, 1);
+  assert.equal(forwardRecorder.execution.success, false);
+  assert.equal(rollbackCancelled, false);
+  assert.equal(rollbackRecorder.execution.success, true);
+  assert.equal(
+    rollbackRecorder.execution.outputs[0]?.items[0]?.value,
+    "rollback-ok",
+  );
+});
+
+test("executeCell allows editing and rerunning rollback after a rollback failure in same session", async () => {
+  const evaluateCalls: string[] = [];
+  let rollbackAttempt = 0;
+  const connection = createFakeConnection(async (expression) => {
+    evaluateCalls.push(expression);
+
+    if (expression.includes("FORWARD_MARKER")) {
+      return {
+        result: {
+          type: "string",
+          value: "state-mutated",
+        },
+      } as never;
+    }
+
+    if (expression.includes("ROLLBACK_MARKER_FAIL")) {
+      rollbackAttempt += 1;
+      return {
+        result: {
+          type: "undefined",
+        },
+        exceptionDetails: {
+          text: "Uncaught Error: rollback failed",
+          exception: {
+            className: "Error",
+            description: "Error: rollback failed",
+          },
+        },
+      } as never;
+    }
+
+    return {
+      result: {
+        type: "string",
+        value: "state-restored",
+      },
+    } as never;
+  });
+
+  const forward = createExecutionRecorder();
+  const rollbackFailed = createExecutionRecorder();
+  const rollbackRerun = createExecutionRecorder();
+  let callCount = 0;
+
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  const controller = {
+    createNotebookCellExecution: () => {
+      callCount += 1;
+      if (callCount === 1) {
+        return forward.notebookExecution;
+      }
+
+      if (callCount === 2) {
+        return rollbackFailed.notebookExecution;
+      }
+
+      return rollbackRerun.notebookExecution;
+    },
+  };
+
+  const forwardCancelled = await executeCell({
+    cell: createFakeCell(
+      "globalThis.state = 'mutated'; 'FORWARD_MARKER'",
+    ) as never,
+    controller: controller as never,
+    executionOrder: 205,
+    runtime,
+  });
+
+  const failedRollbackCancelled = await executeCell({
+    cell: createFakeCell("throw new Error('ROLLBACK_MARKER_FAIL')") as never,
+    controller: controller as never,
+    executionOrder: 206,
+    runtime,
+  });
+
+  const rerunRollbackCancelled = await executeCell({
+    cell: createFakeCell(
+      "globalThis.state = 'baseline'; 'ROLLBACK_MARKER_OK'",
+    ) as never,
+    controller: controller as never,
+    executionOrder: 207,
+    runtime,
+  });
+
+  assert.equal(forwardCancelled, false);
+  assert.equal(failedRollbackCancelled, false);
+  assert.equal(rerunRollbackCancelled, false);
+  assert.equal(forward.execution.success, true);
+  assert.equal(rollbackFailed.execution.success, false);
+  assert.equal(rollbackFailed.execution.outputs[0]?.items[0]?.kind, "error");
+  assert.equal(rollbackRerun.execution.success, true);
+  assert.equal(
+    rollbackRerun.execution.outputs[0]?.items[0]?.value,
+    "state-restored",
+  );
+  assert.equal(rollbackAttempt, 1);
+
+  const userExpressions = collectUserExpressions(evaluateCalls);
+  assert.equal(userExpressions.length, 3);
+  assert.match(userExpressions[1] ?? "", /ROLLBACK_MARKER_FAIL/);
+  assert.match(userExpressions[2] ?? "", /ROLLBACK_MARKER_OK/);
+});
+
+test("executeCell keeps result-first ordering and intentional-only logs across forward then rollback", async () => {
+  let callIndex = 0;
+  const connection = createFakeConnection(async () => {
+    callIndex += 1;
+
+    // setup (forward), user-eval (forward), teardown (forward), setup (rollback), user-eval (rollback), teardown (rollback)
+    if (callIndex === 1 || callIndex === 4) {
+      return {
+        result: {
+          type: "string",
+          value: "__jbkRuntilmeCellBridge:flow",
+        },
+      } as never;
+    }
+
+    if (callIndex === 2) {
+      return {
+        result: {
+          type: "string",
+          value: "forward-value",
+        },
+      } as never;
+    }
+
+    if (callIndex === 3) {
+      return {
+        result: {
+          type: "object",
+          subtype: "array",
+          value: ["forward-intentional"],
+        },
+      } as never;
+    }
+
+    if (callIndex === 5) {
+      return {
+        result: {
+          type: "string",
+          value: "rollback-value",
+        },
+      } as never;
+    }
+
+    return {
+      result: {
+        type: "object",
+        subtype: "array",
+        value: ["rollback-intentional"],
+      },
+    } as never;
+  });
+
+  const forward = createExecutionRecorder();
+  const rollback = createExecutionRecorder();
+  let callCount = 0;
+
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  const controller = {
+    createNotebookCellExecution: () => {
+      callCount += 1;
+      return callCount === 1
+        ? forward.notebookExecution
+        : rollback.notebookExecution;
+    },
+  };
+
+  await executeCell({
+    cell: createFakeCell(
+      "$cell.log('forward-intentional'); 'forward-value'",
+      undefined,
+      {
+        jupyterBrowserKernel: { isolated: true },
+      },
+    ) as never,
+    controller: controller as never,
+    executionOrder: 208,
+    runtime,
+  });
+
+  await executeCell({
+    cell: createFakeCell(
+      "$cell.log('rollback-intentional'); 'rollback-value'",
+      undefined,
+      {
+        jupyterBrowserKernel: { isolated: true },
+      },
+    ) as never,
+    controller: controller as never,
+    executionOrder: 209,
+    runtime,
+  });
+
+  assert.equal(forward.execution.success, true);
+  assert.equal(forward.execution.outputs.length, 2);
+  assert.equal(forward.execution.outputs[0]?.items[0]?.value, "forward-value");
+  assert.equal(
+    forward.execution.outputs[1]?.items[0]?.value,
+    "Cell logs:\nforward-intentional",
+  );
+
+  assert.equal(rollback.execution.success, true);
+  assert.equal(rollback.execution.outputs.length, 2);
+  assert.equal(
+    rollback.execution.outputs[0]?.items[0]?.value,
+    "rollback-value",
+  );
+  assert.equal(
+    rollback.execution.outputs[1]?.items[0]?.value,
+    "Cell logs:\nrollback-intentional",
+  );
+});
+
 test("executeCell uses global mode when getDefaultCellIsolation returns false (backward-compat boolean false path)", async () => {
   const sourceUri =
     "vscode-notebook-cell://test-authority/workspaces/foundry-devil-code-sight/tests/files/test1.ipynb#ch0000000000001";
