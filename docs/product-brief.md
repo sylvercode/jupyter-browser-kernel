@@ -57,11 +57,11 @@ Primary users:
 1. Power users and developers who iterate JavaScript logic against live browser applications.
 2. Solo builders who need a repeatable notebook workflow with fast reruns and explicit failure diagnostics.
 
-Post-MVP example profile audience:
+De-scoped example profile audience:
 
-1. Foundry VTT builders who want notebook-first macro iteration.
+1. Foundry VTT builders were previously planned as an example profile, but that scope is now de-scoped from this repository.
 
-Foundry is the first example profile after MVP, not the platform definition.
+Foundry-specific profile work is no longer part of the current product scope.
 
 ## Success Criteria
 
@@ -84,13 +84,13 @@ Foundry is the first example profile after MVP, not the platform definition.
 7. Extension-owned runtime envelope and structured output helper protocol.
 8. Deterministic target-matching and target-eligibility diagnostics for the active profile boundary.
 
-### Post-MVP Scope
+### De-Scoped Profile Scope
 
-1. Foundry profile examples, including token-state read and token update notebook flows.
-2. Rich complex-object inspection and deeper app-aware diagnostics.
-3. Optional companion-module enhancements for app-specific deep runtime integration.
-4. Observation and parameterization extensions, including watcher-depth improvements and prompt-based cell inputs.
-5. Workspace action promotion and action reuse workflows.
+1. Foundry profile examples, including token-state read and token update notebook flows, were removed from the current scope.
+2. Rich complex-object inspection and deeper app-aware diagnostics for a Foundry profile are out of scope for this repository.
+3. Optional companion-module enhancements for app-specific deep runtime integration are out of scope.
+4. Observation and parameterization extensions remain tracked separately in the core roadmap.
+5. Workspace action promotion and action reuse workflows are out of scope for the current product line.
 
 ### Explicit MVP Non-Goals
 
@@ -102,7 +102,7 @@ Foundry is the first example profile after MVP, not the platform definition.
 
 ## Vision
 
-If successful, jupyter-browser-kernel becomes a reusable browser-execution platform with a stable core and thin app-specific profiles. Foundry serves as the first practical profile example, proving profile layering without coupling the platform to a single domain.
+If successful, jupyter-browser-kernel becomes a reusable browser-execution platform with a stable core and thin app-specific profiles. Foundry-specific profile work is not part of the current repository scope.
 
 Long term, the product can expand profile coverage while preserving the same kernel contract, notebook experience, and coexistence guarantees.
 
