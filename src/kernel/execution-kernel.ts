@@ -25,6 +25,7 @@ import {
   createRuntilmeCellBridgeTeardownExpression,
   referencesRuntimeCellBridge,
 } from "./runtilme-cell-bridge";
+import { RESULT_TYPE_METADATA_KEY } from "../notebook/result-type-metadata";
 
 export interface NotebookOutputApi {
   NotebookCellOutput: typeof vscode.NotebookCellOutput;
@@ -108,13 +109,13 @@ export async function executeCell({
   execution.start(Date.now());
   execution.executionOrder = executionOrder;
 
-  // Clear outputs when execution starts so result-type status disappears during running state
-  await execution.clearOutput();
-
   if (execution.token.isCancellationRequested) {
     endExecution(false);
     return true;
   }
+
+  // Clear outputs when execution starts so result-type status disappears during running state.
+  await execution.clearOutput();
 
   try {
     const connection = runtime.getActiveConnection();
@@ -342,7 +343,7 @@ async function writeSuccessOutput(
 
   // Add result type to output metadata for status bar rendering
   const outputMetadata = {
-    "jupyterBrowserKernel.resultType": resultType,
+    [RESULT_TYPE_METADATA_KEY]: resultType,
   };
 
   outputs.push(

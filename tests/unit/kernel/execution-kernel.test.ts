@@ -644,6 +644,14 @@ test("executeCell exits before evaluation when cancellation was already requeste
   const { execution, notebookExecution } = createExecutionRecorder({
     isCancellationRequested: true,
   });
+  let clearOutputCalled = false;
+  const cancellingExecution = {
+    ...notebookExecution,
+    clearOutput: async () => {
+      clearOutputCalled = true;
+      await notebookExecution.clearOutput();
+    },
+  };
 
   const runtime = createKernelRuntime(
     {
@@ -657,7 +665,7 @@ test("executeCell exits before evaluation when cancellation was already requeste
   const wasCancelled = await executeCell({
     cell: createFakeCell("5 + 5") as never,
     controller: {
-      createNotebookCellExecution: () => notebookExecution,
+      createNotebookCellExecution: () => cancellingExecution,
     } as never,
     executionOrder: 8,
     runtime,
@@ -665,6 +673,7 @@ test("executeCell exits before evaluation when cancellation was already requeste
 
   assert.equal(wasCancelled, true);
   assert.deepEqual(evaluateCalls, []);
+  assert.equal(clearOutputCalled, false);
   assert.equal(execution.success, false);
   assert.equal(execution.outputs.length, 0);
 });

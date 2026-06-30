@@ -22,5 +22,6 @@
   "configuration.defaultCellIsolation.enum.isolated.label": "Isolated mode",
   "configuration.defaultCellIsolation.enum.global.label": "Global mode",
   "configuration.defaultCellIsolation.enum.isolated.description": "Run cells in isolated mode by default. The cell bridge is available and values require explicit return.",
-  "configuration.defaultCellIsolation.enum.global.description": "Run cells in global mode by default. No $cell bridge is injected and normal global execution semantics apply."
+  "configuration.defaultCellIsolation.enum.global.description": "Run cells in global mode by default. No $cell bridge is injected and normal global execution semantics apply.",
+  "Result Type: {0}": "Result Type: {0}"
 }

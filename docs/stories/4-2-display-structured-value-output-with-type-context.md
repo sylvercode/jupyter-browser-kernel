@@ -3,7 +3,7 @@ epic: 4
 story: 2
 story_key: 4-2-display-structured-value-output-with-type-context
 title: Display Structured Value Output with Type Context
-status: review
+status: done
 baseline_commit: b2077ff8348508c1e57809d5c8d6f16665e594ac
 created: 2026-06-29
 updated: 2026-06-30
@@ -24,7 +24,7 @@ dependencies:
 
 ## Status
 
-review
+done
 
 ## Story
 
@@ -114,6 +114,14 @@ Out of scope for this story revision:
   - [x] Run `npm run compile`.
   - [x] Run targeted tests for kernel and notebook status-bar units.
   - [x] Run `npm run test` if feasible.
+
+### Review Findings
+
+- [x] [Review][Patch] Cancellation clears existing output before pre-cancel guard, causing destructive behavior on immediate cancellation [src/kernel/execution-kernel.ts:111]
+- [x] [Review][Patch] Result-type localization key was added to l10n bundle but not package-level NLS manifest required by story task [l10n/bundle.l10n.json:74]
+- [x] [Review][Patch] Result-type metadata key is duplicated as string literals across producer and consumer, creating silent drift risk [src/kernel/execution-kernel.ts:344]
+- [x] [Review][Patch] Result-type extraction reads only first output, making status bar fragile to output ordering changes [src/notebook/result-type-status-bar.ts:35]
+- [x] [Review][Patch] Status bar refresh fires for every notebook document change without filtering relevant output changes [src/notebook/result-type-status-bar.ts:90]
 
 ## Developer Context
 

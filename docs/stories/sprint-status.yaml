@@ -75,7 +75,7 @@ development_status:
   # ── Epic 4: Capture Intentional Values (Basic) ───────────────────────────
   epic-4: in-progress
   4-1-return-execution-values-to-notebook-output: done
-  4-2-display-structured-value-output-with-type-context: review
+  4-2-display-structured-value-output-with-type-context: done
   epic-4-retrospective: optional
 
   # ── Epic 6: Safe Experimentation and Core Reliability ─────────────────────

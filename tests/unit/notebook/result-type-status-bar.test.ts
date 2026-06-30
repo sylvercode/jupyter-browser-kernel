@@ -193,6 +193,28 @@ test("returns no status item when no result type metadata exists", () => {
   assert.equal(items.length, 0);
 });
 
+test("shows status item when result type metadata appears on a non-first output", () => {
+  const harness = createHarness();
+  const cell = harness.createCell([
+    {
+      metadata: {},
+    },
+    {
+      metadata: {
+        "jupyterBrowserKernel.resultType": "number",
+      },
+    },
+  ]);
+
+  const items = harness.provider?.provideCellStatusBarItems(cell, undefined) as
+    | FakeNotebookCellStatusBarItem[]
+    | undefined;
+
+  assert.ok(items);
+  assert.equal(items.length, 1);
+  assert.equal(items[0]?.text, "Result Type: number");
+});
+
 test("returns no status item when cell has no outputs", () => {
   const harness = createHarness();
   const cell = harness.createCell([]);
@@ -256,9 +278,27 @@ test("fires refresh when notebook document changes", () => {
     changed = true;
   });
 
-  harness.documentChangeListener?.({});
+  harness.documentChangeListener?.({
+    cellChanges: [{ outputs: [{ metadata: {} }] }],
+  });
 
   assert.equal(changed, true);
+  harness.disposable.dispose();
+});
+
+test("does not fire refresh when notebook changes do not include output updates", () => {
+  const harness = createHarness();
+
+  let changed = false;
+  harness.provider?.onDidChangeCellStatusBarItems?.(() => {
+    changed = true;
+  });
+
+  harness.documentChangeListener?.({
+    cellChanges: [{ outputs: [] }],
+  });
+
+  assert.equal(changed, false);
   harness.disposable.dispose();
 });
 

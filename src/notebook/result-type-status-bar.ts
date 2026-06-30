@@ -1,9 +1,9 @@
 import type * as vscode from "vscode";
 
 import type { Localize } from "../config/endpoint-config";
+import { RESULT_TYPE_METADATA_KEY } from "./result-type-metadata";
 
 const NOTEBOOK_TYPE = "jupyter-notebook";
-const RESULT_TYPE_METADATA_KEY = "jupyterBrowserKernel.resultType";
 
 type LocalizationApi = {
   t: Localize;
@@ -36,14 +36,14 @@ function extractResultTypeFromOutput(
     return undefined;
   }
 
-  // Check the first output for result type metadata
-  const firstOutput = cell.outputs[0];
-  if (!firstOutput || !firstOutput.metadata) {
-    return undefined;
+  for (const output of cell.outputs) {
+    const resultType = output.metadata?.[RESULT_TYPE_METADATA_KEY];
+    if (typeof resultType === "string") {
+      return resultType;
+    }
   }
 
-  const resultType = firstOutput.metadata[RESULT_TYPE_METADATA_KEY];
-  return typeof resultType === "string" ? resultType : undefined;
+  return undefined;
 }
 
 function toStatusBarText(localize: Localize, resultType: string): string {
@@ -89,9 +89,14 @@ export function registerResultTypeStatusBarProvider(
     );
 
   const documentChangeDisposable = api.workspace.onDidChangeNotebookDocument(
-    (_event) => {
-      // Emit change event whenever notebook output changes so status bar refreshes
-      changeEmitter.fire();
+    (event) => {
+      // Refresh only when output changes in a notebook document.
+      const hasOutputChanges = event.cellChanges.some(
+        (change) => (change.outputs?.length ?? 0) > 0,
+      );
+      if (hasOutputChanges) {
+        changeEmitter.fire();
+      }
     },
   );
 
@@ -104,5 +109,5 @@ export function registerResultTypeStatusBarProvider(
   return { dispose };
 }
 
-export const RESULT_TYPE_METADATA_NAMESPACE = "jupyterBrowserKernel";
-export const RESULT_TYPE_METADATA_KEY_CONSTANT = RESULT_TYPE_METADATA_KEY;
+export { RESULT_TYPE_METADATA_NAMESPACE } from "./result-type-metadata";
+export { RESULT_TYPE_METADATA_KEY as RESULT_TYPE_METADATA_KEY_CONSTANT } from "./result-type-metadata";
