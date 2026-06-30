@@ -11,6 +11,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Checkout tagged commit
         uses: actions/checkout@v5
