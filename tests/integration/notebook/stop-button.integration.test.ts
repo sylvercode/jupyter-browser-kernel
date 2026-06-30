@@ -186,3 +186,145 @@ test(
     assert.equal(probe.result?.value, 2);
   },
 );
+
+test(
+  "rollback cell can run after cancelling a forward cell without reconnect",
+  { skip: !runIntegration },
+  async () => {
+    const connected = await connectToBrowserTarget(
+      { host, port: cdpPort },
+      coreTargetProfile,
+    );
+
+    assert.equal(connected.ok, true);
+
+    const controller = registerKernelController({
+      notebooks: {
+        createNotebookController: () => ({ supportedLanguages: [] }) as never,
+      },
+      l10n: { t: createLocalizeMock() },
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    });
+
+    const executions: RecordedExecution[] = [];
+    let firstCellCancel: (() => void) | undefined;
+    let firstCellStartedResolve: (() => void) | undefined;
+
+    const firstCellStarted = new Promise<void>((resolve) => {
+      firstCellStartedResolve = resolve;
+    });
+
+    let createExecutionCallCount = 0;
+    const executionController = {
+      createNotebookCellExecution: () => {
+        createExecutionCallCount += 1;
+
+        const cancellation = createCancellationHarness();
+        const record: RecordedExecution = {
+          started: false,
+          ended: false,
+          outputs: [],
+        };
+        executions.push(record);
+
+        if (createExecutionCallCount === 1) {
+          firstCellCancel = cancellation.cancel;
+        }
+
+        return {
+          token: cancellation.token,
+          executionOrder: undefined,
+          start: () => {
+            record.started = true;
+            if (createExecutionCallCount === 1) {
+              firstCellStartedResolve?.();
+            }
+          },
+          end: (success: boolean) => {
+            record.success = success;
+            record.ended = true;
+          },
+          replaceOutput: async (outputs: FakeNotebookCellOutput[]) => {
+            record.outputs = outputs;
+          },
+          clearOutput: async () => {
+            record.outputs = [];
+          },
+        };
+      },
+    };
+
+    const forwardAndQueuedRollback = controller.executeHandler?.(
+      [
+        {
+          document: {
+            getText: () =>
+              "(() => { globalThis.__jbkRollbackCounter = 1; const start = Date.now(); while (Date.now() - start < 60000) {} return globalThis.__jbkRollbackCounter; })()",
+            uri: {
+              toString: () =>
+                "vscode-notebook-cell://test-authority/workspaces/foundry-devil-code-sight/tests/files/stop-button.ipynb#ch0000000000101",
+            },
+          },
+        },
+        {
+          document: {
+            getText: () => "return (globalThis.__jbkRollbackCounter = 0)",
+            uri: {
+              toString: () =>
+                "vscode-notebook-cell://test-authority/workspaces/foundry-devil-code-sight/tests/files/stop-button.ipynb#ch0000000000102",
+            },
+          },
+        },
+      ] as never,
+      {} as never,
+      executionController as never,
+    );
+
+    assert.ok(forwardAndQueuedRollback);
+    await withTimeout(firstCellStarted, 2000);
+
+    assert.ok(firstCellCancel);
+    firstCellCancel();
+
+    await withTimeout(Promise.resolve(forwardAndQueuedRollback), 5000);
+
+    assert.equal(createExecutionCallCount, 1);
+    assert.equal(executions.length, 1);
+    assert.equal(executions[0]?.success, false);
+
+    const standaloneRollback = controller.executeHandler?.(
+      [
+        {
+          document: {
+            getText: () => "return (globalThis.__jbkRollbackCounter = 0)",
+            uri: {
+              toString: () =>
+                "vscode-notebook-cell://test-authority/workspaces/foundry-devil-code-sight/tests/files/stop-button.ipynb#ch0000000000103",
+            },
+          },
+        },
+      ] as never,
+      {} as never,
+      executionController as never,
+    );
+
+    assert.ok(standaloneRollback);
+    await withTimeout(Promise.resolve(standaloneRollback), 5000);
+
+    assert.equal(createExecutionCallCount, 2);
+    assert.equal(executions.length, 2);
+    assert.equal(executions[1]?.success, true);
+    assert.equal(executions[1]?.outputs.length, 1);
+    assert.equal(executions[1]?.outputs[0]?.items[0]?.kind, "text");
+    assert.equal(executions[1]?.outputs[0]?.items[0]?.value, "0");
+
+    const activeConnection = getActiveBrowserConnection();
+    assert.ok(activeConnection);
+
+    const probe = await activeConnection.evaluate(
+      "globalThis.__jbkRollbackCounter",
+    );
+    assert.equal(probe.result?.value, 0);
+  },
+);

@@ -542,3 +542,102 @@ test(
     }
   },
 );
+
+test(
+  "deterministic forward then rollback expression restores baseline in one active session",
+  { skip: !runIntegration },
+  async () => {
+    const connected = await connectToBrowserTarget(
+      { host, port: cdpPort },
+      coreTargetProfile,
+    );
+
+    assert.equal(connected.ok, true);
+
+    try {
+      const activeConnection = getActiveBrowserConnection();
+      assert.ok(activeConnection);
+      if (!activeConnection) {
+        return;
+      }
+
+      const baseline = normalizeEvaluationResult(
+        await activeConnection.evaluate(
+          "globalThis.__jbkRollbackCounter = 0; globalThis.__jbkRollbackCounter",
+        ),
+      );
+      assert.equal(baseline.ok, true);
+      if (baseline.ok) {
+        assert.equal(baseline.value, "0");
+      }
+
+      const forward = normalizeEvaluationResult(
+        await activeConnection.evaluate(
+          "globalThis.__jbkRollbackCounter += 1; globalThis.__jbkRollbackCounter",
+        ),
+      );
+      assert.equal(forward.ok, true);
+      if (forward.ok) {
+        assert.equal(forward.value, "1");
+      }
+
+      const rollback = normalizeEvaluationResult(
+        await activeConnection.evaluate(
+          "globalThis.__jbkRollbackCounter -= 1; globalThis.__jbkRollbackCounter",
+        ),
+      );
+      assert.equal(rollback.ok, true);
+      if (rollback.ok) {
+        assert.equal(rollback.value, "0");
+      }
+
+      const rerunProbe = normalizeEvaluationResult(
+        await activeConnection.evaluate("globalThis.__jbkRollbackCounter"),
+      );
+      assert.equal(rerunProbe.ok, true);
+      if (rerunProbe.ok) {
+        assert.equal(rerunProbe.value, "0");
+      }
+    } finally {
+      await disconnectActiveBrowserConnection();
+    }
+  },
+);
+
+test(
+  "deterministic rollback failure remains explicit and actionable through normalized output",
+  { skip: !runIntegration },
+  async () => {
+    const connected = await connectToBrowserTarget(
+      { host, port: cdpPort },
+      coreTargetProfile,
+    );
+
+    assert.equal(connected.ok, true);
+
+    try {
+      const activeConnection = getActiveBrowserConnection();
+      assert.ok(activeConnection);
+      if (!activeConnection) {
+        return;
+      }
+
+      const rollbackFailure = normalizeEvaluationResult(
+        await activeConnection.evaluate(
+          "(() => { throw new Error('rollback failed: restore baseline and retry rollback'); })()",
+        ),
+      );
+
+      assert.equal(rollbackFailure.ok, false);
+      if (!rollbackFailure.ok) {
+        assert.equal(rollbackFailure.kind, "runtime-error");
+        assert.match(
+          rollbackFailure.message,
+          /restore baseline and retry rollback/i,
+        );
+      }
+    } finally {
+      await disconnectActiveBrowserConnection();
+    }
+  },
+);

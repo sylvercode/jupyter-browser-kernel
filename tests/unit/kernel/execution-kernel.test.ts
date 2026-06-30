@@ -586,6 +586,158 @@ test("executeCell keeps success value output first when intentional logs are app
   );
 });
 
+test("executeCell supports forward and rollback cell runs in the same active session", async () => {
+  const evaluateCalls: string[] = [];
+  const connection = createFakeConnection(async (expression) => {
+    evaluateCalls.push(expression);
+
+    if (expression.includes("ROLLBACK_MARKER")) {
+      return {
+        result: {
+          type: "string",
+          value: "state-restored",
+        },
+      } as never;
+    }
+
+    return {
+      result: {
+        type: "string",
+        value: "state-mutated",
+      },
+    } as never;
+  });
+
+  const first = createExecutionRecorder();
+  const second = createExecutionRecorder();
+  let callCount = 0;
+
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  const controller = {
+    createNotebookCellExecution: () => {
+      callCount += 1;
+      return callCount === 1
+        ? first.notebookExecution
+        : second.notebookExecution;
+    },
+  };
+
+  const forwardCancelled = await executeCell({
+    cell: createFakeCell(
+      "globalThis.state = 'mutated'; 'FORWARD_MARKER state-mutated'",
+    ) as never,
+    controller: controller as never,
+    executionOrder: 200,
+    runtime,
+  });
+
+  const rollbackCancelled = await executeCell({
+    cell: createFakeCell(
+      "globalThis.state = 'baseline'; 'ROLLBACK_MARKER state-restored'",
+    ) as never,
+    controller: controller as never,
+    executionOrder: 201,
+    runtime,
+  });
+
+  assert.equal(forwardCancelled, false);
+  assert.equal(rollbackCancelled, false);
+  assert.equal(first.execution.success, true);
+  assert.equal(second.execution.success, true);
+  assert.equal(first.execution.outputs[0]?.items[0]?.value, "state-mutated");
+  assert.equal(second.execution.outputs[0]?.items[0]?.value, "state-restored");
+  assert.equal(evaluateCalls.length >= 2, true);
+});
+
+test("executeCell allows rollback rerun after a cancelled forward run in same session", async () => {
+  let forwardRelease: (() => void) | undefined;
+  const forwardBarrier = new Promise<void>((resolve) => {
+    forwardRelease = resolve;
+  });
+  let forwardStarted: (() => void) | undefined;
+  const forwardStartedPromise = new Promise<void>((resolve) => {
+    forwardStarted = resolve;
+  });
+
+  let phase: "forward" | "rollback" = "forward";
+  const connection = {
+    ...createFakeConnection(async () => {
+      if (phase === "forward") {
+        forwardStarted?.();
+        await forwardBarrier;
+        return {
+          result: {
+            type: "string",
+            value: "unreached",
+          },
+        } as never;
+      }
+
+      return {
+        result: {
+          type: "string",
+          value: "rollback-ok",
+        },
+      } as never;
+    }),
+    terminateExecution: async () => undefined,
+  } satisfies ActiveBrowserConnection;
+
+  const forwardRecorder = createExecutionRecorder();
+  const rollbackRecorder = createExecutionRecorder();
+
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  const forwardRun = executeCell({
+    cell: createFakeCell("forward();") as never,
+    controller: {
+      createNotebookCellExecution: () => forwardRecorder.notebookExecution,
+    } as never,
+    executionOrder: 203,
+    runtime,
+  });
+
+  await forwardStartedPromise;
+  forwardRecorder.cancel();
+  const forwardCancelled = await forwardRun;
+  forwardRelease?.();
+
+  phase = "rollback";
+
+  const rollbackCancelled = await executeCell({
+    cell: createFakeCell("rollback();") as never,
+    controller: {
+      createNotebookCellExecution: () => rollbackRecorder.notebookExecution,
+    } as never,
+    executionOrder: 204,
+    runtime,
+  });
+
+  assert.equal(forwardCancelled, true);
+  assert.equal(forwardRecorder.execution.success, false);
+  assert.equal(rollbackCancelled, false);
+  assert.equal(rollbackRecorder.execution.success, true);
+  assert.equal(
+    rollbackRecorder.execution.outputs[0]?.items[0]?.value,
+    "rollback-ok",
+  );
+});
+
 test("executeCell uses global mode when getDefaultCellIsolation returns false (backward-compat boolean false path)", async () => {
   const sourceUri =
     "vscode-notebook-cell://test-authority/workspaces/foundry-devil-code-sight/tests/files/test1.ipynb#ch0000000000001";
