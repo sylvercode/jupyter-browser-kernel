@@ -76,7 +76,7 @@ development_status:
   epic-4: in-progress
   4-1-return-execution-values-to-notebook-output: done
   4-2-display-structured-value-output-with-type-context: done
-  epic-4-retrospective: optional
+  epic-4-retrospective: done
 
   # ── Epic 6: Safe Experimentation and Core Reliability ─────────────────────
   epic-6: backlog
@@ -127,3 +127,25 @@ development_status:
   11-5-prompt-to-start-a-debug-session-when-running-a-cell-without-one: done
   11-6-retire-connect-disconnect-reconnect-commands-and-migrate-state-reporting: done
   epic-11-retrospective: done
+
+action_items:
+  - epic: 4
+    action: "Enforce story wording guardrails for payload-vs-status-surface semantics"
+    owner: "John"
+    status: open
+  - epic: 4
+    action: "Add a metadata-key centralization rule for producer and consumer code"
+    owner: "Winston"
+    status: open
+  - epic: 4
+    action: "Add a regression suite slice for value, logs, and failure combinations"
+    owner: "Quinn"
+    status: open
+  - epic: 4
+    action: "Add epic closeout reconciliation to sprint-status maintenance routine"
+    owner: "Amelia"
+    status: open
+  - epic: 4
+    action: "Preserve no-blame, evidence-linked review notes in story closeout artifacts"
+    owner: "Amelia"
+    status: open
