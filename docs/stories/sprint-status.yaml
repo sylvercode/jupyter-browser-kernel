@@ -1,5 +1,5 @@
 # generated: 2026-06-24
-# last_updated: 2026-06-30 (story 4.2 clarified after reverted iteration)
+# last_updated: 2026-06-30 (story 6.1 context created)
 # project: jupyter-browser-kernel
 # project_key: NOKEY
 # tracking_system: file-system
@@ -79,8 +79,8 @@ development_status:
   epic-4-retrospective: done
 
   # ── Epic 6: Safe Experimentation and Core Reliability ─────────────────────
-  epic-6: backlog
-  6-1-validate-core-pipeline-with-deterministic-fixtures: backlog
+  epic-6: in-progress
+  6-1-validate-core-pipeline-with-deterministic-fixtures: ready-for-dev
   6-2-support-forward-and-rollback-cell-patterns: backlog
   6-3-preserve-multi-version-iteration-in-one-session: backlog
   epic-6-retrospective: optional
