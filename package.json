@@ -2,7 +2,7 @@
   "name": "jupyter-browser-kernel",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "publisher": "sylvercode",
   "license": "MIT",
   "engines": {
