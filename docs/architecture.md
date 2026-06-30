@@ -47,7 +47,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 ### Requirements Overview
 
 **Functional Requirements:**
-The requirement set defines a clear two-layer architecture. The core layer owns browser session lifecycle, JavaScript notebook execution, normalized result contracts, intentional output handling, reconnect operations, and deterministic testing. A separate profile layer owns target-matching policies, eligibility diagnostics, runtime envelope details, and profile-specific workflows.
+The requirement set defines a core architecture focused on browser session lifecycle, JavaScript notebook execution, normalized result contracts, intentional output handling, reconnect operations, and deterministic testing.
 
 The FR structure also enforces stability boundaries:
 
@@ -154,7 +154,6 @@ Important Decisions (Shape Architecture):
 
 - Module decomposition: Clear core/kernel, transport, profile, notebook, and UI boundaries.
 - Execution envelope: Hybrid strategy where kernel owns canonical envelope and normalization while profile can inject controlled hooks.
-- Profile boundary: Capability-negotiated profile interface with minimal default capability surface.
 - Testing strategy: Layered deterministic strategy spanning unit, contract, integration, and extension-host tests.
 
 Deferred Decisions (Post-MVP):
@@ -619,7 +618,7 @@ The architecture supports all MVP platform capabilities: connection and session 
 - FR18 (Platform Testing and Validation) is covered by `tests/fixtures/`, `tests/integration/`, and `tests/contract/`.
 - FR19-FR22 (Experimentation Workflow and install path) are supported by notebook execution flow and session lifecycle design.
 - FR23 (Extension-owned output helpers) is covered by kernel envelope and profile hook strategy under architecture-scoped helper conventions.
-- FR24-FR37 (Post-MVP) are accommodated through capability-negotiated profile interfaces and explicit deferred architectural slots.
+- FR24-FR26 are post-MVP core observation extensions; FR39 and FR40 are delivered post-MVP core debugging and lifecycle architecture. FR27-FR37 were de-scoped on 2026-06-30.
 
 **Non-Functional Requirements Coverage:**
 

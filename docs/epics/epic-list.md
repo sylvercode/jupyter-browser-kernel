@@ -30,23 +30,7 @@ Users can test risky operations with forward-and-rollback notebook flows while t
 **FRs covered:** FR18, FR19, FR20, FR21
 **Depends on:** Epic 1, Epic 2
 
-## Epic 7: Enable Foundry Profile Eligibility and Runtime (Post-MVP Profile)
-
-Foundry users can execute only when profile eligibility is satisfied and receive deterministic profile-specific readiness guidance.
-**FRs covered:** FR27, FR28, FR29, FR30, FR31, FR32
-**Depends on:** Epic 1, Epic 2
-
-## Epic 8: Deliver Foundry Productivity Workflows (Post-MVP Profile)
-
-Foundry users can adopt notebook-first macro iteration with starter examples and reusable action workflows.
-**FRs covered:** FR33, FR34, FR35, FR36
-**Depends on:** Epic 7
-
-## Epic 9: Prompted Input Substitution (Post-MVP Core)
-
-Users can inject prompted placeholder values before execution for dynamic, repeatable notebook runs without manual code edits.
-**FRs covered:** FR37
-**Depends on:** Epic 1, Epic 2
+> Post-MVP roadmap update (2026-06-30): Epic 7, Epic 8, and Epic 9 were removed from this product line. The post-MVP direction is now focused on core debug integration and notebook-kernel reliability.
 
 ## Epic 10: Full VS Code Debugging Experience (Post-MVP Core)
 

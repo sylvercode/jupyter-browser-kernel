@@ -130,7 +130,7 @@ export class DebugAdapterFactory
     this.connectToTarget =
       options.connectToTarget ??
       ((endpoint, localize, abortSignal) =>
-        connectToBrowserTarget(endpoint, undefined, localize, abortSignal));
+        connectToBrowserTarget(endpoint, localize, abortSignal));
     this.getSettings =
       options.getSettings ??
       (() => ({ get: <T>(_section: string, defaultValue: T) => defaultValue }));

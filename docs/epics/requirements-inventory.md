@@ -24,17 +24,6 @@ FR20: A user can execute reversal cells to restore state after experiments.
 FR21: A user can iterate through at least two successive snippet versions in a single notebook session.
 FR22: A user can install and use the extension through a manual VS Code workflow without requiring Marketplace distribution.
 FR23: The extension can expose intentional script output through extension-owned runtime helpers providing intentional output capture, structured logging, and value inspection. Helper naming and calling conventions are architecture-scoped.
-FR27 [Post-MVP Foundry Profile]: The Foundry profile can identify valid execution targets using profile-owned matching rules.
-FR28 [Post-MVP Foundry Profile]: The Foundry profile execution path can rely on extension-owned runtime envelope and helper injection.
-FR29 [Post-MVP Foundry Profile]: The extension can inject a zero-boilerplate execution envelope that carries structured value and log output for each cell run.
-FR30 [Post-MVP Foundry Profile]: The Foundry profile can classify target eligibility into states providing ready for execution, target mismatch, and connection-interrupted conditions; labels are architecture-scoped.
-FR31 [Post-MVP Foundry Profile]: The Foundry profile can present actionable reconnect or target-selection guidance when target eligibility is not satisfied.
-FR32 [Post-MVP Foundry Profile]: A user can proceed with Foundry execution whenever the current target is classified as eligible.
-FR33 [Post-MVP Foundry Profile]: A Foundry power user can execute macro logic from notebook cells without using the Foundry macro editor during iteration.
-FR34 [Post-MVP Foundry Profile]: The extension can provide a Foundry starter notebook demonstrating token-state read and token-value update.
-FR35 [Post-MVP Foundry Profile]: A Foundry power user can save a notebook cell as a reusable action.
-FR36 [Post-MVP Foundry Profile]: A Foundry power user can reopen or execute a saved action, including prompted inputs when required.
-FR37 [Post-MVP Core]: A user can define $prompt() substitution placeholders in a notebook cell so that execution pauses and requests a value for each placeholder before running.
 FR39 [Post-MVP Core]: A user can start a VS Code debug session for notebook-cell execution and see breakpoint verification, paused-line highlighting, call stack, variables, and watch evaluation in native VS Code debug surfaces.
 
 ## NonFunctional Requirements
@@ -47,12 +36,8 @@ NFR5: Runtime and syntax failures must always surface as explicit notebook outpu
 NFR6: The shared result contract must preserve identical success and failure classification across supported transports for equivalent deterministic fixtures.
 NFR7: The platform core must remain adapter-agnostic with zero profile-specific imports or literals in core modules.
 NFR8: The extension must coexist with Edge DevTools without forced disconnect behavior.
-NFR9: Each profile must implement deterministic target-eligibility diagnostics with explicit states and guidance.
-NFR10 [Post-MVP]: The Foundry profile attaches only to targets classified as eligible by profile-owned matching rules.
-NFR11 [Post-MVP]: The Foundry target-eligibility check must complete within a configurable timeout (default 5 seconds, bounds 1 to 30 seconds) and return eligible, target_mismatch, or disconnected.
 NFR12: Core execution and result normalization must pass deterministic automated tests for success, syntax, runtime, and serialization-boundary cases.
 NFR13: Automated platform tests must include reconnect state transitions and serialization boundaries (circular refs, null or undefined, large payloads).
-NFR14: Any future profile must pass fixture-based target-matching and target-eligibility diagnostics tests before live integration testing.
 NFR15: The extension must connect only to explicitly user-configured endpoints.
 NFR16: The extension must not persist sensitive runtime secrets from evaluated cells unless explicitly saved by user action.
 NFR17: User-facing diagnostics must include actionable root-cause category and next-step guidance while excluding sensitive environment details.
@@ -129,18 +114,9 @@ FR21: Epic 6 - multi-version iteration in one session
 FR22: Epic 1 - scaffold bootstrap and CI VSIX release workflow
 FR23: Epic 3 and Epic 4 - extension-owned output helpers (logging, output capture, value inspection)
 FR24-FR26: (Removed - Epic 5 cut on 2026-06-29; watches are now debugger-native in Epic 10)
-FR27: Epic 7 - Foundry profile target matching
-FR28: Epic 7 - Foundry profile runtime envelope and helper injection
-FR29: Epic 7 - zero-boilerplate execution envelope for structured output
-FR30: Epic 7 - Foundry eligibility state classification
-FR31: Epic 7 - Foundry actionable guidance for non-eligible targets
-FR32: Epic 7 - proceed when target is eligible
-FR33: Epic 8 - notebook-first Foundry macro iteration
-FR34: Epic 8 - Foundry starter notebook flow
-FR35: Epic 8 - save reusable action
-FR36: Epic 8 - reopen and execute saved action with prompts
-FR37: Epic 9 - pre-execution parameter substitution via $prompt()
 FR39: Epic 10 - full VS Code notebook-cell debugging experience via DAP
+
+FR27-FR37: (Removed - Epics 7, 8, and 9 were de-scoped on 2026-06-30 after post-MVP roadmap realignment)
 
 ### UX-DR to FR Mapping Notes
 

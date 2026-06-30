@@ -11,7 +11,6 @@ import {
   getActiveBrowserConnection,
   type BrowserDebuggerSession,
 } from "../../../src/transport/browser-connect.js";
-import { coreTargetProfile } from "../../../src/profile/core-target-profile.js";
 import { startHeadlessChromium } from "../helpers/headless-chromium.js";
 import { createDebugSessionManager } from "../../../src/debugger/debug-session-manager.js";
 import { NotebookDebugAdapter } from "../../../src/debugger/notebook-dap-adapter.js";
@@ -136,10 +135,7 @@ test(
   "DAP lifecycle initialize->launch->threads->disconnect enables and disables Debugger",
   { skip: !runIntegration },
   async () => {
-    const connected = await connectToBrowserTarget(
-      { host, port: cdpPort },
-      coreTargetProfile,
-    );
+    const connected = await connectToBrowserTarget({ host, port: cdpPort });
 
     assert.equal(connected.ok, true);
     if (!connected.ok) {
@@ -272,10 +268,7 @@ test(
     let adapter: NotebookDebugAdapter | undefined;
 
     try {
-      const connected = await connectToBrowserTarget(
-        { host, port: cdpPort },
-        coreTargetProfile,
-      );
+      const connected = await connectToBrowserTarget({ host, port: cdpPort });
       assert.equal(connected.ok, true);
       if (!connected.ok) {
         return;
@@ -428,10 +421,7 @@ test(
     let adapter: NotebookDebugAdapter | undefined;
 
     try {
-      const connected = await connectToBrowserTarget(
-        { host, port: cdpPort },
-        coreTargetProfile,
-      );
+      const connected = await connectToBrowserTarget({ host, port: cdpPort });
       assert.equal(connected.ok, true);
       if (!connected.ok) {
         return;
@@ -551,10 +541,7 @@ test(
     let adapter: NotebookDebugAdapter | undefined;
 
     try {
-      const connected = await connectToBrowserTarget(
-        { host, port: cdpPort },
-        coreTargetProfile,
-      );
+      const connected = await connectToBrowserTarget({ host, port: cdpPort });
       assert.equal(connected.ok, true);
       if (!connected.ok) {
         return;

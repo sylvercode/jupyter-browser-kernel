@@ -6,7 +6,6 @@ import {
   disconnectActiveBrowserConnection,
   getActiveBrowserConnection,
 } from "../../../src/transport/browser-connect.js";
-import { coreTargetProfile } from "../../../src/profile/core-target-profile.js";
 import { buildCellExpression } from "../../../src/kernel/build-cell-expression.js";
 import {
   createRuntilmeCellBridgeKey,
@@ -47,10 +46,7 @@ test(
   "fast rerun keeps active connection and stable sourceURL identity",
   { skip: !runIntegration },
   async () => {
-    const connected = await connectToBrowserTarget(
-      { host, port: cdpPort },
-      coreTargetProfile,
-    );
+    const connected = await connectToBrowserTarget({ host, port: cdpPort });
     assert.equal(connected.ok, true);
 
     const connection = getActiveBrowserConnection();
@@ -87,10 +83,7 @@ test(
   "default cells accumulate state while isolated wrapper keeps lexical bindings local",
   { skip: !runIntegration },
   async () => {
-    const connected = await connectToBrowserTarget(
-      { host, port: cdpPort },
-      coreTargetProfile,
-    );
+    const connected = await connectToBrowserTarget({ host, port: cdpPort });
     assert.equal(connected.ok, true);
 
     const connection = getActiveBrowserConnection();
@@ -154,10 +147,7 @@ test(
   "RuntilmeCellBridge buffer is per-run and does not leak across reruns",
   { skip: !runIntegration },
   async () => {
-    const connected = await connectToBrowserTarget(
-      { host, port: cdpPort },
-      coreTargetProfile,
-    );
+    const connected = await connectToBrowserTarget({ host, port: cdpPort });
     assert.equal(connected.ok, true);
 
     const connection = getActiveBrowserConnection();
@@ -204,10 +194,7 @@ test(
   "reconnect keeps intentional logs isolated to current run and excludes ambient console activity",
   { skip: !runIntegration },
   async () => {
-    const firstConnect = await connectToBrowserTarget(
-      { host, port: cdpPort },
-      coreTargetProfile,
-    );
+    const firstConnect = await connectToBrowserTarget({ host, port: cdpPort });
     assert.equal(firstConnect.ok, true);
 
     let connection = getActiveBrowserConnection();
@@ -233,10 +220,7 @@ test(
 
     await disconnectActiveBrowserConnection();
 
-    const secondConnect = await connectToBrowserTarget(
-      { host, port: cdpPort },
-      coreTargetProfile,
-    );
+    const secondConnect = await connectToBrowserTarget({ host, port: cdpPort });
     assert.equal(secondConnect.ok, true);
 
     connection = getActiveBrowserConnection();

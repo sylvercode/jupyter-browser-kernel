@@ -9,7 +9,6 @@ import {
   getActiveBrowserConnection,
   toSessionScopedEventName,
 } from "../../../src/transport/browser-connect.js";
-import { coreTargetProfile } from "../../../src/profile/core-target-profile.js";
 import {
   normalizeEvaluationResult,
   normalizeTransportError,
@@ -52,7 +51,6 @@ test(
   async () => {
     const result = await connectToBrowserTarget(
       { host, port: cdpPort },
-      coreTargetProfile,
     );
 
     assert.equal(result.ok, true);
@@ -221,13 +219,11 @@ test(
 
       const initial = await connectToBrowserTarget(
         { host, port: cdpPort },
-        coreTargetProfile,
       );
       assert.equal(initial.ok, true);
 
       const reattached = await connectToBrowserTarget(
         { host, port: cdpPort },
-        coreTargetProfile,
       );
       assert.equal(reattached.ok, true);
 
@@ -255,7 +251,6 @@ test(
   async () => {
     const connected = await connectToBrowserTarget(
       { host, port: cdpPort },
-      coreTargetProfile,
     );
 
     assert.equal(connected.ok, true);
@@ -287,7 +282,6 @@ test(
   async () => {
     const connected = await connectToBrowserTarget(
       { host, port: cdpPort },
-      coreTargetProfile,
     );
 
     assert.equal(connected.ok, true);
@@ -336,7 +330,6 @@ test(
   async () => {
     const connected = await connectToBrowserTarget(
       { host, port: cdpPort },
-      coreTargetProfile,
     );
 
     assert.equal(connected.ok, true);
@@ -551,7 +544,6 @@ test(
   async () => {
     const connected = await connectToBrowserTarget(
       { host, port: cdpPort },
-      coreTargetProfile,
     );
 
     assert.equal(connected.ok, true);
@@ -622,7 +614,6 @@ test(
   async () => {
     const connected = await connectToBrowserTarget(
       { host, port: cdpPort },
-      coreTargetProfile,
     );
 
     assert.equal(connected.ok, true);

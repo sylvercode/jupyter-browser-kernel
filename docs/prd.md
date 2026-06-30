@@ -450,7 +450,7 @@ This product is a VS Code-only developer tool. Its core job is deterministic Jav
 
 ## Functional Requirements
 
-Traceability highlights: FR1 through FR23 plus FR38 cover the platform execution contract used by MVP journeys; FR24 through FR26 (observation extensions), FR37 (parameterized execution), and FR39 and FR40 (VS Code-native debugging and debug-session-driven connection lifecycle) are post-MVP core-platform enhancements mapped to existing journeys as post-MVP expansions; FR27 through FR36 cover post-MVP app-specific profile requirements (Foundry). FR40 re-expresses the FR1/FR5/FR6 connection-control capabilities through the debug session lifecycle, superseding the standalone command surface delivered in Epic 1.
+Traceability highlights: FR1 through FR23 plus FR38 cover the platform execution contract used by MVP journeys; FR24 through FR26 (observation extensions) and FR39 and FR40 (VS Code-native debugging and debug-session-driven connection lifecycle) are post-MVP core-platform enhancements mapped to existing journeys as post-MVP expansions. FR27 through FR37 were de-scoped from this product line on 2026-06-30.
 
 ### Core Platform Requirements
 
@@ -498,30 +498,10 @@ Traceability highlights: FR1 through FR23 plus FR38 cover the platform execution
 - FR25 [Post-MVP Core]: A user can configure depth-limited property projections and expand nested references for watched values.
 - FR26 [Post-MVP Core]: A user can continue refreshing other watched values when one watcher evaluation fails.
 
-### Example Web-App Profile Requirements (Post-MVP, Foundry VTT)
+### De-Scoped Post-MVP Requirements
 
-#### Foundry Target and Execution Preconditions [Post-MVP]
-
-- FR27: The Foundry profile can identify valid execution targets using profile-owned matching rules.
-- FR28: The Foundry profile execution path can rely on extension-owned runtime envelope and helper injection.
-- FR29: The extension can inject a zero-boilerplate execution envelope that carries structured value and log output for each cell run.
-- FR30: The Foundry profile can classify target eligibility into states providing: (a) ready for execution, (b) target mismatch, and (c) connection-interrupted conditions. The full set of eligibility states and their labels are architecture-scoped.
-- FR31: The Foundry profile can present actionable reconnect or target-selection guidance when target eligibility is not satisfied.
-- FR32: A user can proceed with Foundry execution whenever the current target is classified as `eligible`.
-
-#### Foundry Notebook Workflow [Post-MVP]
-
-- FR33: A Foundry power user can execute macro logic from notebook cells without using the Foundry macro editor during iteration.
-- FR34: The extension can provide a Foundry starter notebook demonstrating token-state read and token-value update.
-
-#### Foundry Action Reuse (Foundry-App-Specific Post-MVP Extensions)
-
-- FR35 [Post-MVP]: A Foundry power user can save a notebook cell as a reusable action.
-- FR36 [Post-MVP]: A Foundry power user can reopen or execute a saved action, including prompted inputs when required.
-
-#### Core Parameterization Extension [Post-MVP Core]
-
-- FR37 [Post-MVP Core]: A user can define `$prompt()` substitution placeholders in a notebook cell so that execution pauses and requests a value for each placeholder before running.
+- FR27-FR37 were de-scoped from this repository's product scope on 2026-06-30.
+- Foundry-specific profile workflows and prompted-input substitution are now considered out-of-scope for this extension and candidates for a separate notebook-ecosystem product.
 
 #### Core Debugging Extensions [Post-MVP Core]
 
@@ -546,18 +526,11 @@ Traceability highlights: FR1 through FR23 plus FR38 cover the platform execution
 
 - NFR7: The platform core must remain adapter-agnostic; it does not hardcode app-specific target matching rules, measured by static analysis and code review confirming zero profile-specific imports or literals in core modules.
 - NFR8: The extension must coexist with Edge DevTools without forced disconnect behavior, measured by sustained active session state and successful notebook execution after DevTools attaches to the same target.
-- NFR9: Each profile must implement deterministic target-eligibility diagnostics with explicit states and guidance, measured by integration tests that verify state classification and deterministic diagnostic outcomes.
-
-### Example Web-App Profile Integration and Contracts (Post-MVP, Foundry VTT)
-
-- NFR10 [Post-MVP]: The Foundry profile attaches only to targets classified as `eligible` by profile-owned matching rules, measured by integration tests that verify attachment is attempted only after an `eligible` classification and is rejected for all other states.
-- NFR11 [Post-MVP]: The Foundry target-eligibility check must complete within a configurable timeout and return one of `eligible`, `target_mismatch`, or `disconnected`, with default timeout 5 seconds and configurable bounds of 1 to 30 seconds, measured from check start to state result.
 
 ### Core Platform Testing and Validation
 
 - NFR12: Core execution and result normalization must be validated through deterministic automated tests that require 100% pass rate for success paths, syntax errors, runtime errors, and serialization-boundary cases without requiring a live profile runtime.
 - NFR13: Automated platform tests must cover success paths, syntax errors, runtime errors, reconnect state transitions, and serialization boundaries including circular references, null or undefined values, and large payload handling, measured by test-suite coverage audit confirming each listed path has at least one exercising test case.
-- NFR14: Any future profile must pass fixture-based target-matching and target-eligibility diagnostics tests before live-environment integration testing begins.
 
 ### Security and Diagnostics
 
@@ -580,11 +553,11 @@ This table maps each user journey to the scope items, functional requirements, a
 
 | Journey                               | Scope Items              | FRs                                                        | NFRs                         |
 | ------------------------------------- | ------------------------ | ---------------------------------------------------------- | ---------------------------- |
-| J1: Rapid Snippet Iteration           | Core 1–11                | FR1–FR18, FR22–FR23, FR38; post-MVP: FR24–FR26, FR37, FR39 | NFR1, NFR3, NFR5–9, NFR12–13 |
-| J2: Safe Experimentation and Reversal | Core 3–4, 10             | FR8–FR17, FR19–FR21; post-MVP: FR37                        | NFR1, NFR3, NFR5–6           |
+| J1: Rapid Snippet Iteration           | Core 1–11                | FR1–FR18, FR22–FR23, FR38; post-MVP: FR24–FR26, FR39 | NFR1, NFR3, NFR5–8, NFR12–13 |
+| J2: Safe Experimentation and Reversal | Core 3–4, 10             | FR8–FR17, FR19–FR21 | NFR1, NFR3, NFR5–6           |
 | J3: Connection and Target Recovery    | Core 1–2, 4–5            | FR1–FR7                                                    | NFR2, NFR4, NFR8–9           |
 | J4: Diagnosing Unexpected Behavior    | Core 2, 4, 7             | FR14–FR18; post-MVP: FR24–FR26, FR39                       | NFR3, NFR5–6, NFR8, NFR15–18 |
-| J5: Adding an App Profile (Post-MVP)  | Profile scope (post-MVP) | FR27–FR36                                                  | NFR10–11, NFR14              |
+
 
 ## Glossary
 
@@ -593,5 +566,4 @@ This table maps each user journey to the scope items, functional requirements, a
 - **Shared result contract:** The normalized data structure that represents success and failure outcomes from cell execution, independent of transport or profile. Ensures consistent behavior across all execution paths.
 - **Execution history retention:** Session-scoped storage of cell execution results so earlier outputs remain available for comparison as cells are revised and rerun.
 - **Transport-boundary isolation:** The architectural property that notebook execution semantics do not depend on transport internals. The result contract mediates between transport and notebook concerns.
-- **Target-eligibility state:** A profile-owned classification of whether the current target can execute profile code (`eligible`, `target_mismatch`, or `disconnected`).
 - **Connection state:** A platform-level classification of the session lifecycle: `disconnected`, `connecting`, `connected`, or `error`.

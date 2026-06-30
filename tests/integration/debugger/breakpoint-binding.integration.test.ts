@@ -10,7 +10,6 @@ import {
   disconnectActiveBrowserConnection,
   getActiveBrowserConnection,
 } from "../../../src/transport/browser-connect.js";
-import { coreTargetProfile } from "../../../src/profile/core-target-profile.js";
 import { createDebugSessionManager } from "../../../src/debugger/debug-session-manager.js";
 import { NotebookDebugAdapter } from "../../../src/debugger/notebook-dap-adapter.js";
 import { startHeadlessChromium } from "../helpers/headless-chromium.js";
@@ -134,7 +133,6 @@ test(
     try {
       const connected = await connectToBrowserTarget(
         { host, port: cdpPort },
-        coreTargetProfile,
       );
       assert.equal(connected.ok, true);
       if (!connected.ok) {

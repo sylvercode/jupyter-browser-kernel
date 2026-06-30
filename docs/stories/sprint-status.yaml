@@ -1,5 +1,5 @@
 # generated: 2026-06-24
-# last_updated: 2026-06-30 (story 6.3 moved to done)
+# last_updated: 2026-06-30 (story 6.3 moved to done; epics 7/8/9 de-scoped)
 # project: jupyter-browser-kernel
 # project_key: NOKEY
 # tracking_system: file-system
@@ -84,30 +84,6 @@ development_status:
   6-2-support-forward-and-rollback-cell-patterns: done
   6-3-preserve-multi-version-iteration-in-one-session: done
   epic-6-retrospective: done
-
-  # ── Epic 7: Enable Foundry Profile Eligibility and Runtime (Post-MVP Profile)
-  epic-7: backlog
-  7-1-implement-foundry-target-matching-rules: backlog
-  7-2-inject-extension-owned-runtime-envelope: backlog
-  7-3-classify-foundry-target-eligibility-states: backlog
-  7-4-provide-actionable-non-eligible-guidance: backlog
-  7-5-gate-execution-by-eligibility-and-proceed-when-ready: backlog
-  epic-7-retrospective: optional
-
-  # ── Epic 8: Deliver Foundry Productivity Workflows (Post-MVP Profile) ─────
-  epic-8: backlog
-  8-1-enable-notebook-first-foundry-macro-iteration: backlog
-  8-2-provide-foundry-starter-notebook: backlog
-  8-3-save-notebook-cell-as-reusable-action: backlog
-  8-4-reopen-and-execute-saved-actions-with-prompts: backlog
-  epic-8-retrospective: optional
-
-  # ── Epic 9: Prompted Input Substitution (Post-MVP Core) ───────────────────
-  epic-9: backlog
-  9-1-define-prompt-placeholder-substitution-flow: backlog
-  9-2-validate-placeholder-resolution-and-cancellation-paths: backlog
-  9-3-surface-prompt-diagnostics-and-recovery-guidance: backlog
-  epic-9-retrospective: optional
 
   # ── Epic 10: Full VS Code Debugging Experience (Post-MVP Core) ───────────
   epic-10: done

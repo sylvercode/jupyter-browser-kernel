@@ -5,13 +5,14 @@ import type ProtocolMappingApi from "devtools-protocol/types/protocol-mapping";
 import type * as vscode from "vscode";
 
 import type { EndpointConfig, Localize } from "../config/endpoint-config";
-import {
-  getActiveProfile,
-  selectTarget,
-  type TargetProfile,
-  type BrowserTargetInfo,
-} from "../profile/target-profile";
 import type { ConnectToTargetResult } from "./connect-types";
+
+interface BrowserTargetInfo {
+  targetId: string;
+  type?: string;
+  url?: string;
+  title?: string;
+}
 
 const CDP_EVALUATION_TIMEOUT_MS = 30_000;
 
@@ -675,9 +676,58 @@ async function verifyRuntimeProbe(
   }
 }
 
+function selectDeterministicTarget(
+  targets: BrowserTargetInfo[],
+): BrowserTargetInfo {
+  const sortedTargets = [...targets].sort((left, right) => {
+    const leftUrl = left.url ?? "";
+    const rightUrl = right.url ?? "";
+
+    const urlCompare = leftUrl.localeCompare(rightUrl);
+    if (urlCompare !== 0) {
+      return urlCompare;
+    }
+
+    return left.targetId.localeCompare(right.targetId);
+  });
+
+  return sortedTargets[0];
+}
+
+function selectCoreEligibleTarget(
+  targets: BrowserTargetInfo[],
+  localize: Localize,
+):
+  | { ok: true; target: BrowserTargetInfo }
+  | {
+      ok: false;
+      failure: {
+        category: "target-mismatch";
+        message: string;
+      };
+    } {
+  const eligibleTargets = targets.filter((target) => target.type === "page");
+
+  if (eligibleTargets.length === 0) {
+    return {
+      ok: false,
+      failure: {
+        category: "target-mismatch",
+        message: localize(
+          "No valid browser page target was found. Open the page you want to execute against and retry.",
+        ),
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    target: selectDeterministicTarget(eligibleTargets),
+  };
+}
+
 async function connectViaBrowserTargetAttach(
   endpoint: EndpointConfig,
-  profile: TargetProfile,
   localize: Localize,
   dependencies: BrowserConnectDependencies,
   abortSignal?: AbortSignal,
@@ -719,9 +769,8 @@ async function connectViaBrowserTargetAttach(
       throw createStepError("Target.getTargets", error);
     }
 
-    const targetSelection = selectTarget(
+    const targetSelection = selectCoreEligibleTarget(
       targetsResponse.targetInfos ?? [],
-      profile,
       localize,
     );
 
@@ -822,7 +871,6 @@ async function connectViaBrowserTargetAttach(
 
 export async function connectToBrowserTarget(
   endpoint: EndpointConfig,
-  profile: TargetProfile = getActiveProfile(),
   localize: Localize = passthroughLocalize,
   abortSignal?: AbortSignal,
   dependencies: BrowserConnectDependencies = createBrowserConnectDependencies(),
@@ -833,7 +881,6 @@ export async function connectToBrowserTarget(
     try {
       return await connectViaBrowserTargetAttach(
         endpoint,
-        profile,
         localize,
         dependencies,
         abortSignal,

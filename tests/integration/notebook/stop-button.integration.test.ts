@@ -6,7 +6,6 @@ import {
   disconnectActiveBrowserConnection,
   getActiveBrowserConnection,
 } from "../../../src/transport/browser-connect.js";
-import { coreTargetProfile } from "../../../src/profile/core-target-profile.js";
 import { registerKernelController } from "../../../src/notebook/kernel-controller.js";
 import { createCancellationHarness } from "../../unit/test-utils/cancellation-harness.js";
 import {
@@ -102,10 +101,7 @@ test(
   "notebook stop cancellation terminates running cell and skips queued cells",
   { skip: !runIntegration },
   async () => {
-    const connected = await connectToBrowserTarget(
-      { host, port: cdpPort },
-      coreTargetProfile,
-    );
+    const connected = await connectToBrowserTarget({ host, port: cdpPort });
 
     assert.equal(connected.ok, true);
 
@@ -220,10 +216,7 @@ test(
   "rollback cell can run after cancelling a forward cell without reconnect",
   { skip: !runIntegration },
   async () => {
-    const connected = await connectToBrowserTarget(
-      { host, port: cdpPort },
-      coreTargetProfile,
-    );
+    const connected = await connectToBrowserTarget({ host, port: cdpPort });
 
     assert.equal(connected.ok, true);
 
@@ -364,10 +357,7 @@ test(
   "rollback failure can be edited and rerun successfully in same session",
   { skip: !runIntegration },
   async () => {
-    const connected = await connectToBrowserTarget(
-      { host, port: cdpPort },
-      coreTargetProfile,
-    );
+    const connected = await connectToBrowserTarget({ host, port: cdpPort });
 
     assert.equal(connected.ok, true);
 

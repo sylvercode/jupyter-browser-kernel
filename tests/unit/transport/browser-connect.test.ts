@@ -10,7 +10,6 @@ import {
   safeDetachFromTarget,
   toSessionScopedEventName,
 } from "../../../src/transport/browser-connect.js";
-import { coreTargetProfile } from "../../../src/profile/core-target-profile.js";
 import { createLocalizeMock } from "../test-utils/localize-mock.js";
 
 interface EventHarnessClient {
@@ -558,7 +557,6 @@ test("connectToBrowserTarget does not call Debugger.enable during attach", async
 
   const result = await connectToBrowserTarget(
     { host: "localhost", port: 9222 },
-    coreTargetProfile,
     createLocalizeMock(),
     undefined,
     {
