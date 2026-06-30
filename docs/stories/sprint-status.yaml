@@ -1,5 +1,5 @@
 # generated: 2026-06-24
-# last_updated: 2026-06-30 (story 6.3 moved to done; epics 7/8/9 de-scoped)
+# last_updated: 2026-06-30 (story 6.3 moved to done; epics 2/4 manually closed; epics 7/8/9 de-scoped)
 # project: jupyter-browser-kernel
 # project_key: NOKEY
 # tracking_system: file-system
@@ -54,7 +54,7 @@ development_status:
   epic-1-retrospective: done
 
   # ── Epic 2: Execute JavaScript Cells (No Intentional Capture) ─────────────
-  epic-2: in-progress
+  epic-2: done
   2-1-run-synchronous-javascript-cells: done
   2-2-run-asynchronous-javascript-cells: done
   2-3-normalize-success-and-failure-output-contracts: done
@@ -73,7 +73,7 @@ development_status:
   epic-3-retrospective: done
 
   # ── Epic 4: Capture Intentional Values (Basic) ───────────────────────────
-  epic-4: in-progress
+  epic-4: done
   4-1-return-execution-values-to-notebook-output: done
   4-2-display-structured-value-output-with-type-context: done
   epic-4-retrospective: done

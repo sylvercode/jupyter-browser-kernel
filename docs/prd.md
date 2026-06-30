@@ -77,13 +77,15 @@ editHistory:
     changes: Follow-up PRD validation fixes: moved FR39 into a dedicated post-MVP core debugging subsection, extended J4 traceability to include FR39, added measurable debug-session coexistence NFR coverage, and standardized post-MVP core FR labels.
   - date: 2026-06-23
     changes: Added FR40 for post-MVP core debug-session-driven connection lifecycle (start/restart/stop = connect/reconnect/disconnect, endpoints configured as debug configurations with settings as fallback defaults), linked it to new Epic 11, and updated traceability to note FR40 supersedes the Epic 1 standalone command surface for FR1/FR5/FR6.
+  - date: 2026-06-30
+    changes: De-scoped FR24-FR26 (watch features) from this repository's product scope. Debugger-native coverage in FR39 is sufficient for MVP and post-MVP core direction here; any expanded watch capability now belongs in a separate product line.
 ---
 
 # Product Requirements Document - jupyter-browser-kernel
 
 **Author:** Sylvercode
 **Date:** 2026-03-15
-**Last Edited:** 2026-05-11
+**Last Edited:** 2026-06-30
 
 ## Executive Summary
 
@@ -450,7 +452,7 @@ This product is a VS Code-only developer tool. Its core job is deterministic Jav
 
 ## Functional Requirements
 
-Traceability highlights: FR1 through FR23 plus FR38 cover the platform execution contract used by MVP journeys; FR24 through FR26 (observation extensions) and FR39 and FR40 (VS Code-native debugging and debug-session-driven connection lifecycle) are post-MVP core-platform enhancements mapped to existing journeys as post-MVP expansions. FR27 through FR37 were de-scoped from this product line on 2026-06-30.
+Traceability highlights: FR1 through FR23 plus FR38 cover the platform execution contract used by MVP journeys; FR39 and FR40 (VS Code-native debugging and debug-session-driven connection lifecycle) are post-MVP core-platform enhancements mapped to existing journeys as post-MVP expansions. FR24 through FR37 were de-scoped from this product line on 2026-06-30.
 
 ### Core Platform Requirements
 
@@ -492,15 +494,9 @@ Traceability highlights: FR1 through FR23 plus FR38 cover the platform execution
 - FR22: A user can install and use the extension through a manual VS Code workflow without requiring Marketplace distribution.
 - FR23: The extension can expose intentional script output through extension-owned runtime helpers providing: (a) intentional output capture, (b) structured logging, and (c) value inspection. Helper naming and calling conventions are architecture-scoped.
 
-#### Observation Extensions [Post-MVP Core]
-
-- FR24 [Post-MVP Core]: A user can define watched expressions and refresh them manually or after execution events.
-- FR25 [Post-MVP Core]: A user can configure depth-limited property projections and expand nested references for watched values.
-- FR26 [Post-MVP Core]: A user can continue refreshing other watched values when one watcher evaluation fails.
-
 ### De-Scoped Post-MVP Requirements
 
-- FR27-FR37 were de-scoped from this repository's product scope on 2026-06-30.
+- FR24-FR37 were de-scoped from this repository's product scope on 2026-06-30.
 - Foundry-specific profile workflows and prompted-input substitution are now considered out-of-scope for this extension and candidates for a separate notebook-ecosystem product.
 
 #### Core Debugging Extensions [Post-MVP Core]
@@ -514,7 +510,7 @@ Traceability highlights: FR1 through FR23 plus FR38 cover the platform execution
 
 - NFR1: Notebook execution feedback must render within 2 seconds for synchronous JavaScript cells, measured as elapsed time from run command to notebook output render using a deterministic test cell under normal local development conditions.
 - NFR2: Manual reconnect must report success or failure within 5 seconds when the target browser and page are available, measured as elapsed time from reconnect command invocation to final connection state.
-- NFR3: Intentional output or watched-value refresh behavior, when enabled, must render within 2 seconds, measured as elapsed time from execution completion to output render under the same baseline conditions as NFR1.
+- NFR3: Intentional output behavior, when enabled, must render within 2 seconds, measured as elapsed time from execution completion to output render under the same baseline conditions as NFR1.
 
 ### Core Platform Reliability
 
@@ -553,10 +549,10 @@ This table maps each user journey to the scope items, functional requirements, a
 
 | Journey                               | Scope Items              | FRs                                                        | NFRs                         |
 | ------------------------------------- | ------------------------ | ---------------------------------------------------------- | ---------------------------- |
-| J1: Rapid Snippet Iteration           | Core 1–11                | FR1–FR18, FR22–FR23, FR38; post-MVP: FR24–FR26, FR39 | NFR1, NFR3, NFR5–8, NFR12–13 |
+| J1: Rapid Snippet Iteration           | Core 1–11                | FR1–FR18, FR22–FR23, FR38; post-MVP: FR39 | NFR1, NFR3, NFR5–8, NFR12–13 |
 | J2: Safe Experimentation and Reversal | Core 3–4, 10             | FR8–FR17, FR19–FR21 | NFR1, NFR3, NFR5–6           |
 | J3: Connection and Target Recovery    | Core 1–2, 4–5            | FR1–FR7                                                    | NFR2, NFR4, NFR8–9           |
-| J4: Diagnosing Unexpected Behavior    | Core 2, 4, 7             | FR14–FR18; post-MVP: FR24–FR26, FR39                       | NFR3, NFR5–6, NFR8, NFR15–18 |
+| J4: Diagnosing Unexpected Behavior    | Core 2, 4, 7             | FR14–FR18; post-MVP: FR39                       | NFR3, NFR5–6, NFR8, NFR15–18 |
 
 
 ## Glossary

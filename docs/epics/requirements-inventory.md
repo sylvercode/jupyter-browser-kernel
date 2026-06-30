@@ -30,7 +30,7 @@ FR39 [Post-MVP Core]: A user can start a VS Code debug session for notebook-cell
 
 NFR1: Notebook execution feedback must render within 2 seconds for synchronous JavaScript cells, measured from run command to output render under normal local conditions.
 NFR2: Manual reconnect must report success or failure within 5 seconds when the target browser and page are available.
-NFR3: Intentional output or watched-value refresh behavior, when enabled, must render within 2 seconds after execution completion.
+NFR3: Intentional output behavior, when enabled, must render within 2 seconds after execution completion.
 NFR4: Manual reconnect must restore execution capability within 5 seconds after target reload when reachable, validated by one successful cell execution without restarting VS Code.
 NFR5: Runtime and syntax failures must always surface as explicit notebook outputs; silent failure is not acceptable.
 NFR6: The shared result contract must preserve identical success and failure classification across supported transports for equivalent deterministic fixtures.
@@ -113,10 +113,8 @@ FR20: Epic 6 - rollback restoration pattern
 FR21: Epic 6 - multi-version iteration in one session
 FR22: Epic 1 - scaffold bootstrap and CI VSIX release workflow
 FR23: Epic 3 and Epic 4 - extension-owned output helpers (logging, output capture, value inspection)
-FR24-FR26: (Removed - Epic 5 cut on 2026-06-29; watches are now debugger-native in Epic 10)
+FR24-FR37: (Removed - de-scoped from this repository's product scope on 2026-06-30; debugger coverage retained through FR39 in Epic 10)
 FR39: Epic 10 - full VS Code notebook-cell debugging experience via DAP
-
-FR27-FR37: (Removed - Epics 7, 8, and 9 were de-scoped on 2026-06-30 after post-MVP roadmap realignment)
 
 ### UX-DR to FR Mapping Notes
 

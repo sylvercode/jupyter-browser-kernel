@@ -618,7 +618,7 @@ The architecture supports all MVP platform capabilities: connection and session 
 - FR18 (Platform Testing and Validation) is covered by `tests/fixtures/`, `tests/integration/`, and `tests/contract/`.
 - FR19-FR22 (Experimentation Workflow and install path) are supported by notebook execution flow and session lifecycle design.
 - FR23 (Extension-owned output helpers) is covered by kernel envelope and profile hook strategy under architecture-scoped helper conventions.
-- FR24-FR26 are post-MVP core observation extensions; FR39 and FR40 are delivered post-MVP core debugging and lifecycle architecture. FR27-FR37 were de-scoped on 2026-06-30.
+- FR39 and FR40 are delivered post-MVP core debugging and lifecycle architecture. FR24-FR37 were de-scoped on 2026-06-30.
 
 **Non-Functional Requirements Coverage:**
 
