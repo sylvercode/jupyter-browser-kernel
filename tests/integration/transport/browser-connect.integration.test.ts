@@ -380,11 +380,11 @@ test(
       );
       assert.equal(promiseRejection.ok, false);
       if (!promiseRejection.ok) {
-        assert.ok(
-          ["promise-rejection", "runtime-error"].includes(
-            promiseRejection.kind,
-          ),
-        );
+        const validPromiseKinds = new Set([
+          "promise-rejection",
+          "runtime-error",
+        ]);
+        assert.ok(validPromiseKinds.has(promiseRejection.kind));
       }
 
       assert.equal(runtimeFailure.ok, false);
@@ -455,10 +455,11 @@ test(
 
       assert.ok(timeoutError);
       const normalized = normalizeTransportError(timeoutError);
-      assert.ok(["timeout", "transport-error"].includes(normalized.kind));
-      assert.ok(
-        ["EvaluationTimeout", "TransportError"].includes(normalized.name),
-      );
+      const validTimeoutPairs = new Set([
+        "timeout:EvaluationTimeout",
+        "transport-error:TransportError",
+      ]);
+      assert.ok(validTimeoutPairs.has(`${normalized.kind}:${normalized.name}`));
     } finally {
       await browser.close();
     }

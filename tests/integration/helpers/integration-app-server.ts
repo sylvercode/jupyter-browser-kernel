@@ -36,7 +36,10 @@ export async function startStaticAppServer(
     options?.defaultBody ?? "<html><body>generic-target</body></html>";
 
   const server = http.createServer((request, response) => {
-    const routeBody = request.url ? routeMap.get(request.url) : undefined;
+    const requestPath = request.url
+      ? (request.url.split("?")[0] ?? request.url)
+      : undefined;
+    const routeBody = requestPath ? routeMap.get(requestPath) : undefined;
 
     response.writeHead(200, { "content-type": "text/html" });
     response.end(routeBody ?? defaultBody);

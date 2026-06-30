@@ -25,6 +25,8 @@ function assertResultKeys(
   expectedKeys: string[],
 ): void {
   const actualKeys = sortedKeys(result);
+  const expectedKind = result.ok ? "<success>" : "<failure>";
+  const actualKind = result.ok ? "<success>" : result.kind;
   assert.deepEqual(
     actualKeys,
     expectedKeys,
@@ -32,8 +34,8 @@ function assertResultKeys(
       `[fixture:${label}] contract key mismatch`,
       `expected keys: ${expectedKeys.join(", ")}`,
       `actual keys: ${actualKeys.join(", ")}`,
-      `expected kind: ${result.ok ? "<success>" : result.kind}`,
-      `actual kind: ${result.ok ? "<success>" : result.kind}`,
+      `expected kind: ${expectedKind}`,
+      `actual kind: ${actualKind}`,
     ].join(" | "),
   );
 }

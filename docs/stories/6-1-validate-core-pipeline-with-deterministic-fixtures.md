@@ -3,7 +3,7 @@ epic: 6
 story: 1
 story_key: 6-1-validate-core-pipeline-with-deterministic-fixtures
 title: Validate Core Pipeline with Deterministic Fixtures
-status: review
+status: done
 created: 2026-06-30
 updated: 2026-06-30
 completion_note: Ultimate context engine analysis completed - comprehensive developer guide created.
@@ -24,7 +24,7 @@ dependencies:
 
 ## Status
 
-review
+done
 
 ## Story
 
@@ -96,6 +96,13 @@ so that core runtime behavior remains stable and profile-agnostic.
   - [x] Run `npm run compile`.
   - [x] Run `npm run test`.
   - [x] Run `npm run test:integration:cdp` in an environment with Chromium available.
+
+### Review Findings
+
+- [x] [Review][Patch] Diagnostic message duplicates expected/actual kind, reducing failure clarity [tests/unit/kernel/execution-result.test.ts:32]
+- [x] [Review][Patch] Promise-rejection classification assertion is overly permissive and can mask normalization regressions [tests/integration/transport/browser-connect.integration.test.ts:376]
+- [x] [Review][Patch] Timeout classification assertion is overly permissive and can mask timeout-vs-transport misclassification [tests/integration/transport/browser-connect.integration.test.ts:445]
+- [x] [Review][Patch] Static route matching uses full URL string and can miss configured paths when query strings are present [tests/integration/helpers/integration-app-server.ts:36]
 
 ## Developer Context
 
