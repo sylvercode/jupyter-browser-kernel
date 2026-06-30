@@ -1,5 +1,5 @@
 # generated: 2026-06-24
-# last_updated: 2026-06-29 (story 4.2 created - ready for dev)
+# last_updated: 2026-06-30 (story 4.2 clarified after reverted iteration)
 # project: jupyter-browser-kernel
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-24
-last_updated: 2026-06-29
+last_updated: 2026-06-30
 project: jupyter-browser-kernel
 project_key: NOKEY
 tracking_system: file-system

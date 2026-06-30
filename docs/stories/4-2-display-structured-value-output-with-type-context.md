@@ -6,20 +6,18 @@ title: Display Structured Value Output with Type Context
 status: ready-for-dev
 baseline_commit: b2077ff8348508c1e57809d5c8d6f16665e594ac
 created: 2026-06-29
-updated: 2026-06-29
-completion_note: Ultimate context engine analysis completed - comprehensive developer guide created
+updated: 2026-06-30
+completion_note: Story 4.2 clarified after reverted iteration - type context must be shown in cell status bar, not mixed into cell output payload
 dependencies:
   - story: 4.1
     title: Return Execution Values to Notebook Output
-    reason: Story 4.2 extends Story 4.1 output behavior and must preserve its rendering and logging guarantees.
+    reason: Story 4.2 builds on Story 4.1 value rendering and must preserve existing output behavior.
   - story: 2.3
     title: Normalize Success and Failure Output Contracts
-    reason: Error and success envelopes must keep normalized behavior and classification.
+    reason: Execution result typing and failure normalization contracts remain authoritative.
   - story: 2.4
     title: Support Fast Rerun and Iteration Patterns
-    reason: Cell execution ergonomics and rerun flow must not regress while changing output envelope rendering.
-  - epic: 2
-    reason: Core execution pipeline and output contract foundations.
+    reason: Run and rerun ergonomics must remain unchanged while adding result-type context.
 ---
 
 # Story 4.2: Display Structured Value Output with Type Context
@@ -31,216 +29,231 @@ ready-for-dev
 ## Story
 
 As a developer,
-I want value output to include type context in a labeled output envelope,
-so that ambiguous outcomes like null, undefined, and empty string are easy to distinguish.
+I want each JavaScript cell to show a result type identifier in the cell status bar,
+so that ambiguous outcomes like null, undefined, and empty string are easy to distinguish without mixing UI labels into output payload content.
+
+## Clarification From Product Direction
+
+The previous 4.2 implementation direction that injected success or error envelope text into notebook cell outputs is invalid for this story revision.
+
+Required direction:
+
+- Keep notebook output payloads focused on value and error content only.
+- Do not prepend or append status text labels to output payload text.
+- Use a cell status bar item (left aligned) for type context.
+- Display format must be exactly: Result Type: {0}
+
+Out of scope for this story revision:
+
+- Adding success or error indicator labels (not needed because notebook execution UI already shows this).
+- Reworking transport, execution lifecycle, or error normalization contracts.
 
 ## Acceptance Criteria
 
-1. Given any successful execution value, when output renders, then the output includes both the value and its type metadata, and the envelope remains explicitly labeled as success.
-2. Given an error outcome, when output renders, then the envelope is explicitly labeled as error, and no unlabeled free-form output is produced.
-3. Given nested object values, when output is displayed, then nested content uses progressive disclosure defaults, and users can expand detail on demand without overwhelming the default view.
+1. Given a JavaScript code cell executed with Browser Kernel and a successful result,
+   when the cell status bar renders,
+   then a left-aligned item is shown with localized text format `Result Type: {0}` using the normalized result type.
+2. Given ambiguous successful values (`null`, `undefined`, empty string),
+   when the status bar renders,
+   then the type label clearly disambiguates them (for example `null`, `undefined`, `string`).
+3. Given cell output rendering for both success and failure,
+   when this story is implemented,
+   then no new success or error label text is mixed into notebook output payload content.
+4. Given non-JavaScript cells or JavaScript cells with no available Browser Kernel result type metadata yet,
+   when status bar items are requested,
+   then no result-type status item is shown.
+5. Given reruns and result changes,
+   when a cell is re-executed,
+   then the status bar type item refreshes to reflect the latest result type.
 
 ## Scope Boundaries
 
 - In scope:
-  - Output envelope formatting and labeling for success and error paths.
-  - Type metadata visibility for all success values.
-  - Progressive disclosure default for structured values.
-  - Unit-test updates validating envelope structure and MIME behavior.
+  - Add a dedicated result-type notebook cell status bar provider.
+  - Render result-type text on the left side using localized format `Result Type: {0}`.
+  - Source result-type context from Browser Kernel execution results (without polluting output payload text).
+  - Add or update unit tests for status-bar behavior and metadata propagation.
 - Out of scope:
-  - Changes to CDP transport, session lifecycle, reconnect, debugger lifecycle, or profile eligibility.
-  - Changes to result normalization contracts in `src/kernel/execution-result.ts`.
-  - New renderer extension or custom notebook renderer.
+  - Output envelope label text (success or error labels in notebook output).
+  - Custom renderer, webview, or UI beyond native notebook status bar.
+  - Changes to connection lifecycle, debugger lifecycle, or transport behavior.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Design labeled output envelope shape and localization keys (AC: 1, 2)
-  - [ ] Define success envelope text format that includes explicit success label and value type label.
-  - [ ] Define error envelope text format for infrastructure failures and structured failures.
-  - [ ] Add/adjust localization keys in `package.nls.json` and message helpers in `src/kernel/execution-messages.ts`.
-- [ ] Task 2: Implement success envelope with type context in kernel output path (AC: 1, 3)
-  - [ ] Update success output construction in `src/kernel/execution-kernel.ts` to include labeled success header and type metadata.
-  - [ ] Preserve JSON MIME rendering for structured values so VS Code built-in progressive disclosure remains available.
-  - [ ] Ensure ambiguous values (`null`, `undefined`, empty string) render distinctly with explicit type metadata.
-- [ ] Task 3: Implement explicit labeled error envelope behavior (AC: 2)
-  - [ ] Ensure infrastructure failures and runtime failures both produce explicitly labeled error outputs.
-  - [ ] Avoid unlabeled fallback text in failure paths.
-  - [ ] Preserve existing actionable diagnostics text and no-session guidance.
-- [ ] Task 4: Preserve existing intentional log behavior and output order (AC: 1, 2)
-  - [ ] Keep value or error output first, intentional logs second.
-  - [ ] Keep intentional log output format unchanged unless a label update is required by AC wording.
-- [ ] Task 5: Add and update tests for envelope, labels, and progressive disclosure behavior (AC: 1, 2, 3)
-  - [ ] Extend unit tests in `tests/unit/kernel/execution-kernel.test.ts` for new success label and type metadata assertions.
-  - [ ] Extend failure tests to assert explicit error labeling across infrastructure and runtime error paths.
-  - [ ] Keep existing JSON MIME assertions for object and array payloads.
-  - [ ] Add coverage for ambiguous value distinctions (`null` vs `undefined` vs empty string).
-- [ ] Task 6: Validation and regression checks (AC: 1, 2, 3)
+- [ ] Task 1: Define result-type status-bar contract and localization (AC: 1, 2, 4)
+  - [ ] Add localized string key for `Result Type: {0}` in [package.nls.json](../../package.nls.json) and [l10n/bundle.l10n.json](../../l10n/bundle.l10n.json).
+  - [ ] Define notebook output metadata contract for result type (extension-owned metadata namespace).
+  - [ ] Keep text concise and accessible; no icon-only result-type rendering.
+
+- [ ] Task 2: Propagate result type from execution to cell output metadata (AC: 1, 2, 5)
+  - [ ] Update [src/kernel/execution-kernel.ts](../../src/kernel/execution-kernel.ts) success output construction to include result type metadata on the primary output object.
+  - [ ] Ensure metadata is updated on rerun so stale type labels are not shown.
+  - [ ] Preserve existing output value MIME/content behavior from Story 4.1.
+
+- [ ] Task 3: Implement left-aligned result-type status bar provider (AC: 1, 2, 4, 5)
+  - [ ] Create a provider modeled after [src/notebook/cell-isolation-status-bar.ts](../../src/notebook/cell-isolation-status-bar.ts), but independent from isolation mode behavior.
+  - [ ] Register provider for `jupyter-notebook` JavaScript code cells only.
+  - [ ] Read latest result type from the cell output metadata contract and render `Result Type: {0}` with `NotebookCellStatusBarAlignment.Left`.
+  - [ ] Emit refresh events when relevant cell/output/config state changes.
+
+- [ ] Task 4: Wire provider into extension activation and notebook exports (AC: 1, 4)
+  - [ ] Register/dispose the new provider in [src/extension.ts](../../src/extension.ts).
+  - [ ] Export provider API from [src/notebook/index.ts](../../src/notebook/index.ts).
+  - [ ] Keep existing cell-isolation status item on the right; do not regress its command behavior.
+
+- [ ] Task 5: Add targeted unit tests and regression guards (AC: 1-5)
+  - [ ] Add tests for new status-bar provider in `tests/unit/notebook/` verifying:
+    - [ ] Left alignment.
+    - [ ] Text format `Result Type: {0}`.
+    - [ ] Hidden state when no result type exists.
+    - [ ] Refresh behavior after output changes.
+  - [ ] Update kernel tests in [tests/unit/kernel/execution-kernel.test.ts](../../tests/unit/kernel/execution-kernel.test.ts) to assert result type metadata is written and refreshed.
+  - [ ] Add regression assertions that output payload text does not include new success or error envelope label prefixes.
+
+- [ ] Task 6: Validate build and tests (AC: 1-5)
   - [ ] Run `npm run compile`.
-  - [ ] Run targeted tests: `node --test tests/unit/kernel/execution-kernel.test.ts`.
-  - [ ] Run full test suite if feasible: `npm run test`.
+  - [ ] Run targeted tests for kernel and notebook status-bar units.
+  - [ ] Run `npm run test` if feasible.
 
 ## Developer Context
 
-### Current State (Files Likely To Be Updated)
+### Current State (Files To Update)
 
-- `src/kernel/execution-kernel.ts`
+- [src/kernel/execution-kernel.ts](../../src/kernel/execution-kernel.ts)
   - Current state:
-    - Success path writes first output item from `createSuccessValueOutputItem`.
-    - Structured values (`resultType` `object`/`array`) use JSON MIME via formatted JSON string.
-    - Failure path uses `NotebookCellOutputItem.error(error)` for runtime failures and plain text for infrastructure failures.
-    - Intentional logs append as a second output block labeled by existing message helper.
+    - Success path already receives normalized `result.type` and renders value output.
+    - Structured values currently use `application/json`; primitives remain `text/plain`.
+    - Failure outputs preserve existing normalized failure messaging.
   - Story 4.2 change target:
-    - Add explicit success and error envelope labeling.
-    - Surface type metadata alongside value.
-    - Keep progressive-disclosure behavior for structured values.
+    - Attach result type as extension metadata on primary output object.
+    - Keep output payload text exactly value/error focused.
   - Must preserve:
-    - Execution flow, cancellation behavior, and runtime bridge behavior.
-    - Output ordering (primary result first, logs second).
-    - Existing no-session and transport-failure reporting behavior.
+    - Existing MIME routing behavior.
+    - Output ordering (primary result first, intentional logs second).
+    - Existing cancellation and no-session behavior.
 
-- `tests/unit/kernel/execution-kernel.test.ts`
+- [src/notebook/cell-isolation-status-bar.ts](../../src/notebook/cell-isolation-status-bar.ts)
   - Current state:
-    - Comprehensive execution behavior coverage already exists (success, failure, cancellation, bridge behavior, log ordering).
-    - Story 4.1 already added structured output MIME assertions.
+    - Right-aligned icon-only status item for isolation mode with toggle command.
   - Story 4.2 change target:
-    - Update/extend assertions for explicit envelope labels and type metadata.
-    - Add ambiguous value distinction assertions.
+    - Reference pattern only (registration, filtering, refresh wiring).
+    - Do not overload this provider with result-type responsibilities.
   - Must preserve:
-    - Existing behavior contracts unrelated to envelope wording.
-    - Runtime bridge and cancellation regression coverage.
+    - Isolation item behavior and command wiring.
 
-- `src/kernel/execution-messages.ts` (likely update)
+- [src/extension.ts](../../src/extension.ts)
   - Current state:
-    - Holds user-facing kernel output labels/messages.
+    - Registers kernel controller and cell isolation status bar provider.
   - Story 4.2 change target:
-    - Add/adjust message helpers for explicit success/error envelope labels and type metadata wording.
+    - Register new result-type status bar provider.
   - Must preserve:
-    - Existing localization patterns and key usage.
+    - Existing activation flow and disposal hygiene.
 
-- `package.nls.json` (likely update)
+- [src/notebook/index.ts](../../src/notebook/index.ts)
   - Current state:
-    - Localization source for user-visible messages.
+    - Exports notebook providers including cell isolation provider.
   - Story 4.2 change target:
-    - Add keys for any new envelope labels and type descriptors.
-  - Must preserve:
-    - Existing key naming style and no hardcoded user-facing strings.
+    - Export new result-type provider API and options.
+
+- [tests/unit/notebook/cell-isolation-status-bar.test.ts](../../tests/unit/notebook/cell-isolation-status-bar.test.ts)
+  - Current state:
+    - Validates status bar provider behavior patterns and refresh strategy.
+  - Story 4.2 change target:
+    - Reuse test harness pattern for new result-type provider tests.
+
+- [tests/unit/kernel/execution-kernel.test.ts](../../tests/unit/kernel/execution-kernel.test.ts)
+  - Current state:
+    - Verifies MIME and value rendering behavior.
+  - Story 4.2 change target:
+    - Add metadata assertions and no-envelope-text regression checks.
 
 ### Technical Requirements
 
-- Preserve normalized result contract (`ExecutionSuccess` / `ExecutionFailure`) and do not mutate shape.
-- Keep output rendering through VS Code notebook core APIs (`NotebookCellOutputItem.text`, `NotebookCellOutputItem.error`, JSON-compatible MIME usage).
-- Ensure type metadata is shown for every success result, including primitives and non-serializable fallback strings.
-- Ensure every failure surface is explicitly labeled as error and not unlabeled plain text.
-- Keep intentional logs distinguishable and ordered after primary result output.
+- Reuse normalized result `type` from [src/kernel/execution-result.ts](../../src/kernel/execution-result.ts); do not introduce duplicate type derivation logic in notebook layer.
+- Keep user-visible strings localized.
+- Keep result-type context in status bar, not in output payload text.
+- Use native VS Code notebook APIs only.
+- Ensure provider filters to Browser Kernel-supported JavaScript notebook cells.
 
 ### Architecture Compliance
 
-- Respect core boundaries:
-  - This is kernel output rendering work, not transport/profile/debugger lifecycle work.
-- Keep transport-boundary isolation:
-  - Do not leak raw protocol fields into notebook output contract.
-- Preserve DevTools coexistence constraints:
-  - No changes to session attach/multiplexing logic.
-- Preserve post-MVP debug architecture:
-  - No direct Debugger domain usage in kernel path.
+- Keep feature inside native VS Code surfaces (status bar and notebook outputs), aligned with UX-DR16.
+- Preserve output contract stability and avoid transport-layer coupling.
+- Keep extension-owned metadata namespaced under `jupyterBrowserKernel`.
+- Do not alter debugger/session ownership semantics.
 
 ### Library and Framework Requirements
 
-- Use VS Code Notebook API only; no new rendering dependency.
-- Keep TypeScript strict-mode safe narrowing and type guards.
-- Use localization for user-visible labels (`vscode.l10n.t(...)` via existing localize helper pipeline).
-- Confirm MIME behavior based on current VS Code docs:
-  - Built-in rich output supports JSON and text output in core notebook rendering.
-  - `NotebookCellOutputItem.json(...)` and JSON/text MIME representations are valid for progressive disclosure use cases.
+- VS Code Notebook APIs:
+  - `registerNotebookCellStatusBarItemProvider`
+  - `NotebookCellStatusBarItem`
+  - `NotebookCellStatusBarAlignment.Left`
+  - `NotebookCellOutput` metadata channel
+- TypeScript strict mode compatibility required.
+- No new runtime dependencies.
 
 ### File Structure Requirements
 
-- Modify only story-relevant kernel and message files.
-- Do not introduce new cross-layer imports violating architecture boundaries.
-- Keep tests in `tests/unit/...` (no source-co-located tests).
+- New notebook provider implementation in `src/notebook/`.
+- Keep kernel changes in `src/kernel/` only.
+- Keep tests in `tests/unit/`.
+- Do not move or rename unrelated files.
 
 ### Testing Requirements
 
-- Required unit coverage for ACs:
-  - Success outputs include explicit success label and type metadata.
-  - Error outputs include explicit error label for both runtime and infrastructure failure paths.
-  - Structured object/array values still render as JSON MIME with expandable display defaults.
-  - Ambiguous outcomes are distinguishable:
-    - `null` labeled with type `null`.
-    - `undefined` labeled with type `undefined`.
-    - Empty string labeled with type `string` and displayed value clearly.
-- Required regression checks:
-  - Intentional log ordering and content unchanged unless explicitly required.
-  - Cancellation path behavior unchanged.
-  - No-session guidance still reported and surfaced.
+- Unit tests must cover:
+  - Success result type label rendering in left status bar.
+  - Ambiguous type disambiguation (`null`, `undefined`, `string`).
+  - No label shown when no result type exists.
+  - Result-type refresh after rerun.
+  - Output payload regression guard (no appended success/error text labels).
 
 ## Previous Story Intelligence (4.1)
 
-- Story 4.1 already established MIME routing and fallback behavior in `writeSuccessOutput`.
-- Review corrections from 4.1 emphasized:
-  - Avoid dead branches in JSON parse guards.
-  - Keep CDP-shape-accurate tests (arrays represented as type `object` with subtype `array` in fixtures).
-  - Preserve separation between display fallback behavior and execution success classification.
-- Reuse strategy for 4.2:
-  - Extend existing output builder logic instead of replacing execution pipeline.
-  - Add targeted tests around envelope labeling instead of rewriting broad test scaffolding.
+- Story 4.1 established reliable value rendering with JSON MIME for structured values.
+- Review corrections from 4.1 highlighted strict CDP shape fidelity and narrow-scope changes.
+- For 4.2, extend existing behavior by adding metadata plus status-bar surface, not by changing value payload strings.
 
 ## Git Intelligence Summary
 
-- Recent implementation work for Epic 4 concentrated in:
-  - `src/kernel/execution-kernel.ts`
-  - `tests/unit/kernel/execution-kernel.test.ts`
-  - story docs and sprint status
-- Commit pattern shows quick implementation followed by focused review-fix pass.
-- Recommended implementation approach:
-  - Keep changes narrow and local.
-  - Add tests in same change set.
-  - Expect review scrutiny on subtle output behavior and edge cases.
+- Branch diff vs `main` currently affects only story-planning files, confirming implementation was rolled back.
+- Last branch commit (`c19e6f8`) created initial Story 4.2 context file and sprint-status update.
+- This clarification supersedes prior guidance that suggested output-envelope success/error labels.
 
 ## Latest Technical Information
 
-- VS Code Notebook API guidance (fetched 2026-06-29) confirms:
-  - Rich outputs can provide multiple MIME variants.
-  - Core notebook renderer supports common text/JSON rendering behavior.
-  - Output ordering matters and multiple outputs are shown in sequence.
-- Practical implication for Story 4.2:
-  - Keep labeled envelope content explicit.
-  - Preserve structured JSON output path for nested inspection.
-  - Avoid custom renderer complexity for this AC set.
+- VS Code `NotebookCellStatusBarItem` supports explicit left alignment and text labels.
+- Provider refresh callbacks are invoked when cell outputs/metadata/execution state change.
+- This supports a type-context status item without introducing custom notebook renderers.
 
 ## Project Context Reference
 
-- Canonical product and architecture constraints from:
-  - `docs/prd.md`
-  - `docs/architecture.md`
-  - `docs/epics/epic-4-capture-intentional-values-basic.md`
-  - `.github/copilot-instructions.md`
-- No separate `project-context.md` file was discovered during this workflow run.
+- [docs/epics/epic-4-capture-intentional-values-basic.md](../epics/epic-4-capture-intentional-values-basic.md)
+- [docs/prd.md](../prd.md)
+- [docs/architecture.md](../architecture.md)
+- [docs/ux-spec/10-component-strategy.md](../ux-spec/10-component-strategy.md)
+- [docs/ux-spec/06-detailed-core-user-experience.md](../ux-spec/06-detailed-core-user-experience.md)
+- [.github/copilot-instructions.md](../../.github/copilot-instructions.md)
 
 ## Risks and Guardrails
 
-- Risk: breaking Story 4.1 JSON MIME behavior while adding labels.
-  - Guardrail: keep structured MIME assertions and add explicit regression tests.
-- Risk: label implementation introduces hardcoded user-facing strings.
-  - Guardrail: route all user-visible text through localization keys.
-- Risk: error output labeling accidentally degrades actionable error details.
-  - Guardrail: keep existing error message semantics and wrap with label only.
+- Risk: reintroducing output label text into notebook payload.
+  - Guardrail: explicit regression tests for payload content and strict scope notes in this story.
+- Risk: stale result-type labels after rerun.
+  - Guardrail: overwrite metadata on every execution and verify in tests.
+- Risk: coupling result-type logic to isolation provider.
+  - Guardrail: separate provider module and independent tests.
 
-## References
+## Questions Saved For End
 
-- docs/epics/epic-4-capture-intentional-values-basic.md
-- docs/stories/4-1-return-execution-values-to-notebook-output.md
-- docs/prd.md
-- docs/architecture.md
-- src/kernel/execution-kernel.ts
-- tests/unit/kernel/execution-kernel.test.ts
-- https://code.visualstudio.com/api/extension-guides/notebook
+1. Should result-type status be hidden on failure runs, or set to a failure classification value like `error`?
+2. Should result-type status clear immediately when a cell enters running state, or continue to show the previous completed run type until replaced?
 
 ## Completion Status
 
-- Story file created with exhaustive artifact analysis context.
-- Story status set to `ready-for-dev`.
-- Sprint tracking updated to `ready-for-dev` for story key `4-2-display-structured-value-output-with-type-context`.
+- Story 4.2 context regenerated with corrected implementation direction after reverted iteration.
+- Story status remains `ready-for-dev`.
+- Developer guidance now enforces status-bar type context and forbids output payload UI-label mixing.
 
 ## Dev Agent Record
 
@@ -250,15 +263,15 @@ GPT-5.3-Codex
 
 ### Debug Log References
 
-- Activation resolver:
-  - `python3 _bmad/scripts/resolve_customization.py --skill .agents/skills/bmad-create-story --key workflow`
+- `python3 _bmad/scripts/resolve_customization.py --skill .agents/skills/bmad-create-story --key workflow`
+- `git log --oneline -5`
+- `git diff --name-only main...HEAD`
 
 ### Completion Notes List
 
-- Exhaustive artifact load completed (epic, PRD, architecture, UX, prior story, git history, update files).
-- Story drafted with implementation guardrails, test expectations, and regression protections.
+- Full artifact re-analysis completed (epic, PRD, architecture, UX, prior story, code files, tests, and git context).
+- Story corrected to match user direction and avoid prior invalid implementation pattern.
 
 ### File List
 
 - docs/stories/4-2-display-structured-value-output-with-type-context.md
-- docs/stories/sprint-status.yaml
