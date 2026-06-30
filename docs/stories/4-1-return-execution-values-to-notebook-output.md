@@ -3,7 +3,7 @@ epic: 4
 story: 1
 story_key: 4-1-return-execution-values-to-notebook-output
 title: Return Execution Values to Notebook Output
-status: in-progress
+status: done
 baseline_commit: 816ba8ad3ff2f9cc96bbc81e7fc39270eb3b889e
 created: 2026-06-29
 updated: 2026-06-29
@@ -306,6 +306,34 @@ The jupyter-browser-kernel architecture separates **core kernel** from **profile
 - `src/kernel/` serialization logic (stable from Story 2.1)
 - `src/notebook/` cell isolation, status bar, debug preflight
 - Test fixtures
+
+### Review Findings
+
+Code review findings (2026-06-29) from adversarial review (Blind Hunter, Edge Case Hunter, Acceptance Auditor):
+
+#### Patches
+
+- [x] [Review][Patch] Dead `typeof parsed === "string"` condition in `tryParseJsonValue` [src/kernel/execution-kernel.ts:375] — Removed unreachable clause after `typeof parsed !== "object"` already short-circuits for strings.
+
+- [x] [Review][Patch] "Nested arrays" test uses wrong CDP shape [tests/unit/kernel/execution-kernel.test.ts:281] — Fixed test fixture to use correct CDP shape `{ type: "object", subtype: "array" }` instead of `{ type: "array", subtype: "array" }`.
+
+- [x] [Review][Patch] Redundant return type on `tryParseJsonValue` [src/kernel/execution-kernel.ts:375] — Simplified return type from `object | unknown[]` to `object`.
+
+#### Deferred (Pre-Existing, Out of Scope for Story 4.1)
+
+- [x] [Review][Defer] Description-only fallback for unserializable arrays silently renders as plain text [src/kernel/serialization] — When CDP can't serialize a large array due to serialization limits, it returns only `description: "Array(100)"` with no `value`. Story 4.1 will show this as opaque plain text. This is pre-existing CDP serialization limit behavior. Addressed as Requirement 4 in the spec.
+
+- [x] [Review][Defer] Foundry objects with non-JSON properties silently shed properties, render as `{}` [CDP serialization] — When a Foundry object with functions/symbols/DOM properties is returned via CDP's `returnByValue`, only JSON-serializable properties are kept. Result is `{}` or sparse object with no indication properties were dropped. Pre-existing CDP behaviour, documented as Requirement 4.
+
+- [x] [Review][Defer] Latent coupling between `renderedValue` substitution and `resultType` parameter [src/kernel/execution-kernel.ts:211] — When `value` is empty, `renderedValue` is substituted with the localized fallback string, but `resultType` is the original pre-substitution type. If future changes broaden when empty values are substituted, this mismatch could cause incorrect MIME type selection. Pre-existing design pattern, not introduced by this diff.
+
+#### Dismissed (7 findings)
+
+- Test fixtures use raw CDP object values (valid for mocking)
+- `typeof null === "object"` makes the `parsed === null` guard necessary in `tryParseJsonValue`
+- Bridge sentinel (`__jbkRuntilmeCellBridge:` prefix) in logs-order test confirmed correct by Acceptance Auditor
+- `shouldUseJsonMimeType` covering `"array"` branch is defensible for future-proofing even if CDP never emits it
+- Return type precision and test coverage nuances already handled
 
 ---
 

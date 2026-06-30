@@ -372,14 +372,10 @@ function shouldUseJsonMimeType(resultType: string): boolean {
   return resultType === "object" || resultType === "array";
 }
 
-function tryParseJsonValue(value: string): object | unknown[] | undefined {
+function tryParseJsonValue(value: string): object | undefined {
   try {
     const parsed = JSON.parse(value) as unknown;
-    if (
-      parsed === null ||
-      typeof parsed !== "object" ||
-      typeof parsed === "string"
-    ) {
+    if (parsed === null || typeof parsed !== "object") {
       return undefined;
     }
 

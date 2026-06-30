@@ -281,7 +281,7 @@ test("executeCell renders nested arrays as structured application/json output", 
   const connection = createFakeConnection(async () => {
     return {
       result: {
-        type: "array",
+        type: "object",
         subtype: "array",
         value: [1, { nested: { value: 123 } }],
       },

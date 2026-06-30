@@ -1,5 +1,11 @@
 # Deferred Work
 
+## Deferred from: code review of 4-1-return-execution-values-to-notebook-output (2026-06-29)
+
+- Description-only fallback for unserializable arrays silently renders as plain text — When CDP can't serialize a large array due to serialization limits, it returns only `description: "Array(100)"` with no `value`. Story 4.1 will show this as opaque plain text. This is pre-existing CDP serialization limit behavior, documented as Requirement 4 in the spec.
+- Foundry objects with non-JSON properties silently shed properties, render as `{}` — When a Foundry object with functions/symbols/DOM properties is returned via CDP's `returnByValue`, only JSON-serializable properties are kept. Result is `{}` or sparse object with no indication properties were dropped. Pre-existing CDP behaviour, documented as Requirement 4.
+- Latent coupling between `renderedValue` substitution and `resultType` parameter — When `value` is empty, `renderedValue` is substituted with the localized fallback string, but `resultType` is the original pre-substitution type. If future changes broaden when empty values are substituted, this mismatch could cause incorrect MIME type selection. Pre-existing design pattern, not introduced by this diff.
+
 ## Requested product-direction change (2026-06-28)
 
 - Reverse the cell-isolation paradigm so the default execution mode becomes isolated instead of shared.

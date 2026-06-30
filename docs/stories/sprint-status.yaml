@@ -74,7 +74,7 @@ development_status:
 
   # ── Epic 4: Capture Intentional Values (Basic) ───────────────────────────
   epic-4: in-progress
-  4-1-return-execution-values-to-notebook-output: in-progress
+  4-1-return-execution-values-to-notebook-output: done
   4-2-display-structured-value-output-with-type-context: backlog
   4-3-preserve-session-scoped-execution-history: backlog
   epic-4-retrospective: optional
