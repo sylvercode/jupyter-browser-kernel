@@ -18,6 +18,14 @@ export {
 } from "./cell-isolation-status-bar";
 
 export {
+  registerResultTypeStatusBarProvider,
+  type ResultTypeStatusBarApi,
+  type ResultTypeStatusBarOptions,
+  RESULT_TYPE_METADATA_NAMESPACE,
+  RESULT_TYPE_METADATA_KEY_CONSTANT,
+} from "./result-type-status-bar";
+
+export {
   registerKernelController,
   resetExecutionOrderForTests,
   type KernelControllerApi,

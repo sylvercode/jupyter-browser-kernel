@@ -1,5 +1,9 @@
 # Deferred Work
 
+## Deferred from: code review of 4-2-display-structured-value-output-with-type-context (2026-06-30)
+
+- None.
+
 ## Deferred from: code review of 4-1-return-execution-values-to-notebook-output (2026-06-29)
 
 - Description-only fallback for unserializable arrays silently renders as plain text — When CDP can't serialize a large array due to serialization limits, it returns only `description: "Array(100)"` with no `value`. Story 4.1 will show this as opaque plain text. This is pre-existing CDP serialization limit behavior, documented as Requirement 4 in the spec.
