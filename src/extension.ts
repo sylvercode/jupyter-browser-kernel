@@ -10,6 +10,7 @@ import { createConnectionStatusIndicator } from "./ui/connection-status-indicato
 import { disconnectActiveBrowserConnection } from "./transport/browser-connect";
 import {
   registerCellIsolationStatusBarProvider,
+  registerResultTypeStatusBarProvider,
   registerKernelController,
 } from "./notebook";
 import { registerToggleCellIsolationCommand } from "./commands/toggle-cell-isolation-command";
@@ -102,6 +103,20 @@ export function activate(context: vscode.ExtensionContext): void {
     },
   );
   context.subscriptions.push(cellIsolationStatusBarProvider);
+
+  const resultTypeStatusBarProvider = registerResultTypeStatusBarProvider(
+    {
+      notebooks: vscode.notebooks,
+      workspace: vscode.workspace,
+      NotebookCellKind: vscode.NotebookCellKind,
+      NotebookCellStatusBarAlignment: vscode.NotebookCellStatusBarAlignment,
+      NotebookCellStatusBarItem: vscode.NotebookCellStatusBarItem,
+      EventEmitter: vscode.EventEmitter,
+      l10n: vscode.l10n,
+    },
+    {},
+  );
+  context.subscriptions.push(resultTypeStatusBarProvider);
 
   const debugLogger = (message: string, error?: unknown): void => {
     outputChannel.appendLine(vscode.l10n.t(message, String(error ?? "")));

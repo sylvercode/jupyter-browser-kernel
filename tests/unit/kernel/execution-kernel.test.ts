@@ -29,6 +29,7 @@ interface RecordedNotebookExecution {
   start: (startTime: number) => void;
   end: (success: boolean, endTime: number) => void;
   replaceOutput: (outputs: FakeNotebookCellOutput[]) => Promise<void>;
+  clearOutput: () => Promise<void>;
   executionOrder?: number;
   token: CancellationTokenLike;
 }
@@ -67,6 +68,9 @@ function createExecutionRecorder(options?: {
     },
     replaceOutput: async (outputs: FakeNotebookCellOutput[]) => {
       execution.outputs = outputs;
+    },
+    clearOutput: async () => {
+      execution.outputs = [];
     },
     executionOrder: undefined as number | undefined,
     token: cancellation.token,
@@ -1970,6 +1974,280 @@ test("executeCell keeps logs after error output for isolated failures", async ()
     execution.outputs[1]?.items[0]?.value,
     "Cell logs:\nbefore boom",
   );
+});
+
+test("executeCell propagates result type metadata to output for status bar", async () => {
+  const connection = createFakeConnection(async () => {
+    return {
+      result: {
+        type: "string",
+        value: "hello",
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell('"hello"') as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 50,
+    runtime,
+  });
+
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 1);
+  assert.ok(execution.outputs[0]?.metadata);
+  assert.equal(
+    execution.outputs[0]?.metadata["jupyterBrowserKernel.resultType"],
+    "string",
+  );
+});
+
+test("executeCell includes null result type in metadata", async () => {
+  const connection = createFakeConnection(async () => {
+    return {
+      result: {
+        type: "object",
+        subtype: "null",
+        value: null,
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell("null") as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 51,
+    runtime,
+  });
+
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 1);
+  assert.ok(execution.outputs[0]?.metadata);
+  assert.equal(
+    execution.outputs[0]?.metadata["jupyterBrowserKernel.resultType"],
+    "null",
+  );
+});
+
+test("executeCell includes undefined result type in metadata", async () => {
+  const connection = createFakeConnection(async () => {
+    return {
+      result: {
+        type: "undefined",
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell("undefined") as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 52,
+    runtime,
+  });
+
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 1);
+  assert.ok(execution.outputs[0]?.metadata);
+  assert.equal(
+    execution.outputs[0]?.metadata["jupyterBrowserKernel.resultType"],
+    "undefined",
+  );
+});
+
+test("executeCell includes object result type in metadata", async () => {
+  const connection = createFakeConnection(async () => {
+    return {
+      result: {
+        type: "object",
+        value: { foo: "bar" },
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell("({ foo: 'bar' })") as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 53,
+    runtime,
+  });
+
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 1);
+  assert.ok(execution.outputs[0]?.metadata);
+  assert.equal(
+    execution.outputs[0]?.metadata["jupyterBrowserKernel.resultType"],
+    "object",
+  );
+});
+
+test("executeCell includes array result type in metadata", async () => {
+  const connection = createFakeConnection(async () => {
+    return {
+      result: {
+        type: "object",
+        subtype: "array",
+        value: [1, 2, 3],
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell("[1, 2, 3]") as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 54,
+    runtime,
+  });
+
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 1);
+  assert.ok(execution.outputs[0]?.metadata);
+  assert.equal(
+    execution.outputs[0]?.metadata["jupyterBrowserKernel.resultType"],
+    "array",
+  );
+});
+
+test("executeCell keeps output payload text free of success envelope labels", async () => {
+  const connection = createFakeConnection(async () => {
+    return {
+      result: {
+        type: "string",
+        value: "test output",
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell('"test output"') as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 55,
+    runtime,
+  });
+
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 1);
+  // Verify no UI labels in output payload
+  assert.equal(execution.outputs[0]?.items[0]?.value, "test output");
+  assert(!execution.outputs[0]?.items[0]?.value.includes("Result Type:"));
+  assert(!execution.outputs[0]?.items[0]?.value.includes("Success"));
+});
+
+test("executeCell clears outputs when execution starts to hide result-type status during running state", async () => {
+  let clearOutputCalled = false;
+  const connection = createFakeConnection(async () => {
+    return {
+      result: {
+        type: "string",
+        value: "new result",
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution: baseExecution } =
+    createExecutionRecorder();
+  const notebookExecution = {
+    ...baseExecution,
+    clearOutput: async () => {
+      clearOutputCalled = true;
+      await baseExecution.clearOutput?.();
+    },
+  };
+
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell('"new result"') as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 56,
+    runtime,
+  });
+
+  assert.equal(clearOutputCalled, true);
+  assert.equal(execution.success, true);
+  // After execution completes, new output is written
+  assert.equal(execution.outputs.length, 1);
+  assert.equal(execution.outputs[0]?.items[0]?.value, "new result");
 });
 
 test("executeCell kernel path never invokes Debugger APIs (passive provider)", async () => {

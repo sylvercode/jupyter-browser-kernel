@@ -108,6 +108,9 @@ export async function executeCell({
   execution.start(Date.now());
   execution.executionOrder = executionOrder;
 
+  // Clear outputs when execution starts so result-type status disappears during running state
+  await execution.clearOutput();
+
   if (execution.token.isCancellationRequested) {
     endExecution(false);
     return true;
@@ -337,7 +340,14 @@ async function writeSuccessOutput(
     notebookOutputApi,
   );
 
-  outputs.push(new notebookOutputApi.NotebookCellOutput([valueOutputItem]));
+  // Add result type to output metadata for status bar rendering
+  const outputMetadata = {
+    "jupyterBrowserKernel.resultType": resultType,
+  };
+
+  outputs.push(
+    new notebookOutputApi.NotebookCellOutput([valueOutputItem], outputMetadata),
+  );
 
   if (intentionalLogs.length > 0) {
     outputs.push(

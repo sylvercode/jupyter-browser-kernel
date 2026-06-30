@@ -105,6 +105,7 @@ test("executeHandler dispatches each cell to kernel execution", async () => {
       start: () => undefined,
       end: () => undefined,
       replaceOutput: async () => undefined,
+      clearOutput: async () => undefined,
       token: createCancellationToken(),
       set executionOrder(order: number) {
         executionOrders.push(order);
@@ -158,6 +159,7 @@ test("executeHandler stops dispatching remaining cells after cancellation", asyn
         start: () => undefined,
         end: () => undefined,
         replaceOutput: async () => undefined,
+        clearOutput: async () => undefined,
         token: createCancellationToken(true),
         set executionOrder(order: number) {
           executionOrders.push(order);
@@ -212,6 +214,7 @@ test("executeHandler skips execution when session preflight blocks run", async (
         start: () => undefined,
         end: () => undefined,
         replaceOutput: async () => undefined,
+        clearOutput: async () => undefined,
         token: createCancellationToken(),
       };
     },
@@ -268,6 +271,7 @@ test("executeHandler waits for session preflight readiness before dispatch", asy
         end: () => undefined,
         replaceOutput: async () => undefined,
         token: createCancellationToken(),
+        clearOutput: async () => undefined,
       };
     },
   };

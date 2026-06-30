@@ -23,5 +23,8 @@ export class FakeNotebookCellOutputItem {
 }
 
 export class FakeNotebookCellOutput {
-  public constructor(public readonly items: FakeNotebookCellOutputItem[]) {}
+  public constructor(
+    public readonly items: FakeNotebookCellOutputItem[],
+    public readonly metadata?: Record<string, unknown>,
+  ) {}
 }
