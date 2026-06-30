@@ -209,6 +209,7 @@ export async function executeCell({
       await writeSuccessOutput(
         execution,
         renderedValue,
+        result.type,
         intentionalLogs,
         runtime.notebookOutputApi,
         runtime.localize,
@@ -323,17 +324,20 @@ function readIsolationMetadata(metadata: unknown): boolean | undefined {
 async function writeSuccessOutput(
   execution: vscode.NotebookCellExecution,
   value: string,
+  resultType: string,
   intentionalLogs: readonly string[],
   notebookOutputApi: NotebookOutputApi,
   localize: Localize,
 ): Promise<void> {
   const outputs: vscode.NotebookCellOutput[] = [];
 
-  outputs.push(
-    new notebookOutputApi.NotebookCellOutput([
-      notebookOutputApi.NotebookCellOutputItem.text(value, "text/plain"),
-    ]),
+  const valueOutputItem = createSuccessValueOutputItem(
+    value,
+    resultType,
+    notebookOutputApi,
   );
+
+  outputs.push(new notebookOutputApi.NotebookCellOutput([valueOutputItem]));
 
   if (intentionalLogs.length > 0) {
     outputs.push(
@@ -342,6 +346,43 @@ async function writeSuccessOutput(
   }
 
   await execution.replaceOutput(outputs);
+}
+
+function createSuccessValueOutputItem(
+  value: string,
+  resultType: string,
+  notebookOutputApi: NotebookOutputApi,
+): vscode.NotebookCellOutputItem {
+  if (!shouldUseJsonMimeType(resultType)) {
+    return notebookOutputApi.NotebookCellOutputItem.text(value, "text/plain");
+  }
+
+  const parsedValue = tryParseJsonValue(value);
+  if (parsedValue === undefined) {
+    return notebookOutputApi.NotebookCellOutputItem.text(value, "text/plain");
+  }
+
+  return notebookOutputApi.NotebookCellOutputItem.text(
+    JSON.stringify(parsedValue, undefined, 2),
+    "application/json",
+  );
+}
+
+function shouldUseJsonMimeType(resultType: string): boolean {
+  return resultType === "object" || resultType === "array";
+}
+
+function tryParseJsonValue(value: string): object | undefined {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (parsed === null || typeof parsed !== "object") {
+      return undefined;
+    }
+
+    return Array.isArray(parsed) ? (parsed as unknown[]) : (parsed as object);
+  } catch {
+    return undefined;
+  }
 }
 
 async function writeFailureOutput(

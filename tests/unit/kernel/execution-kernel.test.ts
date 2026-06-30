@@ -168,6 +168,420 @@ test("executeCell evaluates expression and writes success output", async () => {
   assert.equal(execution.outputs[0]?.items[0]?.mime, "text/plain");
 });
 
+test("executeCell renders object results as structured application/json output", async () => {
+  const connection = createFakeConnection(async () => {
+    return {
+      result: {
+        type: "object",
+        value: { foo: 42, bar: "test" },
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell("({ foo: 42, bar: 'test' })") as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 71,
+    runtime,
+  });
+
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 1);
+  assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
+  assert.equal(execution.outputs[0]?.items[0]?.mime, "application/json");
+  assert.equal(
+    execution.outputs[0]?.items[0]?.value,
+    '{\n  "foo": 42,\n  "bar": "test"\n}',
+  );
+});
+
+test("executeCell keeps primitive string, boolean, null, and undefined values as text/plain", async () => {
+  const primitiveCases = [
+    {
+      type: "string",
+      result: { type: "string", value: "hello" },
+      expectedValue: "hello",
+    },
+    {
+      type: "boolean",
+      result: { type: "boolean", value: true },
+      expectedValue: "true",
+    },
+    {
+      type: "null",
+      result: { type: "object", subtype: "null", value: null },
+      expectedValue: "null",
+    },
+    {
+      type: "undefined",
+      result: { type: "undefined" },
+      expectedValue: "undefined",
+    },
+  ] as const;
+
+  for (const [index, primitiveCase] of primitiveCases.entries()) {
+    const connection = createFakeConnection(async () => {
+      return {
+        result: primitiveCase.result,
+      } as never;
+    });
+
+    const { execution, notebookExecution } = createExecutionRecorder();
+    const runtime = createKernelRuntime(
+      {
+        NotebookCellOutput: FakeNotebookCellOutput as never,
+        NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+      },
+      createLocalizeMock(),
+      () => connection,
+    );
+
+    await executeCell({
+      cell: createFakeCell("primitive") as never,
+      controller: {
+        createNotebookCellExecution: () => notebookExecution,
+      } as never,
+      executionOrder: 80 + index,
+      runtime,
+    });
+
+    assert.equal(execution.success, true, primitiveCase.type);
+    assert.equal(execution.outputs.length, 1, primitiveCase.type);
+    assert.equal(
+      execution.outputs[0]?.items[0]?.kind,
+      "text",
+      primitiveCase.type,
+    );
+    assert.equal(
+      execution.outputs[0]?.items[0]?.mime,
+      "text/plain",
+      primitiveCase.type,
+    );
+    assert.equal(
+      execution.outputs[0]?.items[0]?.value,
+      primitiveCase.expectedValue,
+      primitiveCase.type,
+    );
+  }
+});
+
+test("executeCell renders nested arrays as structured application/json output", async () => {
+  const connection = createFakeConnection(async () => {
+    return {
+      result: {
+        type: "object",
+        subtype: "array",
+        value: [1, { nested: { value: 123 } }],
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell("[1, { nested: { value: 123 } }]") as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 72,
+    runtime,
+  });
+
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 1);
+  assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
+  assert.equal(execution.outputs[0]?.items[0]?.mime, "application/json");
+  assert.equal(
+    execution.outputs[0]?.items[0]?.value,
+    '[\n  1,\n  {\n    "nested": {\n      "value": 123\n    }\n  }\n]',
+  );
+});
+
+test("executeCell renders empty objects and arrays as application/json", async () => {
+  const structuredCases = [
+    {
+      result: { type: "object", value: {} },
+      expectedValue: "{}",
+    },
+    {
+      result: { type: "object", subtype: "array", value: [] },
+      expectedValue: "[]",
+    },
+  ] as const;
+
+  for (const [index, structuredCase] of structuredCases.entries()) {
+    const connection = createFakeConnection(async () => {
+      return {
+        result: structuredCase.result,
+      } as never;
+    });
+
+    const { execution, notebookExecution } = createExecutionRecorder();
+    const runtime = createKernelRuntime(
+      {
+        NotebookCellOutput: FakeNotebookCellOutput as never,
+        NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+      },
+      createLocalizeMock(),
+      () => connection,
+    );
+
+    await executeCell({
+      cell: createFakeCell("structured") as never,
+      controller: {
+        createNotebookCellExecution: () => notebookExecution,
+      } as never,
+      executionOrder: 90 + index,
+      runtime,
+    });
+
+    assert.equal(execution.success, true);
+    assert.equal(execution.outputs.length, 1);
+    assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
+    assert.equal(execution.outputs[0]?.items[0]?.mime, "application/json");
+    assert.equal(
+      execution.outputs[0]?.items[0]?.value,
+      structuredCase.expectedValue,
+    );
+  }
+});
+
+test("executeCell falls back to plain text when object-like value is not valid JSON", async () => {
+  const connection = createFakeConnection(async () => {
+    return {
+      result: {
+        type: "object",
+        description: "HTMLDivElement",
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell("document.createElement('div')") as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 73,
+    runtime,
+  });
+
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 1);
+  assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
+  assert.equal(execution.outputs[0]?.items[0]?.mime, "text/plain");
+  assert.equal(execution.outputs[0]?.items[0]?.value, "HTMLDivElement");
+});
+
+test("executeCell keeps non-serializable function values as plain text", async () => {
+  const connection = createFakeConnection(async () => {
+    return {
+      result: {
+        type: "function",
+        description: "ƒ test()",
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell("function test() {}") as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 74,
+    runtime,
+  });
+
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 1);
+  assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
+  assert.equal(execution.outputs[0]?.items[0]?.mime, "text/plain");
+  assert.equal(execution.outputs[0]?.items[0]?.value, "ƒ test()");
+});
+
+test("executeCell keeps non-serializable symbol values as plain text", async () => {
+  const connection = createFakeConnection(async () => {
+    return {
+      result: {
+        type: "symbol",
+        description: "Symbol(id)",
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell("Symbol('id')") as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 96,
+    runtime,
+  });
+
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 1);
+  assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
+  assert.equal(execution.outputs[0]?.items[0]?.mime, "text/plain");
+  assert.equal(execution.outputs[0]?.items[0]?.value, "Symbol(id)");
+});
+
+test("executeCell renders large structured values without falling back to plain text", async () => {
+  const largeArray = Array.from({ length: 512 }, (_value, index) => index);
+  const connection = createFakeConnection(async () => {
+    return {
+      result: {
+        type: "object",
+        value: {
+          items: largeArray,
+        },
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell(
+      "({ items: Array.from({ length: 512 }, (_, i) => i) })",
+    ) as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 97,
+    runtime,
+  });
+
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 1);
+  assert.equal(execution.outputs[0]?.items[0]?.kind, "text");
+  assert.equal(execution.outputs[0]?.items[0]?.mime, "application/json");
+  assert.match(String(execution.outputs[0]?.items[0]?.value), /"items": \[/);
+});
+
+test("executeCell keeps success value output first when intentional logs are appended", async () => {
+  let callIndex = 0;
+  const connection = createFakeConnection(async () => {
+    callIndex += 1;
+
+    if (callIndex === 1) {
+      return {
+        result: {
+          type: "string",
+          value: "__jbkRuntilmeCellBridge:test-json-logs-order",
+        },
+      } as never;
+    }
+
+    if (callIndex === 3) {
+      return {
+        result: {
+          type: "object",
+          subtype: "array",
+          value: ["after value"],
+        },
+      } as never;
+    }
+
+    return {
+      result: {
+        type: "object",
+        value: { ok: true },
+      },
+    } as never;
+  });
+
+  const { execution, notebookExecution } = createExecutionRecorder();
+  const runtime = createKernelRuntime(
+    {
+      NotebookCellOutput: FakeNotebookCellOutput as never,
+      NotebookCellOutputItem: FakeNotebookCellOutputItem as never,
+    },
+    createLocalizeMock(),
+    () => connection,
+  );
+
+  await executeCell({
+    cell: createFakeCell(
+      "$cell.log('after value'); ({ ok: true })",
+      undefined,
+      {
+        jupyterBrowserKernel: { isolated: true },
+      },
+    ) as never,
+    controller: {
+      createNotebookCellExecution: () => notebookExecution,
+    } as never,
+    executionOrder: 75,
+    runtime,
+  });
+
+  assert.equal(execution.success, true);
+  assert.equal(execution.outputs.length, 2);
+  assert.equal(execution.outputs[0]?.items[0]?.mime, "application/json");
+  assert.equal(execution.outputs[1]?.items[0]?.mime, "text/plain");
+  assert.equal(
+    execution.outputs[1]?.items[0]?.value,
+    "Cell logs:\nafter value",
+  );
+});
+
 test("executeCell uses global mode when getDefaultCellIsolation returns false (backward-compat boolean false path)", async () => {
   const sourceUri =
     "vscode-notebook-cell://test-authority/workspaces/foundry-devil-code-sight/tests/files/test1.ipynb#ch0000000000001";
